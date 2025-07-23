@@ -8,7 +8,6 @@ creating a new worker per wrapper.
 
 from __future__ import annotations
 
-import logging
 import queue
 import threading
 from typing import Any, Optional
@@ -17,8 +16,8 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential_jitter
 
 from .client import CostManagerClient
 
-
 _global_delivery: "ResilientDelivery" | None = None
+
 
 def get_global_delivery(
     client: CostManagerClient,
@@ -116,7 +115,7 @@ class ResilientDelivery:
         try:
             self._queue.put_nowait(payload)
         except queue.Full:
-            logging.warning("Delivery queue full - dropping payload")
+            pass  # Drop payload if queue is full
 
     # ------------------------------------------------------------------
     # Worker implementation
@@ -144,6 +143,7 @@ class ResilientDelivery:
                     self._queue.task_done()
 
     def _send_with_retry(self, payload: dict[str, Any]) -> None:
+        url = f"{self.api_root}{self.endpoint}"
         retry = Retrying(
             stop=stop_after_attempt(self.max_retries),
             wait=wait_exponential_jitter(initial=1, max=30),
@@ -153,7 +153,7 @@ class ResilientDelivery:
             for attempt in retry:
                 with attempt:
                     response = self.session.post(
-                        f"{self.api_root}{self.endpoint}",
+                        url,
                         json=payload,
                         timeout=self.timeout,
                     )
@@ -161,7 +161,6 @@ class ResilientDelivery:
                         response.raise_for_status()
             self._total_sent += 1
         except Exception as exc:  # pragma: no cover - network failure
-            logging.error("Failed to deliver payload after retries: %s", exc)
             self._total_failed += 1
             self._last_error = str(exc)
 

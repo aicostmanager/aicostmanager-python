@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional, List
-
-from .delivery import ResilientDelivery, get_global_delivery
+from typing import Any, List, Optional
 
 from .client import CostManagerClient
-from .config_manager import CostManagerConfig, Config
+from .config_manager import Config, CostManagerConfig
+from .delivery import ResilientDelivery, get_global_delivery
 from .universal_extractor import UniversalExtractor
 
 
@@ -65,21 +64,24 @@ class CostManager:
     def __getattr__(self, name: str) -> Any:
         attr = getattr(self.client, name)
 
-        if not callable(attr):
-            return attr
+        if callable(attr):
 
-        def wrapper(*args, **kwargs):
-            response = attr(*args, **kwargs)
-            payloads = self.extractor.process_call(
-                name, args, kwargs, response, client=self.client
-            )
-            if payloads:
-                self.tracked_payloads.extend(payloads)
-                for payload in payloads:
-                    self.delivery.deliver({"usage_records": [payload]})
-            return response
+            def wrapper(*args, **kwargs):
+                response = attr(*args, **kwargs)
+                payloads = self.extractor.process_call(
+                    name, args, kwargs, response, client=self.client
+                )
+                if payloads:
+                    self.tracked_payloads.extend(payloads)
+                    for payload in payloads:
+                        self.delivery.deliver({"usage_records": [payload]})
+                return response
 
-        return wrapper
+            return wrapper
+        else:
+            # For non-callable attributes, wrap them with a nested tracker
+            # to handle cases like client.chat.completions.create()
+            return NestedAttributeWrapper(attr, self, name)
 
     def get_tracked_payloads(self) -> list[dict[str, Any]]:
         """Return a copy of payloads generated so far."""
@@ -106,3 +108,39 @@ class CostManager:
     def __exit__(self, exc_type, exc, tb) -> None:
         self.stop_delivery()
 
+
+class NestedAttributeWrapper:
+    """Wrapper for non-callable attributes to enable tracking of nested method calls."""
+
+    def __init__(self, obj: Any, parent_manager: CostManager, path: str):
+        self._wrapped_obj = obj
+        self._parent_manager = parent_manager
+        self._path = path
+
+    def __getattr__(self, name: str) -> Any:
+        attr = getattr(self._wrapped_obj, name)
+        full_path = f"{self._path}.{name}"
+
+        if callable(attr):
+
+            def wrapper(*args, **kwargs):
+                response = attr(*args, **kwargs)
+                payloads = self._parent_manager.extractor.process_call(
+                    full_path,
+                    args,
+                    kwargs,
+                    response,
+                    client=self._parent_manager.client,
+                )
+                if payloads:
+                    self._parent_manager.tracked_payloads.extend(payloads)
+                    for payload in payloads:
+                        self._parent_manager.delivery.deliver(
+                            {"usage_records": [payload]}
+                        )
+                return response
+
+            return wrapper
+        else:
+            # Continue wrapping for deeper nesting
+            return NestedAttributeWrapper(attr, self._parent_manager, full_path)

@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from typing import Any, Iterable
+from urllib.parse import ParseResult
 
 from .config_manager import Config
 
@@ -82,8 +83,7 @@ class UniversalExtractor:
     ) -> dict[str, Any]:
         """Create the base tracking dictionary for a single config."""
         tracking: dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(timespec="microseconds")
-            + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(timespec="microseconds"),
             "method": method_name,
             "config_identifier": cfg.config_id,
             "request_data": self._extract_request_fields(cfg, kwargs),
@@ -133,10 +133,87 @@ class UniversalExtractor:
         payload: dict[str, Any] = {}
         for key, path in mapping.items():
             value = self._get_nested_value(tracking, path)
-            payload[key] = value
+            # Ensure the value is JSON-serializable
+            payload[key] = self._make_json_serializable(value)
         static_fields = cfg.handling_config.get("static_payload_fields", {})
         payload.update(static_fields)
-        return payload
+
+        # Fix field name mismatches between config and API expectations
+        api_payload = self._translate_to_api_format(payload)
+        return api_payload
+
+    def _translate_to_api_format(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Translate config field names to API field names."""
+        api_payload = {}
+
+        # Field name mappings from config to API
+        field_mappings = {
+            "config": "config_id",
+            "model_id": "service_id",
+        }
+
+        for key, value in payload.items():
+            # Use mapped field name if it exists, otherwise use original
+            api_key = field_mappings.get(key, key)
+            api_payload[api_key] = value
+
+        # Ensure timestamp is a string in ISO format (without trailing Z)
+        if "timestamp" in api_payload:
+            if isinstance(api_payload["timestamp"], (int, float)):
+                # Convert Unix timestamp to ISO string
+                from datetime import datetime, timezone
+
+                dt = datetime.fromtimestamp(api_payload["timestamp"], tz=timezone.utc)
+                api_payload["timestamp"] = dt.isoformat(timespec="microseconds")
+            elif isinstance(api_payload["timestamp"], str) and api_payload[
+                "timestamp"
+            ].endswith("Z"):
+                # Remove trailing Z from ISO string
+                api_payload["timestamp"] = api_payload["timestamp"][:-1]
+
+        return api_payload
+
+    def _make_json_serializable(self, value: Any) -> Any:
+        """Convert complex objects to JSON-serializable representations."""
+        if value is None:
+            return None
+
+        # Handle URLs
+        if hasattr(value, "__class__") and "URL" in str(type(value)):
+            return str(value)
+
+        # Handle ParseResult (urllib.parse)
+        if isinstance(value, ParseResult):
+            return value.geturl()
+
+        # Handle objects with model_dump (Pydantic models)
+        if hasattr(value, "model_dump"):
+            return value.model_dump()
+
+        # Handle objects with dict() method
+        if hasattr(value, "dict") and callable(getattr(value, "dict")):
+            return value.dict()
+
+        # Handle objects with __dict__ attribute
+        if hasattr(value, "__dict__") and not isinstance(
+            value, (str, int, float, bool, list, dict)
+        ):
+            return value.__dict__
+
+        # Handle dictionaries recursively
+        if isinstance(value, dict):
+            return {k: self._make_json_serializable(v) for k, v in value.items()}
+
+        # Handle lists/tuples recursively
+        if isinstance(value, (list, tuple)):
+            return [self._make_json_serializable(item) for item in value]
+
+        # Basic types are already JSON-serializable
+        if isinstance(value, (str, int, float, bool)):
+            return value
+
+        # Fallback: convert to string
+        return str(value)
 
     # utility -----------------------------------------------------------
     def _get_nested_value(self, obj: Any, path: str) -> Any:
