@@ -1,0 +1,53 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.pkl
+*.egg-info
+.pytest_cache
+
+# Django
+*.log
+db.sqlite3
+*.dump
+media/
+mediafiles/
+staticfiles/
+celerybeat-schedule*
+prod_backup_*
+
+# Environments
+.venv/
+venv/
+.env
+**/*.env
+
+# Editors & IDEs
+.vscode/
+*.swp
+
+# Node / JS
+package-lock.json
+**/node_modules/
+**/build/
+
+# Certificates / SSL
+*.csr
+*.crt
+*.key
+
+# Misc / Temporary
+aicm_Demo_2025.mp4
+notebooks/
+.cdk.staging
+repomix-output.*
+.cursor/
+.tasks/
+
+# DXT Package Dependencies
+mcp_integration/claude_desktop_extension_dev/server/lib/
