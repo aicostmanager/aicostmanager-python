@@ -24,3 +24,10 @@ where = ["aicostmanager"]
 
 [tool.pytest.ini_options]
 addopts = "-v"
+
+[dependency-groups]
+test = [
+    "openai>=1.97.1",
+    "pytest>=8.3.5",
+    "python-dotenv>=1.0.1",
+]
