@@ -46,6 +46,17 @@ def get_global_delivery(
             timeout=timeout,
         )
         _global_delivery.start()
+    else:
+        # Ensure the worker is actually running.  Tests may stop the
+        # singleton leaving the object assigned but the thread stopped.
+        thread = getattr(_global_delivery, "_thread", None)
+        if thread is None or not thread.is_alive():
+            try:
+                # ``stop`` is idempotent so it is safe to call even if not running
+                _global_delivery.stop()
+            except Exception:  # pragma: no cover - defensive
+                pass
+            _global_delivery.start()
     return _global_delivery
 
 

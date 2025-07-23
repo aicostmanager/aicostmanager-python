@@ -161,6 +161,22 @@ def test_global_singleton(monkeypatch):
     d1.stop()
 
 
+def test_global_restart(monkeypatch):
+    reset_global()
+    sess = DummySession()
+    client = CostManagerClient(aicm_api_key="sk-test", session=sess)
+    delivery = get_global_delivery(client, queue_size=10)
+    delivery.stop()
+
+    # Stopped delivery should restart on subsequent retrieval
+    restarted = get_global_delivery(client, queue_size=10)
+    restarted.deliver({"usage_records": [{}]})
+    restarted._queue.join()
+    restarted.stop()
+
+    assert len(sess.calls) == 1
+
+
 def test_delivery_uses_api_root(monkeypatch):
     reset_global()
     sess = DummySession()
