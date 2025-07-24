@@ -8,6 +8,66 @@ openai = pytest.importorskip("openai")
 from aicostmanager import CostManager, UniversalExtractor
 
 
+def verify_event_delivered(
+    aicm_api_key, aicm_api_base, response_id, timeout=10, max_attempts=8
+):
+    """
+    Verify that a usage event with the given response_id was delivered to the server.
+
+    Args:
+        aicm_api_key: API key for authentication
+        aicm_api_base: Base URL for the API
+        response_id: The response_id to search for
+        timeout: Request timeout in seconds
+        max_attempts: Maximum number of attempts with delay between each
+
+    Returns:
+        dict: The event data if found, None if not found
+    """
+    headers = {
+        "Authorization": f"Bearer {aicm_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    for attempt in range(max_attempts):
+        try:
+            # Query events - if response_id filtering doesn't work, get recent events and search
+            events_response = requests.get(
+                f"{aicm_api_base}/api/v1/usage/events/",
+                headers=headers,
+                params={"limit": 20},  # Get more events to search through
+                timeout=timeout,
+            )
+
+            if events_response.status_code == 200:
+                events_data = events_response.json()
+                results = events_data.get("results", [])
+
+                # Search for our specific response_id in the results
+                for event in results:
+                    if event.get("response_id") == response_id:
+                        print(f"✅ Found usage event for response_id: {response_id}")
+                        print(f"   Event data: {json.dumps(event, indent=2)}")
+                        return event
+
+            # Wait before next attempt (except on last attempt)
+            if attempt < max_attempts - 1:
+                time.sleep(3)
+                print(
+                    f"⏱️  Attempt {attempt + 1}/{max_attempts}: Event not found yet, waiting..."
+                )
+
+        except Exception as e:
+            print(f"⚠️  Error checking usage events (attempt {attempt + 1}): {e}")
+            if attempt < max_attempts - 1:
+                time.sleep(3)
+
+    print(
+        f"❌ Usage event for response_id {response_id} not found after {max_attempts} attempts"
+    )
+    return None
+
+
 def test_openai_cost_manager_configs(
     openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path
 ):
@@ -411,54 +471,18 @@ def test_openai_chat_completion_usage_delivery(
         assert hasattr(response, "choices")
         assert len(response.choices) > 0
 
-        # Wait a moment for the background delivery to complete
-        time.sleep(2)
+        # Verify that the usage event was delivered to the server
+        event = verify_event_delivered(aicm_api_key, aicm_api_base, response.id)
+        assert event is not None, (
+            f"Usage event for response_id {response.id} was not delivered to server"
+        )
 
-        # Verify that the usage payload was delivered by checking the /track-usage endpoint
-        # We'll check if we can retrieve the event by making a request to the API
-        headers = {
-            "Authorization": f"Bearer {aicm_api_key}",
-            "Content-Type": "application/json",
-        }
-
-        # Try to get usage events to see if our event was recorded
-        try:
-            events_response = requests.get(
-                f"{aicm_api_base}/api/v1/usage/events/",
-                headers=headers,
-                params={"limit": 10},
-                timeout=10,
-            )
-
-            if events_response.status_code == 200:
-                events_data = events_response.json()
-                print(f"Retrieved {len(events_data.get('results', []))} usage events")
-
-                # Check if our response_id appears in the events
-                response_id = response.id
-                found_event = False
-                for event in events_data.get("results", []):
-                    if event.get("response_id") == response_id:
-                        found_event = True
-                        print(f"✅ Found usage event for response_id: {response_id}")
-                        print(f"   Event data: {event}")
-                        break
-
-                if not found_event:
-                    print(
-                        f"⚠️  Usage event for response_id {response_id} not found in recent events"
-                    )
-                    print(
-                        "   This might be normal if delivery is still in progress or if events are processed asynchronously"
-                    )
-            else:
-                print(
-                    f"⚠️  Could not retrieve usage events: {events_response.status_code}"
-                )
-                print(f"   Response: {events_response.text}")
-
-        except Exception as e:
-            print(f"⚠️  Error checking usage events: {e}")
+        # Verify event structure
+        assert event.get("config_id") == "openai_chat"
+        assert event.get("service_id") == response.model
+        assert event.get("response_id") == response.id
+        assert "usage" in event
+        assert "timestamp" in event
 
         print(f"Dad joke response: {response.choices[0].message.content}")
 
@@ -510,56 +534,18 @@ def test_openai_chat_completion_streaming_usage_delivery(
         assert chunk_count > 0, "No chunks received in streaming response"
         assert full_content.strip(), "No content received in streaming response"
 
-        # Wait a moment for the background delivery to complete
-        time.sleep(2)
-
-        # Verify that the usage payload was delivered
+        # Verify that the usage event was delivered to the server
         if response_id:
-            headers = {
-                "Authorization": f"Bearer {aicm_api_key}",
-                "Content-Type": "application/json",
-            }
+            event = verify_event_delivered(aicm_api_key, aicm_api_base, response_id)
+            assert event is not None, (
+                f"Streaming usage event for response_id {response_id} was not delivered to server"
+            )
 
-            try:
-                events_response = requests.get(
-                    f"{aicm_api_base}/api/v1/usage/events/",
-                    headers=headers,
-                    params={"limit": 10},
-                    timeout=10,
-                )
-
-                if events_response.status_code == 200:
-                    events_data = events_response.json()
-                    print(
-                        f"Retrieved {len(events_data.get('results', []))} usage events"
-                    )
-
-                    # Check if our response_id appears in the events
-                    found_event = False
-                    for event in events_data.get("results", []):
-                        if event.get("response_id") == response_id:
-                            found_event = True
-                            print(
-                                f"✅ Found streaming usage event for response_id: {response_id}"
-                            )
-                            print(f"   Event data: {event}")
-                            break
-
-                    if not found_event:
-                        print(
-                            f"⚠️  Streaming usage event for response_id {response_id} not found in recent events"
-                        )
-                        print(
-                            "   This might be normal if delivery is still in progress or if events are processed asynchronously"
-                        )
-                else:
-                    print(
-                        f"⚠️  Could not retrieve usage events: {events_response.status_code}"
-                    )
-                    print(f"   Response: {events_response.text}")
-
-            except Exception as e:
-                print(f"⚠️  Error checking streaming usage events: {e}")
+            # Verify event structure
+            assert event.get("config_id") == "openai_chat"
+            assert event.get("response_id") == response_id
+            assert "usage" in event
+            assert "timestamp" in event
 
     except Exception as e:
         pytest.fail(f"Streaming chat completion API call failed: {e}")
@@ -594,51 +580,18 @@ def test_openai_responses_api_usage_delivery(
         assert hasattr(response, "output")
         assert len(response.output) > 0
 
-        # Wait a moment for the background delivery to complete
-        time.sleep(2)
+        # Verify that the usage event was delivered to the server
+        event = verify_event_delivered(aicm_api_key, aicm_api_base, response.id)
+        assert event is not None, (
+            f"Responses API usage event for response_id {response.id} was not delivered to server"
+        )
 
-        # Verify that the usage payload was delivered
-        headers = {
-            "Authorization": f"Bearer {aicm_api_key}",
-            "Content-Type": "application/json",
-        }
-
-        try:
-            events_response = requests.get(
-                f"{aicm_api_base}/api/v1/usage/events/",
-                headers=headers,
-                params={"limit": 10},
-                timeout=10,
-            )
-
-            if events_response.status_code == 200:
-                events_data = events_response.json()
-                print(f"Retrieved {len(events_data.get('results', []))} usage events")
-
-                # Check if our response appears in the events
-                # For responses API, we might need to look for a different identifier
-                found_event = False
-                for event in events_data.get("results", []):
-                    # Look for events with the same model and similar timestamp
-                    if event.get("service_id") == "gpt-3.5-turbo":
-                        found_event = True
-                        print("✅ Found responses API usage event")
-                        print(f"   Event data: {event}")
-                        break
-
-                if not found_event:
-                    print("⚠️  Responses API usage event not found in recent events")
-                    print(
-                        "   This might be normal if delivery is still in progress or if events are processed asynchronously"
-                    )
-            else:
-                print(
-                    f"⚠️  Could not retrieve usage events: {events_response.status_code}"
-                )
-                print(f"   Response: {events_response.text}")
-
-        except Exception as e:
-            print(f"⚠️  Error checking responses API usage events: {e}")
+        # Verify event structure
+        assert event.get("config_id") == "openai_responses"
+        assert event.get("service_id") == response.model
+        assert event.get("response_id") == response.id
+        assert "usage" in event
+        assert "timestamp" in event
 
         # Verify the response contains content
         output = response.output[0]
@@ -712,52 +665,18 @@ def test_openai_responses_api_streaming_usage_delivery(
             "No content received in streaming responses API response"
         )
 
-        # Wait a moment for the background delivery to complete
-        time.sleep(2)
-
-        # Verify that the usage payload was delivered
-        headers = {
-            "Authorization": f"Bearer {aicm_api_key}",
-            "Content-Type": "application/json",
-        }
-
-        try:
-            events_response = requests.get(
-                f"{aicm_api_base}/api/v1/usage/events/",
-                headers=headers,
-                params={"limit": 10},
-                timeout=10,
+        # Verify that the usage event was delivered to the server
+        if response_id:
+            event = verify_event_delivered(aicm_api_key, aicm_api_base, response_id)
+            assert event is not None, (
+                f"Streaming responses API usage event for response_id {response_id} was not delivered to server"
             )
 
-            if events_response.status_code == 200:
-                events_data = events_response.json()
-                print(f"Retrieved {len(events_data.get('results', []))} usage events")
-
-                # Check if our response appears in the events
-                found_event = False
-                for event in events_data.get("results", []):
-                    # Look for events with the same model and similar timestamp
-                    if event.get("service_id") == "gpt-3.5-turbo":
-                        found_event = True
-                        print("✅ Found streaming responses API usage event")
-                        print(f"   Event data: {event}")
-                        break
-
-                if not found_event:
-                    print(
-                        "⚠️  Streaming responses API usage event not found in recent events"
-                    )
-                    print(
-                        "   This might be normal if delivery is still in progress or if events are processed asynchronously"
-                    )
-            else:
-                print(
-                    f"⚠️  Could not retrieve usage events: {events_response.status_code}"
-                )
-                print(f"   Response: {events_response.text}")
-
-        except Exception as e:
-            print(f"⚠️  Error checking streaming responses API usage events: {e}")
+            # Verify event structure
+            assert event.get("config_id") == "openai_responses"
+            assert event.get("response_id") == response_id
+            assert "usage" in event
+            assert "timestamp" in event
 
     except Exception as e:
         pytest.fail(f"Streaming responses API call failed: {e}")
@@ -793,82 +712,43 @@ def test_usage_payload_delivery_verification(
         assert hasattr(response, "choices")
         assert len(response.choices) > 0
 
-        # Wait for delivery to complete
-        time.sleep(3)
+        # Verify that the usage event was delivered to the server and validate structure
+        event = verify_event_delivered(aicm_api_key, aicm_api_base, response.id)
+        assert event is not None, (
+            f"Usage event for response_id {response.id} was not delivered to server"
+        )
 
-        # Verify the payload format by checking the /track-usage endpoint directly
-        headers = {
-            "Authorization": f"Bearer {aicm_api_key}",
-            "Content-Type": "application/json",
-        }
+        # Verify the complete event structure
+        assert "config_id" in event, "Event missing config_id"
+        assert "service_id" in event, "Event missing service_id"
+        assert "timestamp" in event, "Event missing timestamp"
+        assert "response_id" in event, "Event missing response_id"
+        assert "usage" in event, "Event missing usage data"
 
-        try:
-            # Get recent usage events to verify payload format
-            events_response = requests.get(
-                f"{aicm_api_base}/api/v1/usage/events/",
-                headers=headers,
-                params={"limit": 5},
-                timeout=10,
+        # Verify specific values
+        assert event.get("config_id") == "openai_chat"
+        assert event.get("service_id") == response.model
+        assert event.get("response_id") == response.id
+
+        # Verify usage data structure
+        usage = event["usage"]
+        assert isinstance(usage, dict), "Usage data should be a dictionary"
+
+        # Check for expected usage fields (may vary by provider)
+        if "prompt_tokens" in usage:
+            assert isinstance(usage["prompt_tokens"], (int, float)), (
+                "prompt_tokens should be numeric"
+            )
+        if "completion_tokens" in usage:
+            assert isinstance(usage["completion_tokens"], (int, float)), (
+                "completion_tokens should be numeric"
+            )
+        if "total_tokens" in usage:
+            assert isinstance(usage["total_tokens"], (int, float)), (
+                "total_tokens should be numeric"
             )
 
-            if events_response.status_code == 200:
-                events_data = events_response.json()
-                print(f"Retrieved {len(events_data.get('results', []))} usage events")
-
-                # Look for our specific event
-                response_id = response.id
-                found_event = None
-                for event in events_data.get("results", []):
-                    if event.get("response_id") == response_id:
-                        found_event = event
-                        break
-
-                if found_event:
-                    print(f"✅ Found usage event for response_id: {response_id}")
-                    print(f"   Event data: {json.dumps(found_event, indent=2)}")
-
-                    # Verify the payload structure
-                    assert "config_id" in found_event, "Event missing config_id"
-                    assert "service_id" in found_event, "Event missing service_id"
-                    assert "timestamp" in found_event, "Event missing timestamp"
-                    assert "response_id" in found_event, "Event missing response_id"
-                    assert "usage" in found_event, "Event missing usage data"
-
-                    # Verify usage data structure
-                    usage = found_event["usage"]
-                    assert isinstance(usage, dict), "Usage data should be a dictionary"
-
-                    # Check for expected usage fields (may vary by provider)
-                    if "prompt_tokens" in usage:
-                        assert isinstance(usage["prompt_tokens"], (int, float)), (
-                            "prompt_tokens should be numeric"
-                        )
-                    if "completion_tokens" in usage:
-                        assert isinstance(usage["completion_tokens"], (int, float)), (
-                            "completion_tokens should be numeric"
-                        )
-                    if "total_tokens" in usage:
-                        assert isinstance(usage["total_tokens"], (int, float)), (
-                            "total_tokens should be numeric"
-                        )
-
-                    print("✅ Usage payload structure verification passed")
-                else:
-                    print(
-                        f"⚠️  Usage event for response_id {response_id} not found in recent events"
-                    )
-                    print(
-                        "   This might be normal if delivery is still in progress or if events are processed asynchronously"
-                    )
-            else:
-                print(
-                    f"⚠️  Could not retrieve usage events: {events_response.status_code}"
-                )
-                print(f"   Response: {events_response.text}")
-
-        except Exception as e:
-            print(f"⚠️  Error verifying usage payload: {e}")
-
+        print("✅ Usage payload structure verification passed")
         print(f"Dad joke response: {response.choices[0].message.content}")
 
     except Exception as e:

@@ -138,40 +138,7 @@ class UniversalExtractor:
         static_fields = cfg.handling_config.get("static_payload_fields", {})
         payload.update(static_fields)
 
-        # Fix field name mismatches between config and API expectations
-        api_payload = self._translate_to_api_format(payload)
-        return api_payload
-
-    def _translate_to_api_format(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Translate config field names to API field names."""
-        api_payload = {}
-
-        # Field name mappings from config to API
-        field_mappings = {
-            "config": "config_id",
-            "model_id": "service_id",
-        }
-
-        for key, value in payload.items():
-            # Use mapped field name if it exists, otherwise use original
-            api_key = field_mappings.get(key, key)
-            api_payload[api_key] = value
-
-        # Ensure timestamp is a string in ISO format (without trailing Z)
-        if "timestamp" in api_payload:
-            if isinstance(api_payload["timestamp"], (int, float)):
-                # Convert Unix timestamp to ISO string
-                from datetime import datetime, timezone
-
-                dt = datetime.fromtimestamp(api_payload["timestamp"], tz=timezone.utc)
-                api_payload["timestamp"] = dt.isoformat(timespec="microseconds")
-            elif isinstance(api_payload["timestamp"], str) and api_payload[
-                "timestamp"
-            ].endswith("Z"):
-                # Remove trailing Z from ISO string
-                api_payload["timestamp"] = api_payload["timestamp"][:-1]
-
-        return api_payload
+        return payload
 
     def _make_json_serializable(self, value: Any) -> Any:
         """Convert complex objects to JSON-serializable representations."""
