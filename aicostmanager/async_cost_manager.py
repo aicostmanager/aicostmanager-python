@@ -9,6 +9,7 @@ from typing import Any, Optional, List
 from .client import CostManagerClient, AsyncCostManagerClient
 from .config_manager import CostManagerConfig, Config
 from .universal_extractor import UniversalExtractor
+from .cost_manager import _AsyncStreamIterator
 
 
 class AsyncResilientDelivery:
@@ -185,6 +186,8 @@ class AsyncCostManager:
 
         async def wrapper(*args, **kwargs):
             response = await attr(*args, **kwargs)
+            if kwargs.get("stream") and hasattr(response, "__aiter__"):
+                return _AsyncStreamIterator(response, self, name, args, kwargs)
             payloads = self.extractor.process_call(
                 name, args, kwargs, response, client=self.client
             )

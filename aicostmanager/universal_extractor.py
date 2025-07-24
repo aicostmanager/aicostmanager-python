@@ -42,6 +42,7 @@ class UniversalExtractor:
         response: Any,
         *,
         client: Any,
+        is_streaming: bool = False,
     ) -> list[dict[str, Any]]:
         """Return tracking payloads for ``method_name``.
 
@@ -57,7 +58,7 @@ class UniversalExtractor:
                 continue
             try:
                 tracking = self._build_tracking_data(
-                    cfg, method_name, args, kwargs, response, client
+                    cfg, method_name, args, kwargs, response, client, is_streaming
                 )
                 payload = self._build_payload(cfg, tracking)
                 payloads.append(payload)
@@ -80,6 +81,7 @@ class UniversalExtractor:
         kwargs: dict,
         response: Any,
         client: Any,
+        is_streaming: bool = False,
     ) -> dict[str, Any]:
         """Create the base tracking dictionary for a single config."""
         tracking: dict[str, Any] = {
@@ -87,7 +89,7 @@ class UniversalExtractor:
             "method": method_name,
             "config_identifier": cfg.config_id,
             "request_data": self._extract_request_fields(cfg, kwargs),
-            "response_data": self._extract_response_fields(cfg, response),
+            "response_data": self._extract_response_fields(cfg, response, is_streaming),
             "client_data": self._extract_client_fields(cfg, client),
         }
         tracking["usage_data"] = self._extract_usage_data(cfg, tracking)
@@ -102,9 +104,31 @@ class UniversalExtractor:
                 data[field] = kwargs[field]
         return data
 
-    def _extract_response_fields(self, cfg: Config, response: Any) -> dict[str, Any]:
+    def _extract_response_fields(
+        self, cfg: Config, response: Any, is_streaming: bool = False
+    ) -> dict[str, Any]:
         result: dict[str, Any] = {}
-        for field in cfg.handling_config.get("response_fields", []):
+
+        if is_streaming:
+            # For streaming responses, use final_fields if available
+            streaming_config = cfg.handling_config.get("streaming", {})
+            final_fields = streaming_config.get("final_fields", [])
+
+            if final_fields:
+                # Convert final_fields (which are paths) to the same format as response_fields
+                fields = []
+                for field_path in final_fields:
+                    # Extract key from path (e.g., "response.usage" -> "usage")
+                    key = field_path.split(".")[-1]
+                    fields.append({"path": field_path, "key": key})
+            else:
+                # Fallback to response_fields if no final_fields
+                fields = cfg.handling_config.get("response_fields", [])
+        else:
+            # For non-streaming responses, use response_fields
+            fields = cfg.handling_config.get("response_fields", [])
+
+        for field in fields:
             path = field["path"] if isinstance(field, dict) else field
             key = field.get("key") if isinstance(field, dict) else path.split(".")[-1]
             value = self._get_nested_value(response, path)
