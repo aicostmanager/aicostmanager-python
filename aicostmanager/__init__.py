@@ -1,5 +1,7 @@
 """Python SDK for the AICostManager API."""
 
+__version__ = "0.1.0"
+
 from .client import CostManagerClient, AsyncCostManagerClient
 from .config_manager import CostManagerConfig
 from .cost_manager import CostManager
@@ -63,4 +65,5 @@ __all__ = [
     "ErrorResponse",
     "ValidationError",
     "PaginatedResponse",
+    "__version__",
 ]
