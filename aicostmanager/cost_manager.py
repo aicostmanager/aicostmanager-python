@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Iterable, Iterator
 
 from .client import CostManagerClient
 from .config_manager import Config, CostManagerConfig
@@ -68,6 +68,8 @@ class CostManager:
 
             def wrapper(*args, **kwargs):
                 response = attr(*args, **kwargs)
+                if kwargs.get("stream") and hasattr(response, "__iter__"):
+                    return _StreamIterator(response, self, name, args, kwargs)
                 payloads = self.extractor.process_call(
                     name, args, kwargs, response, client=self.client
                 )
@@ -109,6 +111,77 @@ class CostManager:
         self.stop_delivery()
 
 
+class _StreamIterator:
+    """Proxy iterator that tracks streaming responses after completion."""
+
+    def __init__(self, iterator: Iterator, manager: "CostManager", method: str,
+                 args: tuple, kwargs: dict) -> None:
+        self._iterator = iterator
+        self._manager = manager
+        self._method = method
+        self._args = args
+        self._kwargs = kwargs
+        self._last = None
+
+    def __iter__(self) -> Iterator:
+        for item in self._iterator:
+            self._last = item
+            yield item
+        self._finalise()
+
+    def _finalise(self) -> None:
+        payloads = self._manager.extractor.process_call(
+            self._method,
+            self._args,
+            self._kwargs,
+            self._last,
+            client=self._manager.client,
+        )
+        if payloads:
+            self._manager.tracked_payloads.extend(payloads)
+            for payload in payloads:
+                self._manager.delivery.deliver({"usage_records": [payload]})
+
+
+class _AsyncStreamIterator:
+    """Async variant of :class:`_StreamIterator`."""
+
+    def __init__(self, iterator: Iterable, manager: "CostManager", method: str,
+                 args: tuple, kwargs: dict) -> None:
+        self._iterator = iterator
+        self._manager = manager
+        self._method = method
+        self._args = args
+        self._kwargs = kwargs
+        self._last = None
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            item = await self._iterator.__anext__()
+        except StopAsyncIteration:
+            self._finalise()
+            raise
+        else:
+            self._last = item
+            return item
+
+    def _finalise(self) -> None:
+        payloads = self._manager.extractor.process_call(
+            self._method,
+            self._args,
+            self._kwargs,
+            self._last,
+            client=self._manager.client,
+        )
+        if payloads:
+            self._manager.tracked_payloads.extend(payloads)
+            for payload in payloads:
+                self._manager.delivery.deliver({"usage_records": [payload]})
+
+
 class NestedAttributeWrapper:
     """Wrapper for non-callable attributes to enable tracking of nested method calls."""
 
@@ -125,6 +198,10 @@ class NestedAttributeWrapper:
 
             def wrapper(*args, **kwargs):
                 response = attr(*args, **kwargs)
+                if kwargs.get("stream") and hasattr(response, "__iter__"):
+                    return _StreamIterator(
+                        response, self._parent_manager, full_path, args, kwargs
+                    )
                 payloads = self._parent_manager.extractor.process_call(
                     full_path,
                     args,
