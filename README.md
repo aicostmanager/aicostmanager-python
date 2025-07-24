@@ -1,104 +1,109 @@
 # AICostManager Python SDK
 
-This package provides a thin wrapper around the AICostManager API.
-Requests and responses are represented using Pydantic models so data is
-validated before hitting the network.
+Track API usage and enforce cost controls by forwarding your LLM client calls to [AICostManager](https://aicostmanager.com).  The package exposes a minimal HTTP client for interacting with the service and a `CostManager` wrapper that can instrument other SDKs.
 
 ## Installation
+
+### Using `uv`
+
+```bash
+# install uv if needed - see https://github.com/astral-sh/uv
+uv venv          # create virtual environment in .venv
+source .venv/bin/activate
+uv pip install -e .
+```
+
+### Using `pip`
 
 ```bash
 pip install aicostmanager
 ```
 
-```python
-from aicostmanager import CostManagerClient as aicm
-# use as a context manager to automatically close the session
-with aicm() as client:
-    ...
+## Quick start with OpenAI
 
-# async usage
-from aicostmanager import AsyncCostManagerClient
-# async with AsyncCostManagerClient() as client:
-#     ...
-```
-
-`CostManagerClient` also implements the context manager protocol so the
-underlying HTTP session is closed automatically when exiting the `with`
-block.
-
-By default the client reads configuration from environment variables.  You can pass
-``proxies`` and extra ``headers`` when creating a client to suit enterprise
-environments.  Errors from API calls raise ``APIRequestError`` which exposes
-``error`` and ``message`` attributes parsed from the server response.
-
-Configuration values can also be refreshed on demand using
-``CostManagerConfig.refresh()`` or automatically on every call by setting
-``auto_refresh=True`` when constructing ``CostManagerConfig``.
-
-By default the client reads configuration from environment variables:
-
-- `AICM_API_KEY` – API key used for authentication.
-- `AICM_API_BASE` – base URL for the service (defaults to `https://aicostmanager.com`).
-- `AICM_API_URL` – API path prefix (defaults to `/api/v1`).
-- `AICM_INI_PATH` – path to the configuration INI file.
-
-The combined base API URL is exposed via the `api_root` property on
-`CostManagerClient`.
-
-All endpoints documented in the project are available as methods on the
-`CostManagerClient`.  Methods such as ``create_customer`` and
-``create_usage_limit`` accept the corresponding models from
-``aicostmanager.models`` and return typed objects. Pagination helpers
-(``iter_usage_events``/``iter_usage_rollups``/``iter_customers``)
-yield model instances across all pages. Typed list variants
-(``list_usage_events_typed``, ``list_usage_rollups_typed`` and
-``list_customers_typed``) return ``PaginatedResponse`` wrappers. Filter
-models such as ``UsageEventFilters``, ``RollupFilters`` and
-``CustomerFilters`` (which now include ``limit`` and ``offset`` fields)
-can be provided to these methods to construct query parameters
-automatically.
-
-Refer to the [docs](docs/usage.md) for full examples.
-
-## Tracking Wrapper
-
-`CostManager` can wrap any API/LLM client and, using configuration
-retrieved from `CostManagerConfig`, extract request and response data.
-Payloads are queued and sent asynchronously via a single background
-worker so tracking calls never block your application.
-See [docs/tracking.md](docs/tracking.md) for a brief overview. ``CostManager``
-is also a context manager so you can ``with CostManager(client)`` and the
-delivery queue will start and stop automatically.
-
-The worker batches queued payloads and retries failed requests with
-exponential backoff.  The queue size, retry limit and request timeout
-can be customised via ``delivery_queue_size``, ``delivery_max_retries``
-and ``delivery_timeout`` when constructing ``CostManager``.
-
-## Configuration Helper
-
-Use `CostManagerConfig` to manage encrypted tracker configuration data stored in
-`AICM.ini`:
+The tests in this repository wrap the [`openai` Python library](https://github.com/openai/openai-python).  Below mirrors that pattern.
 
 ```python
-from aicostmanager import CostManagerClient, CostManagerConfig
+import openai
+from aicostmanager import CostManager
 
-client = CostManagerClient()
-cfg = CostManagerConfig(client)
-configs = cfg.get_config("python-client")
-limits = cfg.get_triggered_limits(service_id="gpt-4")
+openai_client = openai.OpenAI(api_key="OPENAI_API_KEY")
+tracked = CostManager(openai_client, aicm_api_key="AICM_API_KEY")
+
+response = tracked.chat.completions.create(
+    model="gpt-3.5-turbo",
+    messages=[{"role": "system", "content": "Tell me a dad joke."}],
+    max_tokens=50,
+)
+print(response.choices[0].message.content)
 ```
 
-## Building and Publishing
+### Streaming
 
-Use [bump-my-version](https://github.com/callowayproject/bump-my-version)
-to update the version number across the project. After bumping the
-version, run the publishing script:
-
-```bash
-./scripts/publish_pypi.sh
+```python
+stream = tracked.chat.completions.create(
+    model="gpt-3.5-turbo",
+    messages=[{"role": "system", "content": "Tell me a dad joke."}],
+    max_tokens=50,
+    stream=True,
+)
+for chunk in stream:
+    if chunk.choices and chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")
 ```
 
-The script builds the distribution using `python -m build` and uploads it
-to PyPI with `twine`. Set the `TWINE_PASSWORD` environment variable with
-your API token before running the script.
+## Querying events
+
+Usage records pushed to `/track-usage` can be viewed through the `/usage/events/` endpoint.  The snippet below fetches the most recent events and searches for a specific `response_id`.
+
+```python
+import requests
+
+def find_event(aicm_api_key: str, aicm_api_base: str, response_id: str):
+    headers = {"Authorization": f"Bearer {aicm_api_key}"}
+    resp = requests.get(
+        f"{aicm_api_base}/api/v1/usage/events/",
+        headers=headers,
+        params={"limit": 20},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    for event in resp.json().get("results", []):
+        if event.get("response_id") == response_id:
+            return event
+    return None
+```
+
+## How delivery works
+
+`CostManager` places extracted usage payloads onto a global queue.  A background worker thread batches and retries delivery to `/track-usage` so that instrumentation never blocks your application.  The queue size, retry attempts and request timeout can be tuned when constructing the wrapper.  Asynchronous variants share the same behaviour.
+
+## Running the tests
+
+1. Create a `.env` file in `tests/` containing the following keys:
+
+   ```env
+   AICM_API_KEY=your-aicostmanager-api-key
+   OPENAI_API_KEY=your-openai-api-key
+   # optional overrides
+   # AICM_API_BASE=https://aicostmanager.com
+   # AICM_INI_PATH=/path/to/AICM.ini
+   ```
+
+   An active key from [aicostmanager.com](https://aicostmanager.com) is required; without it the wrapper will not deliver usage data.
+
+2. Install dependencies and the test extras using `uv`:
+
+   ```bash
+   uv venv
+   source .venv/bin/activate
+   uv pip install -e . openai pytest python-dotenv
+   ```
+
+3. Run the suite:
+
+   ```bash
+   pytest
+   ```
+
+See [docs/usage.md](docs/usage.md) and [docs/tracking.md](docs/tracking.md) for more detail.
