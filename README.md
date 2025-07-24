@@ -4,6 +4,12 @@ This package provides a thin wrapper around the AICostManager API.
 Requests and responses are represented using Pydantic models so data is
 validated before hitting the network.
 
+## Installation
+
+```bash
+pip install aicostmanager
+```
+
 ```python
 from aicostmanager import CostManagerClient as aicm
 # use as a context manager to automatically close the session
@@ -52,7 +58,7 @@ models such as ``UsageEventFilters``, ``RollupFilters`` and
 can be provided to these methods to construct query parameters
 automatically.
 
-Refer to the [docs](docs/USAGE.md) for full examples.
+Refer to the [docs](docs/usage.md) for full examples.
 
 ## Tracking Wrapper
 
@@ -60,7 +66,7 @@ Refer to the [docs](docs/USAGE.md) for full examples.
 retrieved from `CostManagerConfig`, extract request and response data.
 Payloads are queued and sent asynchronously via a single background
 worker so tracking calls never block your application.
-See [docs/TRACKING.md](docs/TRACKING.md) for a brief overview. ``CostManager``
+See [docs/tracking.md](docs/tracking.md) for a brief overview. ``CostManager``
 is also a context manager so you can ``with CostManager(client)`` and the
 delivery queue will start and stop automatically.
 
@@ -82,3 +88,17 @@ cfg = CostManagerConfig(client)
 configs = cfg.get_config("python-client")
 limits = cfg.get_triggered_limits(service_id="gpt-4")
 ```
+
+## Building and Publishing
+
+Use [bump-my-version](https://github.com/callowayproject/bump-my-version)
+to update the version number across the project. After bumping the
+version, run the publishing script:
+
+```bash
+./scripts/publish_pypi.sh
+```
+
+The script builds the distribution using `python -m build` and uploads it
+to PyPI with `twine`. Set the `TWINE_PASSWORD` environment variable with
+your API token before running the script.
