@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Iterable, Iterator
+from typing import Any, Iterable, Iterator, List, Optional
 
 from .client import CostManagerClient
 from .config_manager import Config, CostManagerConfig
@@ -67,11 +67,21 @@ class CostManager:
         if callable(attr):
 
             def wrapper(*args, **kwargs):
+                # Add stream_options for OpenAI clients to enable usage data in streaming
+                # Only for endpoints that support stream_options (chat.completions and completions)
+                if (
+                    kwargs.get("stream")
+                    and self.api_id == "openai"
+                    and name in ["completions.create", "chat.completions.create"]
+                ):
+                    if "stream_options" not in kwargs:
+                        kwargs["stream_options"] = {"include_usage": True}
+
                 response = attr(*args, **kwargs)
-                if kwargs.get("stream") and hasattr(response, "__iter__"):
+                if self._is_streaming(response):
                     return _StreamIterator(response, self, name, args, kwargs)
                 payloads = self.extractor.process_call(
-                    name, args, kwargs, response, client=self.client
+                    name, args, kwargs, response, client=self.client, is_streaming=False
                 )
                 if payloads:
                     self.tracked_payloads.extend(payloads)
@@ -89,6 +99,59 @@ class CostManager:
         """Return a copy of payloads generated so far."""
 
         return list(self.tracked_payloads)
+
+    # ------------------------------------------------------------
+    # streaming detection helpers
+    # ------------------------------------------------------------
+    def _is_streaming(self, result: Any) -> bool:
+        """Determine if result is streaming using multiple detection methods."""
+        return (
+            self._is_streaming_type(result)
+            or self._appears_to_be_stream(result)
+            or self._has_streaming_interface(result)
+        )
+
+    def _is_streaming_type(self, result: Any) -> bool:
+        """Check type-based indicators for streaming."""
+        import inspect
+        from typing import AsyncGenerator, AsyncIterator, Generator, Iterator
+
+        if isinstance(result, (Iterator, AsyncIterator, Generator, AsyncGenerator)):
+            return True
+
+        if inspect.isgenerator(result) or inspect.isasyncgen(result):
+            return True
+
+        return False
+
+    def _appears_to_be_stream(self, result: Any) -> bool:
+        """Check duck-typing indicators for streaming."""
+        # Check class name
+        class_name = type(result).__name__.lower()
+        if any(
+            indicator in class_name for indicator in ["stream", "iterator", "chunk"]
+        ):
+            return True
+
+        # Check for iterator protocol
+        if hasattr(result, "__iter__") and hasattr(result, "__next__"):
+            return True
+
+        if hasattr(result, "__aiter__") and hasattr(result, "__anext__"):
+            return True
+
+        return False
+
+    def _has_streaming_interface(self, result: Any) -> bool:
+        """Check for streaming-specific methods."""
+        streaming_methods = [
+            "read",
+            "readline",
+            "__stream__",
+            "iter_lines",
+            "iter_content",
+        ]
+        return any(hasattr(result, method) for method in streaming_methods)
 
     # ------------------------------------------------------------
     # delivery helpers
@@ -114,8 +177,14 @@ class CostManager:
 class _StreamIterator:
     """Proxy iterator that tracks streaming responses after completion."""
 
-    def __init__(self, iterator: Iterator, manager: "CostManager", method: str,
-                 args: tuple, kwargs: dict) -> None:
+    def __init__(
+        self,
+        iterator: Iterator,
+        manager: "CostManager",
+        method: str,
+        args: tuple,
+        kwargs: dict,
+    ) -> None:
         self._iterator = iterator
         self._manager = manager
         self._method = method
@@ -136,6 +205,7 @@ class _StreamIterator:
             self._kwargs,
             self._last,
             client=self._manager.client,
+            is_streaming=True,
         )
         if payloads:
             self._manager.tracked_payloads.extend(payloads)
@@ -146,8 +216,14 @@ class _StreamIterator:
 class _AsyncStreamIterator:
     """Async variant of :class:`_StreamIterator`."""
 
-    def __init__(self, iterator: Iterable, manager: "CostManager", method: str,
-                 args: tuple, kwargs: dict) -> None:
+    def __init__(
+        self,
+        iterator: Iterable,
+        manager: "CostManager",
+        method: str,
+        args: tuple,
+        kwargs: dict,
+    ) -> None:
         self._iterator = iterator
         self._manager = manager
         self._method = method
@@ -175,6 +251,7 @@ class _AsyncStreamIterator:
             self._kwargs,
             self._last,
             client=self._manager.client,
+            is_streaming=True,
         )
         if payloads:
             self._manager.tracked_payloads.extend(payloads)
@@ -197,8 +274,18 @@ class NestedAttributeWrapper:
         if callable(attr):
 
             def wrapper(*args, **kwargs):
+                # Add stream_options for OpenAI clients to enable usage data in streaming
+                # Only for endpoints that support stream_options (chat.completions and completions)
+                if (
+                    kwargs.get("stream")
+                    and self._parent_manager.api_id == "openai"
+                    and full_path in ["chat.completions.create", "completions.create"]
+                ):
+                    if "stream_options" not in kwargs:
+                        kwargs["stream_options"] = {"include_usage": True}
+
                 response = attr(*args, **kwargs)
-                if kwargs.get("stream") and hasattr(response, "__iter__"):
+                if self._parent_manager._is_streaming(response):
                     return _StreamIterator(
                         response, self._parent_manager, full_path, args, kwargs
                     )
@@ -208,6 +295,7 @@ class NestedAttributeWrapper:
                     kwargs,
                     response,
                     client=self._parent_manager.client,
+                    is_streaming=False,
                 )
                 if payloads:
                     self._parent_manager.tracked_payloads.extend(payloads)

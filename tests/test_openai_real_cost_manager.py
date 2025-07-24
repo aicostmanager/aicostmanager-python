@@ -211,10 +211,21 @@ def test_openai_chat_completion_streaming_with_dad_joke(
 
         for chunk in stream:
             chunk_count += 1
-            if chunk.choices[0].delta.content is not None:
+
+            # Handle content chunks - check if choices exist and have delta content
+            if (
+                hasattr(chunk, "choices")
+                and len(chunk.choices) > 0
+                and hasattr(chunk.choices[0], "delta")
+                and chunk.choices[0].delta.content is not None
+            ):
                 content = chunk.choices[0].delta.content
                 full_content += content
                 print(f"Chunk {chunk_count}: {content}")
+
+            # Handle usage chunk - check if this is the final usage chunk
+            if hasattr(chunk, "usage") and chunk.usage is not None:
+                print(f"Usage chunk {chunk_count}: {chunk.usage}")
 
         print(f"Full streaming response: {full_content}")
         assert chunk_count > 0, "No chunks received in streaming response"
@@ -281,10 +292,23 @@ def test_openai_completion_streaming_with_dad_joke(
 
         for chunk in stream:
             chunk_count += 1
-            if chunk.choices[0].text is not None:
-                content = chunk.choices[0].text
-                full_content += content
-                print(f"Chunk {chunk_count}: {content}")
+
+            # Handle content chunks - legacy completion streaming uses text directly
+            if hasattr(chunk, "choices") and len(chunk.choices) > 0:
+                choice = chunk.choices[0]
+                content = None
+
+                # For legacy completion streaming (uses text directly)
+                if hasattr(choice, "text") and choice.text is not None:
+                    content = choice.text
+
+                if content is not None:
+                    full_content += content
+                    print(f"Chunk {chunk_count}: {content}")
+
+            # Handle usage chunk - check if this is the final usage chunk
+            if hasattr(chunk, "usage") and chunk.usage is not None:
+                print(f"Usage chunk {chunk_count}: {chunk.usage}")
 
         print(f"Full streaming completion response: {full_content}")
         assert chunk_count > 0, "No chunks received in streaming completion response"
@@ -442,7 +466,7 @@ def test_extractor_payload_generation(
 
 
 def test_openai_chat_completion_usage_delivery(
-    openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path
+    openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery
 ):
     """Test that OpenAI chat completion automatically delivers usage payload to /track-usage."""
     if not openai_api_key:
@@ -491,7 +515,7 @@ def test_openai_chat_completion_usage_delivery(
 
 
 def test_openai_chat_completion_streaming_usage_delivery(
-    openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path
+    openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery
 ):
     """Test that OpenAI streaming chat completion automatically delivers usage payload to /track-usage."""
     if not openai_api_key:
@@ -525,10 +549,21 @@ def test_openai_chat_completion_streaming_usage_delivery(
             chunk_count += 1
             if hasattr(chunk, "id") and chunk.id:
                 response_id = chunk.id
-            if chunk.choices[0].delta.content is not None:
+
+            # Handle content chunks - check if choices exist and have content
+            if (
+                hasattr(chunk, "choices")
+                and len(chunk.choices) > 0
+                and hasattr(chunk.choices[0], "delta")
+                and chunk.choices[0].delta.content is not None
+            ):
                 content = chunk.choices[0].delta.content
                 full_content += content
                 print(f"Chunk {chunk_count}: {content}")
+
+            # Handle usage chunk - check if this is the final usage chunk
+            if hasattr(chunk, "usage") and chunk.usage is not None:
+                print(f"Usage chunk {chunk_count}: {chunk.usage}")
 
         print(f"Full streaming response: {full_content}")
         assert chunk_count > 0, "No chunks received in streaming response"
@@ -552,7 +587,7 @@ def test_openai_chat_completion_streaming_usage_delivery(
 
 
 def test_openai_responses_api_usage_delivery(
-    openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path
+    openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery
 ):
     """Test that OpenAI responses API automatically delivers usage payload to /track-usage."""
     if not openai_api_key:
@@ -567,6 +602,15 @@ def test_openai_responses_api_usage_delivery(
         aicm_api_base=aicm_api_base,
         aicm_ini_path=aicm_ini_path,
     )
+
+    # Force config refresh to get the latest server configuration
+    tracked_client.config_manager.refresh()
+    tracked_client.configs = tracked_client.config_manager.get_config(
+        tracked_client.api_id
+    )
+    from aicostmanager.universal_extractor import UniversalExtractor
+
+    tracked_client.extractor = UniversalExtractor(tracked_client.configs)
 
     # Test responses API (non-streaming)
     try:
@@ -607,7 +651,7 @@ def test_openai_responses_api_usage_delivery(
 
 
 def test_openai_responses_api_streaming_usage_delivery(
-    openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path
+    openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery
 ):
     """Test that OpenAI streaming responses API automatically delivers usage payload to /track-usage."""
     if not openai_api_key:
@@ -622,6 +666,15 @@ def test_openai_responses_api_streaming_usage_delivery(
         aicm_api_base=aicm_api_base,
         aicm_ini_path=aicm_ini_path,
     )
+
+    # Force config refresh to get the latest server configuration
+    tracked_client.config_manager.refresh()
+    tracked_client.configs = tracked_client.config_manager.get_config(
+        tracked_client.api_id
+    )
+    from aicostmanager.universal_extractor import UniversalExtractor
+
+    tracked_client.extractor = UniversalExtractor(tracked_client.configs)
 
     # Test streaming responses API
     try:
@@ -683,7 +736,7 @@ def test_openai_responses_api_streaming_usage_delivery(
 
 
 def test_usage_payload_delivery_verification(
-    openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path
+    openai_api_key, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery
 ):
     """Test that usage payloads are properly formatted and delivered to /track-usage endpoint."""
     if not openai_api_key:
