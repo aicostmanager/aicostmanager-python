@@ -14,6 +14,7 @@ so that consumers can extend the logic for their own needs.
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Iterable
 from urllib.parse import ParseResult
@@ -113,7 +114,6 @@ class UniversalExtractor:
             # For streaming responses, use final_fields if available
             streaming_config = cfg.handling_config.get("streaming", {})
             final_fields = streaming_config.get("final_fields", [])
-
             if final_fields:
                 # Convert final_fields (which are paths) to the same format as response_fields
                 fields = []
@@ -138,9 +138,18 @@ class UniversalExtractor:
 
     def _extract_client_fields(self, cfg: Config, client: Any) -> dict[str, Any]:
         out: dict[str, Any] = {}
+
+        # Universal base_url detection - always check if client has base_url
+        if hasattr(client, "base_url") and client.base_url is not None:
+            out["base_url"] = str(client.base_url)
+
+        # Extract configured client fields
         for name, spec in cfg.handling_config.get("client_fields", {}).items():
             path = spec.get("path", name) if isinstance(spec, dict) else spec
-            out[name] = self._get_nested_value(client, path)
+            value = self._get_nested_value(client, path)
+            if value is not None:
+                out[name] = value
+
         return out
 
     def _extract_usage_data(
@@ -159,6 +168,17 @@ class UniversalExtractor:
             value = self._get_nested_value(tracking, path)
             # Ensure the value is JSON-serializable
             payload[key] = self._make_json_serializable(value)
+
+        # Universal base_url inclusion - always include if available in client_data
+        client_base_url = tracking.get("client_data", {}).get("base_url")
+        if client_base_url and "base_url" not in payload:
+            payload["base_url"] = client_base_url
+
+        # Handle response_id generation if configured and response_id is missing/null
+        response_id_generation = cfg.handling_config.get("response_id_generation")
+        if response_id_generation == "uuid" and payload.get("response_id") is None:
+            payload["response_id"] = str(uuid.uuid4())
+
         static_fields = cfg.handling_config.get("static_payload_fields", {})
         payload.update(static_fields)
 

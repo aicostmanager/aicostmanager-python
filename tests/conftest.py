@@ -19,6 +19,7 @@ print("AICM_INI_PATH:", os.environ.get("AICM_INI_PATH"))
 print("OPENAI_API_KEY (pre-force):", os.environ.get("OPENAI_API_KEY"))
 print("ANTHROPIC_API_KEY (pre-force):", os.environ.get("ANTHROPIC_API_KEY"))
 print("GOOGLE_API_KEY (pre-force):", os.environ.get("GOOGLE_API_KEY"))
+print("DEEPSEEK_API_KEY (pre-force):", os.environ.get("DEEPSEEK_API_KEY"))
 print("AWS_DEFAULT_REGION:", os.environ.get("AWS_DEFAULT_REGION"))
 
 
@@ -33,6 +34,7 @@ def force_api_keys():
     openai_key = os.environ.get("OPENAI_API_KEY")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
     google_key = os.environ.get("GOOGLE_API_KEY")
+    deepseek_key = os.environ.get("DEEPSEEK_API_KEY")
     aws_region = os.environ.get("AWS_DEFAULT_REGION")
     if not aicm_key:
         pytest.skip("AICM_API_KEY not set in .env file")
@@ -44,6 +46,8 @@ def force_api_keys():
         os.environ["ANTHROPIC_API_KEY"] = anthropic_key
     if google_key:
         os.environ["GOOGLE_API_KEY"] = google_key
+    if deepseek_key:
+        os.environ["DEEPSEEK_API_KEY"] = deepseek_key
     if aws_region:
         os.environ["AWS_DEFAULT_REGION"] = aws_region
     print("AICM_API_KEY (forced):", os.environ.get("AICM_API_KEY"))
@@ -72,6 +76,11 @@ def anthropic_api_key():
 @pytest.fixture(scope="session")
 def google_api_key():
     return os.environ.get("GOOGLE_API_KEY")
+
+
+@pytest.fixture(scope="session")
+def deepseek_api_key():
+    return os.environ.get("DEEPSEEK_API_KEY")
 
 
 @pytest.fixture(scope="session")

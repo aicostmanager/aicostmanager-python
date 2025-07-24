@@ -1,8 +1,14 @@
 import json
 import time
+import warnings
 
 import pytest
 import requests
+
+# Suppress the datetime deprecation warnings by filtering them specifically
+warnings.filterwarnings(
+    "ignore", message="datetime.datetime.utcnow.*", category=DeprecationWarning
+)
 
 openai = pytest.importorskip("openai")
 from aicostmanager import CostManager, UniversalExtractor

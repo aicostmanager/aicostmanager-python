@@ -109,6 +109,7 @@ class CostManager:
             self._is_streaming_type(result)
             or self._appears_to_be_stream(result)
             or self._has_streaming_interface(result)
+            or self._is_bedrock_streaming(result)
         )
 
     def _is_streaming_type(self, result: Any) -> bool:
@@ -153,6 +154,24 @@ class CostManager:
         ]
         return any(hasattr(result, method) for method in streaming_methods)
 
+    def _is_bedrock_streaming(self, result: Any) -> bool:
+        """Check for Bedrock-specific streaming response structure."""
+        # Bedrock streaming responses are dicts with a "stream" key containing the actual iterator
+        if isinstance(result, dict) and "stream" in result:
+            stream_obj = result["stream"]
+            # Check if the nested stream object has iterator characteristics
+            # EventStream objects have __iter__ but not __next__ (they're iterables, not iterators)
+            is_bedrock_stream = (
+                hasattr(stream_obj, "__iter__")
+                and not isinstance(stream_obj, (str, bytes, dict))
+                and (
+                    hasattr(stream_obj, "__next__")
+                    or "EventStream" in str(type(stream_obj))
+                )
+            )
+            return is_bedrock_stream
+        return False
+
     # ------------------------------------------------------------
     # delivery helpers
     # ------------------------------------------------------------
@@ -191,19 +210,54 @@ class _StreamIterator:
         self._args = args
         self._kwargs = kwargs
         self._last = None
+        self._finalized = False
 
     def __iter__(self) -> Iterator:
         for item in self._iterator:
             self._last = item
             yield item
-        self._finalise()
+        # Only finalize if not already done (e.g., by nested iterator)
+        if not self._finalized:
+            self._finalise()
+            self._finalized = True
+
+    def __getitem__(self, key):
+        """Proxy attribute access for nested streaming responses (e.g., Bedrock's stream["stream"])."""
+        if hasattr(self._iterator, "__getitem__"):
+            nested_item = self._iterator[key]
+            # If accessing a nested iterator (like Bedrock's "stream" key), wrap it
+            if hasattr(nested_item, "__iter__") and not isinstance(
+                nested_item, (str, bytes)
+            ):
+                return _NestedStreamIterator(nested_item, self)
+            return nested_item
+        raise TypeError(
+            f"'{type(self._iterator).__name__}' object is not subscriptable"
+        )
+
+    def __getattr__(self, name):
+        """Proxy attribute access to the underlying iterator."""
+        return getattr(self._iterator, name)
 
     def _finalise(self) -> None:
+        # For Bedrock streaming, merge the original response metadata with the final chunk
+        final_response = self._last
+        if (
+            hasattr(self._iterator, "get")
+            and "ResponseMetadata" in self._iterator
+            and isinstance(final_response, dict)
+        ):
+            # Merge ResponseMetadata from original response
+            final_response = {
+                **final_response,
+                "ResponseMetadata": self._iterator["ResponseMetadata"],
+            }
+
         payloads = self._manager.extractor.process_call(
             self._method,
             self._args,
             self._kwargs,
-            self._last,
+            final_response,
             client=self._manager.client,
             is_streaming=True,
         )
@@ -211,6 +265,23 @@ class _StreamIterator:
             self._manager.tracked_payloads.extend(payloads)
             for payload in payloads:
                 self._manager.delivery.deliver({"usage_records": [payload]})
+
+
+class _NestedStreamIterator:
+    """Handles nested streaming iterators (e.g., Bedrock's stream["stream"])."""
+
+    def __init__(self, nested_iterator: Iterator, parent: "_StreamIterator") -> None:
+        self._nested_iterator = nested_iterator
+        self._parent = parent
+
+    def __iter__(self) -> Iterator:
+        for item in self._nested_iterator:
+            self._parent._last = item  # Track the last item in the parent
+            yield item
+        # Finalize when nested iteration completes
+        if not self._parent._finalized:
+            self._parent._finalise()
+            self._parent._finalized = True
 
 
 class _AsyncStreamIterator:

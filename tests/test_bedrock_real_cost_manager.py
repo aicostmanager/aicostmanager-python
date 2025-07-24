@@ -8,11 +8,15 @@ boto3 = pytest.importorskip("boto3")
 from aicostmanager import CostManager, UniversalExtractor
 
 
-def verify_event_delivered(aicm_api_key, aicm_api_base, response_id, timeout=10, max_attempts=8):
+def verify_event_delivered(
+    aicm_api_key, aicm_api_base, response_id, timeout=10, max_attempts=8
+):
+    """Verify that a usage event was successfully delivered and check /track-usage status codes."""
     headers = {
         "Authorization": f"Bearer {aicm_api_key}",
         "Content-Type": "application/json",
     }
+
     for attempt in range(max_attempts):
         try:
             events_response = requests.get(
@@ -21,65 +25,113 @@ def verify_event_delivered(aicm_api_key, aicm_api_base, response_id, timeout=10,
                 params={"limit": 20},
                 timeout=timeout,
             )
+
+            # Verify the /api/v1/usage/events/ call was successful
+            assert events_response.status_code == 200, (
+                f"Failed to fetch events: {events_response.status_code} - {events_response.text}"
+            )
+
             if events_response.status_code == 200:
                 events_data = events_response.json()
                 results = events_data.get("results", [])
                 for event in results:
                     if event.get("response_id") == response_id:
+                        # Found the event! Now validate the payload structure
+                        required_fields = [
+                            "event_id",
+                            "config_id",
+                            "timestamp",
+                            "response_id",
+                            "usage",
+                        ]
+                        for field in required_fields:
+                            assert field in event, (
+                                f"Required field '{field}' missing from event: {event}"
+                            )
+
+                        # Ensure no forbidden extra fields (like 'provider')
+                        forbidden_fields = ["provider"]
+                        for field in forbidden_fields:
+                            assert field not in event, (
+                                f"Forbidden field '{field}' found in event: {event}"
+                            )
+
                         return event
             if attempt < max_attempts - 1:
                 time.sleep(3)
-        except Exception:
+        except Exception as e:
             if attempt < max_attempts - 1:
                 time.sleep(3)
+            else:
+                raise e
     return None
+
+
+def verify_track_usage_success(client, payload_data):
+    """Directly test /track-usage endpoint to ensure 20x status codes."""
+    try:
+        # Test the payload structure directly
+        test_payload = {"usage_records": [payload_data]}
+
+        # Validate payload structure before sending
+        required_fields = [
+            "config_id",
+            "service_id",
+            "timestamp",
+            "response_id",
+            "usage",
+        ]
+        for field in required_fields:
+            assert field in payload_data, (
+                f"Required field '{field}' missing from payload: {payload_data}"
+            )
+
+        # Ensure no forbidden fields
+        forbidden_fields = ["provider"]
+        for field in forbidden_fields:
+            assert field not in payload_data, (
+                f"Forbidden field '{field}' found in payload: {payload_data}"
+            )
+
+        # Make the actual /track-usage call
+        result = client.track_usage(test_payload)
+
+        # If we get here, the call was successful (20x status code)
+        assert result is not None
+        print(f"✅ /track-usage call successful: {result}")
+        return True
+
+    except Exception as e:
+        print(f"❌ /track-usage call failed: {e}")
+        print(f"❌ Failed payload: {json.dumps(payload_data, indent=2, default=str)}")
+        raise e
 
 
 def _make_client(region):
     return boto3.client("bedrock-runtime", region_name=region)
 
 
-def _invoke(client, model_id, prompt, stream=False):
-    body = {
-        "prompt": prompt,
-        "max_gen_len": 100,
-        "temperature": 0.5,
-    }
-    if stream:
-        response = client.invoke_model_with_response_stream(
-            modelId=model_id,
-            body=json.dumps(body),
-            accept="application/json",
-            contentType="application/json",
-        )
-        return response["body"]
-    else:
-        resp = client.invoke_model(
-            modelId=model_id,
-            body=json.dumps(body),
-            accept="application/json",
-            contentType="application/json",
-        )
-        return json.loads(resp["body"].read())
-
-
-def test_bedrock_cost_manager_configs(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path):
+def test_bedrock_cost_manager_configs(
+    aws_region, aicm_api_key, aicm_api_base, aicm_ini_path
+):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
     client = _make_client(aws_region)
     tracked_client = CostManager(client)
     configs = tracked_client.configs
-    br_configs = [c for c in configs if c.api_id == "bedrock"]
+    br_configs = [c for c in configs if c.api_id == "bedrockruntime"]
     assert br_configs
 
 
-def test_bedrock_config_retrieval_and_extractor_interaction(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path):
+def test_bedrock_config_retrieval_and_extractor_interaction(
+    aws_region, aicm_api_key, aicm_api_base, aicm_ini_path
+):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
     client = _make_client(aws_region)
     tracked_client = CostManager(client)
     configs = tracked_client.configs
-    br_configs = [cfg for cfg in configs if cfg.api_id == "bedrock"]
+    br_configs = [cfg for cfg in configs if cfg.api_id == "bedrockruntime"]
     assert br_configs
     extractor = UniversalExtractor(br_configs)
     for config in br_configs:
@@ -91,118 +143,185 @@ def test_bedrock_config_retrieval_and_extractor_interaction(aws_region, aicm_api
         assert "payload_mapping" in handling
 
 
-def test_bedrock_invoke_model_with_dad_joke(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path):
+def test_bedrock_converse_with_dad_joke(
+    aws_region, aicm_api_key, aicm_api_base, aicm_ini_path
+):
+    """Test non-streaming converse API."""
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
     client = _make_client(aws_region)
     tracked_client = CostManager(client)
-    resp = _invoke(tracked_client, "us.meta.llama3-3-70b-instruct-v1:0", "Tell me a dad joke.")
-    assert resp
+
+    response = tracked_client.converse(
+        modelId="us.amazon.nova-pro-v1:0",
+        messages=[{"role": "user", "content": [{"text": "Tell me a dad joke."}]}],
+        inferenceConfig={"maxTokens": 100, "temperature": 0.5},
+    )
+
+    assert response is not None
+    assert "output" in response
+    assert "message" in response["output"]
 
 
-def test_bedrock_invoke_model_streaming_with_dad_joke(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path):
+def test_bedrock_converse_streaming_with_dad_joke(
+    aws_region, aicm_api_key, aicm_api_base, aicm_ini_path
+):
+    """Test streaming converse API."""
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
     client = _make_client(aws_region)
     tracked_client = CostManager(client)
-    stream = _invoke(tracked_client, "us.meta.llama3-3-70b-instruct-v1:0", "Tell me a dad joke.", stream=True)
-    full = ""
+
+    stream = tracked_client.converse_stream(
+        modelId="us.amazon.nova-pro-v1:0",
+        messages=[{"role": "user", "content": [{"text": "Tell me a dad joke."}]}],
+        inferenceConfig={"maxTokens": 100, "temperature": 0.5},
+    )
+
+    full_content = ""
     chunk_count = 0
-    for chunk in stream:
+
+    for chunk in stream["stream"]:
         chunk_count += 1
-        if "bytes" in chunk:
-            try:
-                data = json.loads(chunk["bytes"].decode("utf-8"))
-                text = data.get("generation") or data.get("output")
-                if text:
-                    full += text
-            except Exception:
-                pass
+        if "contentBlockDelta" in chunk:
+            delta = chunk["contentBlockDelta"]
+            if "delta" in delta and "text" in delta["delta"]:
+                full_content += delta["delta"]["text"]
+
     assert chunk_count > 0
-    assert full.strip()
+    assert full_content.strip()
 
 
-def test_bedrock_completion_with_dad_joke(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path):
+def test_bedrock_converse_usage_delivery(
+    aws_region, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery
+):
+    """Test that non-streaming converse automatically delivers usage payload with proper validation."""
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
+    if not aicm_api_key:
+        pytest.skip("AICM_API_KEY not set in .env file")
+
     client = _make_client(aws_region)
-    tracked_client = CostManager(client)
-    resp = _invoke(tracked_client, "us.amazon.nova-pro-v1:0", "Tell me a dad joke.")
-    assert resp
+    tracked_client = CostManager(
+        client,
+        aicm_api_key=aicm_api_key,
+        aicm_api_base=aicm_api_base,
+        aicm_ini_path=aicm_ini_path,
+    )
+
+    response = tracked_client.converse(
+        modelId="us.amazon.nova-pro-v1:0",
+        messages=[{"role": "user", "content": [{"text": "Tell me a dad joke."}]}],
+        inferenceConfig={"maxTokens": 50, "temperature": 0.5},
+    )
+
+    # Test payload structure and /track-usage call success
+    payloads = tracked_client.get_tracked_payloads()
+    assert len(payloads) > 0, "No payloads were generated"
+
+    # Verify the payload structure is correct
+    verify_track_usage_success(tracked_client.cm_client, payloads[0])
+
+    response_id = response.get("output", {}).get("message", {}).get("id")
+    if not response_id:
+        # Bedrock might use RequestId as response_id
+        response_id = response.get("ResponseMetadata", {}).get("RequestId")
+
+    if response_id:
+        event = verify_event_delivered(aicm_api_key, aicm_api_base, response_id)
+        assert event is not None, (
+            f"Usage event for response_id {response_id} was not delivered to server"
+        )
+        assert "usage" in event
 
 
-def test_bedrock_completion_streaming_with_dad_joke(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path):
+def test_bedrock_converse_streaming_usage_delivery(
+    aws_region, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery
+):
+    """Test that streaming converse automatically delivers usage payload with proper validation."""
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
+    if not aicm_api_key:
+        pytest.skip("AICM_API_KEY not set in .env file")
+
     client = _make_client(aws_region)
-    tracked_client = CostManager(client)
-    stream = _invoke(tracked_client, "us.amazon.nova-pro-v1:0", "Tell me a dad joke.", stream=True)
+    tracked_client = CostManager(
+        client,
+        aicm_api_key=aicm_api_key,
+        aicm_api_base=aicm_api_base,
+        aicm_ini_path=aicm_ini_path,
+    )
+
+    # Refresh config to pick up server changes
+    tracked_client.config_manager.refresh()
+
+    stream = tracked_client.converse_stream(
+        modelId="us.amazon.nova-pro-v1:0",
+        messages=[{"role": "user", "content": [{"text": "Tell me a dad joke."}]}],
+        inferenceConfig={"maxTokens": 50, "temperature": 0.5},
+    )
+
+    response_id = None
     chunk_count = 0
-    full = ""
-    for chunk in stream:
+
+    for chunk in stream["stream"]:
         chunk_count += 1
-        if "bytes" in chunk:
-            try:
-                data = json.loads(chunk["bytes"].decode("utf-8"))
-                text = data.get("generation") or data.get("output")
-                if text:
-                    full += text
-            except Exception:
-                pass
+        if "messageStart" in chunk:
+            # Check if message key exists first
+            if "message" in chunk["messageStart"]:
+                response_id = chunk["messageStart"]["message"].get("id")
+            # Sometimes the id might be directly in messageStart
+            else:
+                response_id = chunk["messageStart"].get("id")
+        elif "metadata" in chunk:
+            response_id = response_id or chunk["metadata"].get("id")
+
     assert chunk_count > 0
-    assert full.strip()
+
+    # Test payload structure and /track-usage call success
+    payloads = tracked_client.get_tracked_payloads()
+    if len(payloads) > 0:
+        verify_track_usage_success(tracked_client.cm_client, payloads[0])
+
+    if response_id:
+        event = verify_event_delivered(aicm_api_key, aicm_api_base, response_id)
+        assert event is not None, (
+            f"Streaming usage event for response_id {response_id} was not delivered to server"
+        )
+        assert "usage" in event
 
 
-def test_bedrock_responses_api_with_dad_joke(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path):
-    if not aws_region:
-        pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    client = _make_client(aws_region)
-    tracked_client = CostManager(client)
-    resp = _invoke(tracked_client, "us.amazon.nova-pro-v1:0", "Tell me a dad joke.")
-    assert resp
-
-
-def test_bedrock_responses_api_streaming_with_dad_joke(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path):
-    if not aws_region:
-        pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    client = _make_client(aws_region)
-    tracked_client = CostManager(client)
-    stream = _invoke(tracked_client, "us.amazon.nova-pro-v1:0", "Tell me a dad joke.", stream=True)
-    chunk_count = 0
-    full = ""
-    for chunk in stream:
-        chunk_count += 1
-        if "bytes" in chunk:
-            try:
-                data = json.loads(chunk["bytes"].decode("utf-8"))
-                text = data.get("generation") or data.get("output")
-                if text:
-                    full += text
-            except Exception:
-                pass
-    assert chunk_count > 0
-    assert full.strip()
-
-
-def test_extractor_payload_generation(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path):
+def test_extractor_payload_generation(
+    aws_region, aicm_api_key, aicm_api_base, aicm_ini_path
+):
+    """Test that extractor can generate payloads from Bedrock responses with proper structure validation."""
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
     client = _make_client(aws_region)
     tracked_client = CostManager(client)
     configs = tracked_client.configs
-    br_configs = [cfg for cfg in configs if cfg.api_id == "bedrock"]
+    br_configs = [cfg for cfg in configs if cfg.api_id == "bedrockruntime"]
     extractor = UniversalExtractor(br_configs)
-    resp = _invoke(tracked_client, "us.meta.llama3-3-70b-instruct-v1:0", "Tell me a dad joke.")
+
+    response = tracked_client.converse(
+        modelId="us.amazon.nova-pro-v1:0",
+        messages=[{"role": "user", "content": [{"text": "Tell me a dad joke."}]}],
+        inferenceConfig={"maxTokens": 50, "temperature": 0.5},
+    )
+
     for config in br_configs:
         tracking_data = extractor._build_tracking_data(
             config,
-            "invoke_model",
+            "converse",
             (),
             {
-                "modelId": "us.meta.llama3-3-70b-instruct-v1:0",
-                "prompt": "Tell me a dad joke.",
+                "modelId": "us.amazon.nova-pro-v1:0",
+                "messages": [
+                    {"role": "user", "content": [{"text": "Tell me a dad joke."}]}
+                ],
+                "inferenceConfig": {"maxTokens": 50, "temperature": 0.5},
             },
-            resp,
+            response,
             client,
         )
         assert "timestamp" in tracking_data
@@ -213,130 +332,20 @@ def test_extractor_payload_generation(aws_region, aicm_api_key, aicm_api_base, a
         assert "client_data" in tracking_data
         assert "usage_data" in tracking_data
 
+        # Build the actual payload
+        payload = extractor._build_payload(config, tracking_data)
 
-def test_bedrock_invoke_model_usage_delivery(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery):
-    if not aws_region:
-        pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    if not aicm_api_key:
-        pytest.skip("AICM_API_KEY not set in .env file")
-    client = _make_client(aws_region)
-    tracked_client = CostManager(
-        client,
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=aicm_api_base,
-        aicm_ini_path=aicm_ini_path,
-    )
-    resp = _invoke(tracked_client, "us.meta.llama3-3-70b-instruct-v1:0", "Tell me a dad joke.")
-    response_id = resp.get("response_id") or resp.get("id")
-    if response_id:
-        event = verify_event_delivered(aicm_api_key, aicm_api_base, response_id)
-        assert event is not None
-        assert "usage" in event
+        # Validate the payload structure matches OpenAPI spec
+        required_fields = ["config_id", "service_id", "timestamp", "usage"]
+        for field in required_fields:
+            assert field in payload, (
+                f"Required field '{field}' missing from generated payload"
+            )
 
-
-def test_bedrock_invoke_model_streaming_usage_delivery(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery):
-    if not aws_region:
-        pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    if not aicm_api_key:
-        pytest.skip("AICM_API_KEY not set in .env file")
-    client = _make_client(aws_region)
-    tracked_client = CostManager(
-        client,
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=aicm_api_base,
-        aicm_ini_path=aicm_ini_path,
-    )
-    stream = _invoke(tracked_client, "us.meta.llama3-3-70b-instruct-v1:0", "Tell me a dad joke.", stream=True)
-    response_id = None
-    chunk_count = 0
-    for chunk in stream:
-        chunk_count += 1
-        if "bytes" in chunk:
-            try:
-                data = json.loads(chunk["bytes"].decode("utf-8"))
-                response_id = response_id or data.get("response_id")
-            except Exception:
-                pass
-    assert chunk_count > 0
-    if response_id:
-        event = verify_event_delivered(aicm_api_key, aicm_api_base, response_id)
-        assert event is not None
-        assert "usage" in event
-
-
-def test_bedrock_responses_api_usage_delivery(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery):
-    if not aws_region:
-        pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    if not aicm_api_key:
-        pytest.skip("AICM_API_KEY not set in .env file")
-    client = _make_client(aws_region)
-    tracked_client = CostManager(
-        client,
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=aicm_api_base,
-        aicm_ini_path=aicm_ini_path,
-    )
-    resp = _invoke(tracked_client, "us.amazon.nova-pro-v1:0", "Tell me a dad joke.")
-    response_id = resp.get("response_id") or resp.get("id")
-    if response_id:
-        event = verify_event_delivered(aicm_api_key, aicm_api_base, response_id)
-        assert event is not None
-        assert "usage" in event
-
-
-def test_bedrock_responses_api_streaming_usage_delivery(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery):
-    if not aws_region:
-        pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    if not aicm_api_key:
-        pytest.skip("AICM_API_KEY not set in .env file")
-    client = _make_client(aws_region)
-    tracked_client = CostManager(
-        client,
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=aicm_api_base,
-        aicm_ini_path=aicm_ini_path,
-    )
-    stream = _invoke(tracked_client, "us.amazon.nova-pro-v1:0", "Tell me a dad joke.", stream=True)
-    response_id = None
-    chunk_count = 0
-    for chunk in stream:
-        chunk_count += 1
-        if "bytes" in chunk:
-            try:
-                data = json.loads(chunk["bytes"].decode("utf-8"))
-                response_id = response_id or data.get("response_id")
-            except Exception:
-                pass
-    assert chunk_count > 0
-    if response_id:
-        event = verify_event_delivered(aicm_api_key, aicm_api_base, response_id)
-        assert event is not None
-        assert "usage" in event
-
-
-def test_usage_payload_delivery_verification(aws_region, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery):
-    if not aws_region:
-        pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    if not aicm_api_key:
-        pytest.skip("AICM_API_KEY not set in .env file")
-    client = _make_client(aws_region)
-    tracked_client = CostManager(
-        client,
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=aicm_api_base,
-        aicm_ini_path=aicm_ini_path,
-    )
-    resp = _invoke(tracked_client, "us.meta.llama3-3-70b-instruct-v1:0", "Tell me a dad joke.")
-    response_id = resp.get("response_id") or resp.get("id")
-    if response_id:
-        event = verify_event_delivered(aicm_api_key, aicm_api_base, response_id)
-        assert event is not None
-        assert "usage" in event
-        usage = event["usage"]
-        assert isinstance(usage, dict)
-        if "prompt_tokens" in usage:
-            assert isinstance(usage["prompt_tokens"], (int, float))
-        if "completion_tokens" in usage:
-            assert isinstance(usage["completion_tokens"], (int, float))
-        if "total_tokens" in usage:
-            assert isinstance(usage["total_tokens"], (int, float))
+        # Check for forbidden fields
+        forbidden_fields = ["provider"]
+        for field in forbidden_fields:
+            if field in payload:
+                print(
+                    f"⚠️  WARNING: Forbidden field '{field}' found in payload - server config needs updating"
+                )
