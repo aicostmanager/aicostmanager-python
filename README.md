@@ -153,30 +153,48 @@ tracked_bedrock = CostManager(bedrock_client)
 
 ## 🏢 Multi-Tenant & Client Tracking
 
-AICostManager supports client tracking and cost allocation through the web dashboard at [aicostmanager.com](https://aicostmanager.com). While the Python SDK automatically tracks all usage, you can organize and allocate costs by:
+Perfect for agencies, SaaS platforms, and enterprise applications that need to track LLM costs across multiple clients or projects. AICostManager provides powerful tools for organizing and billing API usage by customer.
 
-- **Customer/Client**: Group costs by customer for accurate billing
-- **Projects**: Track spending per project or application
-- **Departments**: Allocate costs across business units
-- **Environments**: Separate development, staging, and production costs
+### Client-Based Cost Tracking
 
-Visit your AICostManager dashboard to configure client tracking, set up cost allocation rules, and generate billing reports.
+Track usage with client identifiers for accurate billing and cost allocation:
 
 ```python
 from aicostmanager import CostManager
 import openai
 
 client = openai.OpenAI(api_key="your-key")
-tracked_client = CostManager(client)
 
+# Option 1: Set client info via constructor (planned feature)
+tracked_client = CostManager(
+    client,
+    client_customer_key="customer_acme_corp",
+    context={
+        "project": "chatbot_v2",
+        "user_id": "user_123", 
+        "environment": "production"
+    }
+)
+
+# Option 2: Organize usage via dashboard after tracking
 # All usage is automatically tracked and can be organized
-# by customer, project, or department in the dashboard
+# by customer, project, or department in the AICostManager dashboard
+
 response = tracked_client.chat.completions.create(
     model="gpt-4o-mini",
-    messages=[{"role": "user", "content": "Hello!"}]
+    messages=[{"role": "user", "content": "Hello customer support!"}]
 )
-# → Usage automatically logged and available for client billing
+# → Usage logged with client context for accurate billing
 ```
+
+### Use Cases
+
+- **🏢 Agencies**: Track costs per client for accurate project billing
+- **🌐 SaaS Platforms**: Allocate AI costs across customer accounts  
+- **🏗️ Enterprise**: Organize spending by department, project, or team
+- **🔄 Multi-Environment**: Separate dev, staging, and production costs
+
+**📖 [Complete Multi-Tenant Guide](docs/multi-tenant.md)** - Detailed examples and API usage patterns
 
 ## ✨ Key Features
 
@@ -269,6 +287,25 @@ def get_recent_usage(aicm_api_key: str, customer_id: str = None):
     resp.raise_for_status()
     return resp.json()
 ```
+
+## 📖 Documentation
+
+### Complete Guides
+
+- **[📖 Documentation Hub](docs/index.md)** - Complete documentation index
+- **[🏢 Multi-Tenant Guide](docs/multi-tenant.md)** - Client tracking, cost allocation, and billing
+- **[📊 Usage Examples](docs/usage.md)** - API usage and basic examples
+- **[🔧 Tracking System](docs/tracking.md)** - How the tracking system works
+- **[🧪 Testing Guide](docs/testing.md)** - Running tests and validation
+
+### Quick Reference
+
+| Topic | Description | Link |
+|-------|-------------|------|
+| **Multi-Tenant** | Track costs per client, project, or department | [Guide](docs/multi-tenant.md) |
+| **Basic Usage** | SDK installation and simple examples | [Usage](docs/usage.md) |
+| **Tracking** | How usage tracking works under the hood | [Tracking](docs/tracking.md) |
+| **Testing** | Running tests and validation | [Testing](docs/testing.md) |
 
 ## 💻 Development & Testing
 
