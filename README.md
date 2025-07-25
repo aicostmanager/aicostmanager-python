@@ -1,39 +1,47 @@
 # AICostManager Python SDK
 
-Track API usage and enforce cost controls by forwarding your LLM client calls to [AICostManager](https://aicostmanager.com).  The package exposes a minimal HTTP client for interacting with the service and a `CostManager` wrapper that can instrument other SDKs.
+AICostManager is an LLM usage tracking and cost control service. This SDK provides a simple wrapper that forwards your LLM client calls to [AICostManager](https://aicostmanager.com) so that usage can be analysed and limits enforced.
 
-## Installation
+Sign up for an account and obtain an API key at [aicostmanager.com](https://aicostmanager.com). Without a valid key the tracking wrapper will not deliver usage data.
 
-### Using `uv`
+## ✨ Key Features
+
+- Works with any Python LLM SDK – OpenAI, Anthropic Claude, Google Gemini, AWS Bedrock and more
+- Privacy first: only usage metadata is sent to AICostManager, never your prompts or API keys
+- Automatic background delivery with retry logic so that tracking does not block your application
+- Stream aware: streaming responses are tracked once the stream completes
+- Drop in replacement – wrap your existing client and continue to call it exactly as before
+
+## 👤 Getting an API Key
+
+1. Visit [aicostmanager.com](https://aicostmanager.com) and create a free account.
+2. Generate an API key from the dashboard.
+3. Export the key or pass it to `CostManager` directly.
 
 ```bash
-# install uv if needed - see https://github.com/astral-sh/uv
-uv venv          # create virtual environment in .venv
-source .venv/bin/activate
-uv pip install -e .
+export AICM_API_KEY="sk-your-api-key"
 ```
 
-### Using `pip`
+## 🚀 Quick Start
+
+Install the SDK from PyPI:
 
 ```bash
 pip install aicostmanager
 ```
 
-## Quick start with OpenAI
-
-The tests in this repository wrap the [`openai` Python library](https://github.com/openai/openai-python).  Below mirrors that pattern.
+Wrap your client:
 
 ```python
 import openai
 from aicostmanager import CostManager
 
 openai_client = openai.OpenAI(api_key="OPENAI_API_KEY")
-tracked = CostManager(openai_client, aicm_api_key="AICM_API_KEY")
+tracked_client = CostManager(openai_client)  # reads AICM_API_KEY from env
 
-response = tracked.chat.completions.create(
+response = tracked_client.chat.completions.create(
     model="gpt-3.5-turbo",
-    messages=[{"role": "system", "content": "Tell me a dad joke."}],
-    max_tokens=50,
+    messages=[{"role": "user", "content": "Tell me a dad joke."}],
 )
 print(response.choices[0].message.content)
 ```
@@ -41,10 +49,9 @@ print(response.choices[0].message.content)
 ### Streaming
 
 ```python
-stream = tracked.chat.completions.create(
+stream = tracked_client.chat.completions.create(
     model="gpt-3.5-turbo",
-    messages=[{"role": "system", "content": "Tell me a dad joke."}],
-    max_tokens=50,
+    messages=[{"role": "user", "content": "Tell me a dad joke."}],
     stream=True,
 )
 for chunk in stream:
@@ -52,9 +59,9 @@ for chunk in stream:
         print(chunk.choices[0].delta.content, end="")
 ```
 
-## Querying events
+## 👨‍💻 Querying Events
 
-Usage records pushed to `/track-usage` can be viewed through the `/usage/events/` endpoint.  The snippet below fetches the most recent events and searches for a specific `response_id`.
+Usage data delivered to `/track-usage` can be viewed via the `/usage/events/` API. The helper below fetches recent events and searches for a specific `response_id`:
 
 ```python
 import requests
@@ -74,13 +81,13 @@ def find_event(aicm_api_key: str, aicm_api_base: str, response_id: str):
     return None
 ```
 
-## How delivery works
+## 📦 How Delivery Works
 
-`CostManager` places extracted usage payloads onto a global queue.  A background worker thread batches and retries delivery to `/track-usage` so that instrumentation never blocks your application.  The queue size, retry attempts and request timeout can be tuned when constructing the wrapper.  Asynchronous variants share the same behaviour.
+`CostManager` places extracted usage payloads on a global queue. A background worker batches and retries delivery so that instrumentation never blocks your application. The queue size, retry attempts and request timeout can be tuned when constructing the wrapper. The asynchronous variants share the same behaviour.
 
-## Running the tests
+## 💻 Running the Tests
 
-1. Create a `.env` file in `tests/` containing the following keys:
+1. Create a `.env` file inside `tests/` with at least `AICM_API_KEY` and any provider keys you wish to use:
 
    ```env
    AICM_API_KEY=your-aicostmanager-api-key
@@ -90,9 +97,7 @@ def find_event(aicm_api_key: str, aicm_api_base: str, response_id: str):
    # AICM_INI_PATH=/path/to/AICM.ini
    ```
 
-   An active key from [aicostmanager.com](https://aicostmanager.com) is required; without it the wrapper will not deliver usage data.
-
-2. Install dependencies and the test extras using `uv`:
+2. Install the test dependencies (requires [`uv`](https://github.com/astral-sh/uv) or `pip`):
 
    ```bash
    uv venv
@@ -106,4 +111,4 @@ def find_event(aicm_api_key: str, aicm_api_base: str, response_id: str):
    pytest
    ```
 
-See [docs/usage.md](docs/usage.md) and [docs/tracking.md](docs/tracking.md) for more detail.
+See the [docs](docs/index.md) for additional usage examples and details about the tracking configuration. The [Build & Deploy guide](docs/build_and_deploy.md) explains how to publish a new release to PyPI using GitHub Actions.
