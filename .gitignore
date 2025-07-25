@@ -10,7 +10,7 @@ __pycache__/
 *.pkl
 *.egg-info
 .pytest_cache
-
+/dist/*
 # Django
 *.log
 db.sqlite3
