@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, Optional, AsyncIterator
+import configparser
+import json
 
 import requests
 import httpx
@@ -161,7 +163,17 @@ class CostManagerClient:
     def track_usage(self, data: ApiUsageRequest | Dict[str, Any]) -> ApiUsageResponse:
         payload = data.model_dump() if isinstance(data, ApiUsageRequest) else data
         resp = self._request("POST", "/track-usage", json=payload)
-        return ApiUsageResponse.model_validate(resp)
+        result = ApiUsageResponse.model_validate(resp)
+        if result.triggered_limits:
+            cp = configparser.ConfigParser()
+            cp.read(self.ini_path)
+            os.makedirs(os.path.dirname(self.ini_path), exist_ok=True)
+            if "triggered_limits" not in cp:
+                cp["triggered_limits"] = {}
+            cp["triggered_limits"]["payload"] = json.dumps(result.triggered_limits)
+            with open(self.ini_path, "w") as f:
+                cp.write(f)
+        return result
 
     def list_usage_events(
         self,
@@ -387,7 +399,17 @@ class AsyncCostManagerClient:
     async def track_usage(self, data: ApiUsageRequest | Dict[str, Any]) -> ApiUsageResponse:
         payload = data.model_dump() if isinstance(data, ApiUsageRequest) else data
         resp = await self._request("POST", "/track-usage", json=payload)
-        return ApiUsageResponse.model_validate(resp)
+        result = ApiUsageResponse.model_validate(resp)
+        if result.triggered_limits:
+            cp = configparser.ConfigParser()
+            cp.read(self.ini_path)
+            os.makedirs(os.path.dirname(self.ini_path), exist_ok=True)
+            if "triggered_limits" not in cp:
+                cp["triggered_limits"] = {}
+            cp["triggered_limits"]["payload"] = json.dumps(result.triggered_limits)
+            with open(self.ini_path, "w") as f:
+                cp.write(f)
+        return result
 
     async def list_usage_events(
         self,

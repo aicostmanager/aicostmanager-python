@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Iterable, Iterator, List, Optional
 
 from .client import CostManagerClient
-from .config_manager import Config, CostManagerConfig
+from .config_manager import Config, CostManagerConfig, TriggeredLimit
 from .delivery import ResilientDelivery, get_global_delivery
 from .universal_extractor import UniversalExtractor
 
@@ -47,6 +47,7 @@ class CostManager:
         self.configs: List[Config] = self.config_manager.get_config(self.api_id)
         self.extractor = UniversalExtractor(self.configs)
         self.tracked_payloads: list[dict[str, Any]] = []
+        self.triggered_limits: List[TriggeredLimit] = []
 
         if delivery is not None:
             self.delivery = delivery
@@ -58,6 +59,13 @@ class CostManager:
                 timeout=delivery_timeout,
             )
 
+    def _refresh_limits(self) -> None:
+        """Load latest triggered limits from the config manager."""
+        try:
+            self.triggered_limits = self.config_manager.get_triggered_limits()
+        except Exception:
+            self.triggered_limits = []
+
     # ------------------------------------------------------------
     # attribute proxying
     # ------------------------------------------------------------
@@ -67,6 +75,7 @@ class CostManager:
         if callable(attr):
 
             def wrapper(*args, **kwargs):
+                self._refresh_limits()
                 # Add stream_options for OpenAI clients to enable usage data in streaming
                 # Only for endpoints that support stream_options (chat.completions and completions)
                 if (
@@ -93,6 +102,7 @@ class CostManager:
         else:
             # For non-callable attributes, wrap them with a nested tracker
             # to handle cases like client.chat.completions.create()
+            self._refresh_limits()
             return NestedAttributeWrapper(attr, self, name)
 
     def get_tracked_payloads(self) -> list[dict[str, Any]]:
@@ -345,6 +355,7 @@ class NestedAttributeWrapper:
         if callable(attr):
 
             def wrapper(*args, **kwargs):
+                self._parent_manager._refresh_limits()
                 # Add stream_options for OpenAI clients to enable usage data in streaming
                 # Only for endpoints that support stream_options (chat.completions and completions)
                 if (
@@ -379,4 +390,5 @@ class NestedAttributeWrapper:
             return wrapper
         else:
             # Continue wrapping for deeper nesting
+            self._parent_manager._refresh_limits()
             return NestedAttributeWrapper(attr, self._parent_manager, full_path)

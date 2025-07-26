@@ -1,4 +1,5 @@
 import json
+import configparser
 from typing import Any
 
 import pytest
@@ -325,3 +326,25 @@ def test_filter_objects(monkeypatch):
     filters = CustomerFilters(name="n", limit=2)
     client.list_customers(filters)
     assert captured.get("params") == {"name": "n", "limit": 2}
+
+
+def test_track_usage_persists_triggered_limits(monkeypatch, tmp_path):
+    monkeypatch.setenv("AICM_API_KEY", "sk-test")
+    ini = tmp_path / "AICM.ini"
+    client = CostManagerClient(aicm_api_key="sk-test", aicm_ini_path=str(ini))
+
+    def fake_request(self, method, path, **kwargs):
+        assert method == "POST" and path == "/track-usage"
+        return {"event_ids": [], "triggered_limits": {"encrypted_payload": "tok", "public_key": "pk"}}
+
+    monkeypatch.setattr(CostManagerClient, "_request", fake_request)
+
+    client.track_usage({"usage_records": []})
+
+    cp = configparser.ConfigParser()
+    cp.read(ini)
+    assert cp.has_section("triggered_limits")
+    assert json.loads(cp["triggered_limits"]["payload"]) == {
+        "encrypted_payload": "tok",
+        "public_key": "pk",
+    }
