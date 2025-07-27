@@ -54,3 +54,28 @@ def test_passthrough_streaming(monkeypatch):
     monkeypatch.setattr(CostManagerConfig, "get_config", lambda self, api_id: [])
     tracker = CostManager(DummyClient())
     assert list(tracker.stream()) == [0, 1, 2]
+
+
+def test_limits_checked_on_access(monkeypatch):
+    class Dummy:
+        value = 1
+
+        def add(self, a, b):
+            return a + b
+
+    calls = {"count": 0}
+
+    monkeypatch.setattr(CostManagerConfig, "get_config", lambda self, api_id: [])
+
+    def fake_get_limits(self):
+        calls["count"] += 1
+        return []
+
+    monkeypatch.setattr(CostManagerConfig, "get_triggered_limits", fake_get_limits)
+
+    tracker = CostManager(Dummy())
+    tracker.add(1, 2)
+    _ = tracker.value
+    tracker.add(3, 4)
+
+    assert calls["count"] == 3

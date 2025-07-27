@@ -64,9 +64,15 @@ class CostManagerConfig:
         self._config["configs"] = {
             "payload": json.dumps(payload.get("service_configs", []))
         }
-        self._config["triggered_limits"] = {
-            "payload": json.dumps(payload.get("triggered_limits", {}))
-        }
+        self._set_triggered_limits(payload.get("triggered_limits", {}))
+        self._write()
+
+    def _set_triggered_limits(self, data: dict) -> None:
+        self._config["triggered_limits"] = {"payload": json.dumps(data or {})}
+
+    def store_triggered_limits(self, data: dict) -> None:
+        """Persist ``triggered_limits`` payload to ``AICM.ini``."""
+        self._set_triggered_limits(data)
         self._write()
 
     def refresh(self) -> None:
