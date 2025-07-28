@@ -64,3 +64,17 @@ async def async_example():
         async with AsyncCostManager(aclient) as manager:
             await manager.client.list_customers()
 ```
+
+## Vendor & Service Lookup
+
+You can retrieve available vendors and their services:
+
+```python
+vendors = client.list_vendors()
+for vendor in vendors:
+    print(vendor.name)
+    services = client.list_vendor_services(vendor.uuid)
+    for svc in services:
+        print(" -", svc.service_id)
+```
+

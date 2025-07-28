@@ -220,6 +220,15 @@ def test_async_methods(monkeypatch):
             None,
             204,
         ),
+        ("GET", "/vendors/", client.list_vendors, (), {}, []),
+        (
+            "GET",
+            "/services/",
+            client.list_vendor_services,
+            (),
+            {"vendor": "openai"},
+            [],
+        ),
         (
             "GET",
             "/openapi.json",
@@ -285,6 +294,12 @@ def test_async_filter_objects(monkeypatch):
 
     asyncio.run(run3())
     assert captured.get("params") == {"phone": "p", "limit": 3}
+
+    async def run4():
+        await client.list_vendor_services("openai")
+
+    asyncio.run(run4())
+    assert captured.get("params") == {"vendor": "openai"}
 
 
 def test_async_error_response(monkeypatch):

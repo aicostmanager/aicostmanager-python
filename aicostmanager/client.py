@@ -20,6 +20,8 @@ from .models import (
     UsageEvent,
     UsageLimitIn,
     UsageLimitOut,
+    VendorOut,
+    ServiceOut,
     UsageRollup,
     UsageEventFilters,
     RollupFilters,
@@ -312,6 +314,14 @@ class CostManagerClient:
         self._request("DELETE", f"/usage-limits/{limit_id}/")
         return None
 
+    def list_vendors(self) -> Iterable[VendorOut]:
+        data = self._request("GET", "/vendors/")
+        return [VendorOut.model_validate(i) for i in data]
+
+    def list_vendor_services(self, vendor: str) -> Iterable[ServiceOut]:
+        data = self._request("GET", "/services/", params={"vendor": vendor})
+        return [ServiceOut.model_validate(i) for i in data]
+
     def get_openapi_schema(self) -> Any:
         return self._request("GET", "/openapi.json")
 
@@ -547,6 +557,14 @@ class AsyncCostManagerClient:
     async def delete_usage_limit(self, limit_id: str) -> None:
         await self._request("DELETE", f"/usage-limits/{limit_id}/")
         return None
+
+    async def list_vendors(self) -> Iterable[VendorOut]:
+        data = await self._request("GET", "/vendors/")
+        return [VendorOut.model_validate(i) for i in data]
+
+    async def list_vendor_services(self, vendor: str) -> Iterable[ServiceOut]:
+        data = await self._request("GET", "/services/", params={"vendor": vendor})
+        return [ServiceOut.model_validate(i) for i in data]
 
     async def get_openapi_schema(self) -> Any:
         return await self._request("GET", "/openapi.json")

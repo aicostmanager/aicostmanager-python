@@ -128,6 +128,22 @@ class UsageLimitOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class VendorOut(BaseModel):
+    uuid: str
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ServiceOut(BaseModel):
+    uuid: str
+    service_id: str
+    vendor: str
+    name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UsageEvent(BaseModel):
     event_id: str
     config_id: str
