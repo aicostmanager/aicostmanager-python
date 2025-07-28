@@ -144,6 +144,20 @@ class ServiceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CostUnitOut(BaseModel):
+    """Cost information for a service."""
+
+    uuid: str
+    name: str
+    cost: Decimal
+    unit: str
+    per_quantity: int
+    currency: str
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UsageEvent(BaseModel):
     event_id: str
     config_id: str
