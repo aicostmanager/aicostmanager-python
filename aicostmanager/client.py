@@ -46,11 +46,18 @@ class APIRequestError(AICMError):
     def __init__(self, status_code: int, detail: Any) -> None:
         self.status_code = status_code
         self.error_response: ErrorResponse | None = None
+        self.error: str | None = None
+        self.message: str | None = None
+        self.details: Any | None = None
         if isinstance(detail, dict):
             try:
                 self.error_response = ErrorResponse.model_validate(detail)
+                self.error = self.error_response.error
+                self.message = self.error_response.message
+                self.details = self.error_response.details
             except Exception:
-                pass
+                self.error = detail.get("error")
+                self.message = detail.get("message")
         super().__init__(f"API request failed with status {status_code}: {detail}")
 
 
