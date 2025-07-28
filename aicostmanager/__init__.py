@@ -30,6 +30,8 @@ from .models import (
     UsageEventFilters,
     UsageLimitIn,
     UsageLimitOut,
+    VendorOut,
+    ServiceOut,
     UsageRollup,
     ValidationError,
 )
@@ -54,6 +56,8 @@ __all__ = [
     "CustomerOut",
     "UsageLimitIn",
     "UsageLimitOut",
+    "VendorOut",
+    "ServiceOut",
     "ThresholdType",
     "Period",
     "Granularity",

@@ -247,6 +247,15 @@ def test_methods(monkeypatch):
             None,
             204,
         ),
+        ("GET", "/vendors/", client.list_vendors, (), {}, []),
+        (
+            "GET",
+            "/services/",
+            client.list_vendor_services,
+            (),
+            {"vendor": "openai"},
+            [],
+        ),
         (
             "GET",
             "/openapi.json",
@@ -326,6 +335,9 @@ def test_filter_objects(monkeypatch):
     filters = CustomerFilters(name="n", limit=2)
     client.list_customers(filters)
     assert captured.get("params") == {"name": "n", "limit": 2}
+
+    client.list_vendor_services("openai")
+    assert captured.get("params") == {"vendor": "openai"}
 
 
 def test_track_usage_persists_triggered_limits(monkeypatch, tmp_path):
