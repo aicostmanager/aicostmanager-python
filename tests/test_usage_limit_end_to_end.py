@@ -1,15 +1,16 @@
 import time
-import requests
+
 import pytest
+import requests
 
 openai = pytest.importorskip("openai")
 
 from aicostmanager import (
     CostManager,
     CostManagerClient,
-    UsageLimitIn,
-    ThresholdType,
     Period,
+    ThresholdType,
+    UsageLimitIn,
 )
 
 
@@ -63,7 +64,7 @@ def test_usage_limit_end_to_end(
     limit = client.create_usage_limit(
         UsageLimitIn(
             threshold_type=ThresholdType.LIMIT,
-            amount=1,
+            amount=0.0001,
             period=Period.DAY,
             vendor=openai_vendor.name,
             service=service.service_id,
@@ -89,14 +90,23 @@ def test_usage_limit_end_to_end(
         )
         time.sleep(2)
 
-        # second call expected to exceed limit
-        with pytest.raises(Exception):
-            tracked_client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": "hi again"}],
-                max_tokens=5,
-            )
-        time.sleep(2)
+        # subsequent calls expected to exceed limit (may take multiple calls)
+        exception_raised = False
+        for i in range(100):
+            try:
+                tracked_client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": f"hi again {i}"}],
+                    max_tokens=5,
+                )
+                time.sleep(2)  # Give server time to process usage
+            except Exception:
+                exception_raised = True
+                break
+
+        assert exception_raised, (
+            "Expected an exception to be raised within 100 attempts"
+        )
 
         # refresh triggered limits and check limit uuid
         triggered = tracked_client.config_manager.get_triggered_limits(

@@ -8,6 +8,9 @@ creating a new worker per wrapper.
 
 from __future__ import annotations
 
+import configparser
+import json
+import os
 import queue
 import threading
 from typing import Any, Optional
@@ -35,27 +38,16 @@ def get_global_delivery(
     """
     global _global_delivery
     if _global_delivery is None:
-        api_root = client.api_root
         _global_delivery = ResilientDelivery(
             client.session,
-            api_root,
-            endpoint=endpoint,
+            client.api_root,
             max_retries=max_retries,
             queue_size=queue_size,
+            endpoint=endpoint,
             timeout=timeout,
+            ini_path=client.ini_path,
         )
         _global_delivery.start()
-    else:
-        # Ensure the worker is actually running.  Tests may stop the
-        # singleton leaving the object assigned but the thread stopped.
-        thread = getattr(_global_delivery, "_thread", None)
-        if thread is None or not thread.is_alive():
-            try:
-                # ``stop`` is idempotent so it is safe to call even if not running
-                _global_delivery.stop()
-            except Exception:  # pragma: no cover - defensive
-                pass
-            _global_delivery.start()
     return _global_delivery
 
 
@@ -78,12 +70,14 @@ class ResilientDelivery:
         max_retries: int = 5,
         queue_size: int = 1000,
         timeout: float = 10.0,
+        ini_path: Optional[str] = None,
     ) -> None:
         self.session = session
         self.api_root = api_root.rstrip("/")
         self.endpoint = endpoint
         self.max_retries = max_retries
         self.timeout = timeout
+        self.ini_path = ini_path
         self._queue: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=queue_size)
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
@@ -159,10 +153,37 @@ class ResilientDelivery:
                     )
                     if hasattr(response, "raise_for_status"):
                         response.raise_for_status()
+
+                    # Process response for triggered_limits
+                    if self.ini_path and hasattr(response, "json"):
+                        try:
+                            response_data = response.json()
+                            triggered_limits = response_data.get("triggered_limits")
+                            if triggered_limits:
+                                self._update_triggered_limits(triggered_limits)
+                        except Exception:
+                            # Don't fail delivery for triggered_limits processing errors
+                            pass
+
             self._total_sent += 1
         except Exception as exc:  # pragma: no cover - network failure
             self._total_failed += 1
             self._last_error = str(exc)
+
+    def _update_triggered_limits(self, triggered_limits: dict) -> None:
+        """Update triggered_limits in INI file from delivery response."""
+        try:
+            cp = configparser.ConfigParser()
+            cp.read(self.ini_path)
+            os.makedirs(os.path.dirname(self.ini_path), exist_ok=True)
+            if "triggered_limits" not in cp:
+                cp["triggered_limits"] = {}
+            cp["triggered_limits"]["payload"] = json.dumps(triggered_limits)
+            with open(self.ini_path, "w") as f:
+                cp.write(f)
+        except Exception:
+            # Don't fail delivery for INI update errors
+            pass
 
     # ------------------------------------------------------------------
     # Health helpers

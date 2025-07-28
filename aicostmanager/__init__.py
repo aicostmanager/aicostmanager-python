@@ -3,7 +3,14 @@
 __version__ = "0.1.5"
 
 from .async_cost_manager import AsyncCostManager
-from .client import AsyncCostManagerClient, CostManagerClient
+from .client import (
+    AICMError,
+    APIRequestError,
+    AsyncCostManagerClient,
+    CostManagerClient,
+    MissingConfiguration,
+    UsageLimitExceeded,
+)
 from .config_manager import CostManagerConfig
 from .cost_manager import CostManager
 from .delivery import (
@@ -15,6 +22,7 @@ from .models import (
     ApiUsageRecord,
     ApiUsageRequest,
     ApiUsageResponse,
+    CostUnitOut,
     CustomerFilters,
     CustomerIn,
     CustomerOut,
@@ -25,25 +33,28 @@ from .models import (
     RollupFilters,
     ServiceConfigItem,
     ServiceConfigListResponse,
+    ServiceOut,
     ThresholdType,
     UsageEvent,
     UsageEventFilters,
     UsageLimitIn,
     UsageLimitOut,
-    VendorOut,
-    ServiceOut,
-    CostUnitOut,
     UsageRollup,
     ValidationError,
+    VendorOut,
 )
 from .universal_extractor import UniversalExtractor
 
 __all__ = [
-    "CostManagerClient",
-    "AsyncCostManagerClient",
-    "CostManagerConfig",
-    "CostManager",
+    "AICMError",
+    "APIRequestError",
     "AsyncCostManager",
+    "AsyncCostManagerClient",
+    "CostManager",
+    "CostManagerClient",
+    "MissingConfiguration",
+    "UsageLimitExceeded",
+    "CostManagerConfig",
     "UniversalExtractor",
     "ResilientDelivery",
     "get_global_delivery",

@@ -2,33 +2,33 @@
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, Optional, AsyncIterator
 import configparser
 import json
+import os
+from pathlib import Path
+from typing import Any, AsyncIterator, Dict, Iterable, Iterator, Optional
 
-import requests
 import httpx
+import requests
 
 from .models import (
     ApiUsageRequest,
     ApiUsageResponse,
+    CostUnitOut,
+    CustomerFilters,
     CustomerIn,
     CustomerOut,
-    ServiceConfigListResponse,
-    UsageEvent,
-    UsageLimitIn,
-    UsageLimitOut,
-    VendorOut,
-    ServiceOut,
-    CostUnitOut,
-    UsageRollup,
-    UsageEventFilters,
-    RollupFilters,
-    CustomerFilters,
     ErrorResponse,
     PaginatedResponse,
+    RollupFilters,
+    ServiceConfigListResponse,
+    ServiceOut,
+    UsageEvent,
+    UsageEventFilters,
+    UsageLimitIn,
+    UsageLimitOut,
+    UsageRollup,
+    VendorOut,
 )
 
 
@@ -50,21 +50,19 @@ class APIRequestError(AICMError):
             try:
                 self.error_response = ErrorResponse.model_validate(detail)
             except Exception:
-                self.message = str(detail)
-                self.error = None
-                self.details = None
-                self.timestamp = None
-            else:
-                self.error = self.error_response.error
-                self.message = self.error_response.message
-                self.details = self.error_response.details
-                self.timestamp = self.error_response.timestamp
-        else:
-            self.message = str(detail)
-            self.error = None
-            self.details = None
-            self.timestamp = None
-        super().__init__(f"HTTP {status_code}: {self.message}")
+                pass
+        super().__init__(f"API request failed with status {status_code}: {detail}")
+
+
+class UsageLimitExceeded(AICMError):
+    """Raised when a usage limit has been exceeded and blocks API calls."""
+
+    def __init__(self, triggered_limits: list) -> None:
+        self.triggered_limits = triggered_limits
+        limit_info = ", ".join(
+            [f"limit {tl.limit_id} ({tl.threshold_type})" for tl in triggered_limits]
+        )
+        super().__init__(f"Usage limit exceeded: {limit_info}")
 
 
 class CostManagerClient:
@@ -81,18 +79,11 @@ class CostManagerClient:
         proxies: Optional[dict[str, str]] = None,
         headers: Optional[dict[str, str]] = None,
     ) -> None:
-        self.api_key = (
-            aicm_api_key
-            or os.getenv("AICM_API_KEY")
+        self.api_key = aicm_api_key or os.getenv("AICM_API_KEY")
+        self.api_base = aicm_api_base or os.getenv(
+            "AICM_API_BASE", "https://aicostmanager.com"
         )
-        self.api_base = (
-            aicm_api_base
-            or os.getenv("AICM_API_BASE", "https://aicostmanager.com")
-        )
-        self.api_url = (
-            aicm_api_url
-            or os.getenv("AICM_API_URL", "/api/v1")
-        )
+        self.api_url = aicm_api_url or os.getenv("AICM_API_URL", "/api/v1")
         self.ini_path = (
             aicm_ini_path
             or os.getenv("AICM_INI_PATH")
@@ -111,7 +102,12 @@ class CostManagerClient:
             setattr(session, "proxies", getattr(session, "proxies", {}))
             session.proxies.update(proxies)
         self.session = session
-        self.session.headers.update({"Authorization": f"Bearer {self.api_key}", "User-Agent": "aicostmanager-python"})
+        self.session.headers.update(
+            {
+                "Authorization": f"Bearer {self.api_key}",
+                "User-Agent": "aicostmanager-python",
+            }
+        )
         if headers:
             self.session.headers.update(headers)
 
@@ -153,7 +149,7 @@ class CostManagerClient:
             if not next_url:
                 break
             if next_url.startswith(self.api_root):
-                path = next_url[len(self.api_root):]
+                path = next_url[len(self.api_root) :]
             else:
                 path = next_url
             params = {}
@@ -164,7 +160,9 @@ class CostManagerClient:
         return ServiceConfigListResponse.model_validate(data)
 
     def track_usage(self, data: ApiUsageRequest | Dict[str, Any]) -> ApiUsageResponse:
-        payload = data.model_dump() if isinstance(data, ApiUsageRequest) else data
+        payload = (
+            data.model_dump(mode="json") if isinstance(data, ApiUsageRequest) else data
+        )
         resp = self._request("POST", "/track-usage", json=payload)
         result = ApiUsageResponse.model_validate(resp)
         if result.triggered_limits:
@@ -276,7 +274,7 @@ class CostManagerClient:
             yield CustomerOut.model_validate(item)
 
     def create_customer(self, data: CustomerIn | Dict[str, Any]) -> CustomerOut:
-        payload = data.model_dump() if isinstance(data, CustomerIn) else data
+        payload = data.model_dump(mode="json") if isinstance(data, CustomerIn) else data
         resp = self._request("POST", "/customers/", json=payload)
         return CustomerOut.model_validate(resp)
 
@@ -284,8 +282,10 @@ class CostManagerClient:
         data = self._request("GET", f"/customers/{customer_id}/")
         return CustomerOut.model_validate(data)
 
-    def update_customer(self, customer_id: str, data: CustomerIn | Dict[str, Any]) -> CustomerOut:
-        payload = data.model_dump() if isinstance(data, CustomerIn) else data
+    def update_customer(
+        self, customer_id: str, data: CustomerIn | Dict[str, Any]
+    ) -> CustomerOut:
+        payload = data.model_dump(mode="json") if isinstance(data, CustomerIn) else data
         resp = self._request("PUT", f"/customers/{customer_id}/", json=payload)
         return CustomerOut.model_validate(resp)
 
@@ -298,7 +298,9 @@ class CostManagerClient:
         return [UsageLimitOut.model_validate(i) for i in data]
 
     def create_usage_limit(self, data: UsageLimitIn | Dict[str, Any]) -> UsageLimitOut:
-        payload = data.model_dump() if isinstance(data, UsageLimitIn) else data
+        payload = (
+            data.model_dump(mode="json") if isinstance(data, UsageLimitIn) else data
+        )
         resp = self._request("POST", "/usage-limits/", json=payload)
         return UsageLimitOut.model_validate(resp)
 
@@ -306,8 +308,12 @@ class CostManagerClient:
         data = self._request("GET", f"/usage-limits/{limit_id}/")
         return UsageLimitOut.model_validate(data)
 
-    def update_usage_limit(self, limit_id: str, data: UsageLimitIn | Dict[str, Any]) -> UsageLimitOut:
-        payload = data.model_dump() if isinstance(data, UsageLimitIn) else data
+    def update_usage_limit(
+        self, limit_id: str, data: UsageLimitIn | Dict[str, Any]
+    ) -> UsageLimitOut:
+        payload = (
+            data.model_dump(mode="json") if isinstance(data, UsageLimitIn) else data
+        )
         resp = self._request("PUT", f"/usage-limits/{limit_id}/", json=payload)
         return UsageLimitOut.model_validate(resp)
 
@@ -321,6 +327,9 @@ class CostManagerClient:
 
     def list_vendor_services(self, vendor: str) -> Iterable[ServiceOut]:
         data = self._request("GET", "/services/", params={"vendor": vendor})
+        # Add vendor field to each service object since the API doesn't include it
+        for service in data:
+            service["vendor"] = vendor
         return [ServiceOut.model_validate(i) for i in data]
 
     def list_service_costs(self, vendor: str, service: str) -> Iterable[CostUnitOut]:
@@ -351,7 +360,9 @@ class AsyncCostManagerClient:
         headers: Optional[dict[str, str]] = None,
     ) -> None:
         self.api_key = aicm_api_key or os.getenv("AICM_API_KEY")
-        self.api_base = aicm_api_base or os.getenv("AICM_API_BASE", "https://aicostmanager.com")
+        self.api_base = aicm_api_base or os.getenv(
+            "AICM_API_BASE", "https://aicostmanager.com"
+        )
         self.api_url = aicm_api_url or os.getenv("AICM_API_URL", "/api/v1")
         self.ini_path = (
             aicm_ini_path
@@ -368,7 +379,12 @@ class AsyncCostManagerClient:
                 proxy = next(iter(proxies.values()))
             session = httpx.AsyncClient(proxy=proxy)
         self.session = session
-        self.session.headers.update({"Authorization": f"Bearer {self.api_key}", "User-Agent": "aicostmanager-python"})
+        self.session.headers.update(
+            {
+                "Authorization": f"Bearer {self.api_key}",
+                "User-Agent": "aicostmanager-python",
+            }
+        )
         if headers:
             self.session.headers.update(headers)
 
@@ -416,8 +432,12 @@ class AsyncCostManagerClient:
         data = await self._request("GET", "/configs")
         return ServiceConfigListResponse.model_validate(data)
 
-    async def track_usage(self, data: ApiUsageRequest | Dict[str, Any]) -> ApiUsageResponse:
-        payload = data.model_dump() if isinstance(data, ApiUsageRequest) else data
+    async def track_usage(
+        self, data: ApiUsageRequest | Dict[str, Any]
+    ) -> ApiUsageResponse:
+        payload = (
+            data.model_dump(mode="json") if isinstance(data, ApiUsageRequest) else data
+        )
         resp = await self._request("POST", "/track-usage", json=payload)
         result = ApiUsageResponse.model_validate(resp)
         if result.triggered_limits:
@@ -529,7 +549,7 @@ class AsyncCostManagerClient:
             yield CustomerOut.model_validate(item)
 
     async def create_customer(self, data: CustomerIn | Dict[str, Any]) -> CustomerOut:
-        payload = data.model_dump() if isinstance(data, CustomerIn) else data
+        payload = data.model_dump(mode="json") if isinstance(data, CustomerIn) else data
         resp = await self._request("POST", "/customers/", json=payload)
         return CustomerOut.model_validate(resp)
 
@@ -537,8 +557,10 @@ class AsyncCostManagerClient:
         data = await self._request("GET", f"/customers/{customer_id}/")
         return CustomerOut.model_validate(data)
 
-    async def update_customer(self, customer_id: str, data: CustomerIn | Dict[str, Any]) -> CustomerOut:
-        payload = data.model_dump() if isinstance(data, CustomerIn) else data
+    async def update_customer(
+        self, customer_id: str, data: CustomerIn | Dict[str, Any]
+    ) -> CustomerOut:
+        payload = data.model_dump(mode="json") if isinstance(data, CustomerIn) else data
         resp = await self._request("PUT", f"/customers/{customer_id}/", json=payload)
         return CustomerOut.model_validate(resp)
 
@@ -550,8 +572,12 @@ class AsyncCostManagerClient:
         data = await self._request("GET", "/usage-limits/")
         return [UsageLimitOut.model_validate(i) for i in data]
 
-    async def create_usage_limit(self, data: UsageLimitIn | Dict[str, Any]) -> UsageLimitOut:
-        payload = data.model_dump() if isinstance(data, UsageLimitIn) else data
+    async def create_usage_limit(
+        self, data: UsageLimitIn | Dict[str, Any]
+    ) -> UsageLimitOut:
+        payload = (
+            data.model_dump(mode="json") if isinstance(data, UsageLimitIn) else data
+        )
         resp = await self._request("POST", "/usage-limits/", json=payload)
         return UsageLimitOut.model_validate(resp)
 
@@ -559,8 +585,12 @@ class AsyncCostManagerClient:
         data = await self._request("GET", f"/usage-limits/{limit_id}/")
         return UsageLimitOut.model_validate(data)
 
-    async def update_usage_limit(self, limit_id: str, data: UsageLimitIn | Dict[str, Any]) -> UsageLimitOut:
-        payload = data.model_dump() if isinstance(data, UsageLimitIn) else data
+    async def update_usage_limit(
+        self, limit_id: str, data: UsageLimitIn | Dict[str, Any]
+    ) -> UsageLimitOut:
+        payload = (
+            data.model_dump(mode="json") if isinstance(data, UsageLimitIn) else data
+        )
         resp = await self._request("PUT", f"/usage-limits/{limit_id}/", json=payload)
         return UsageLimitOut.model_validate(resp)
 
@@ -574,9 +604,14 @@ class AsyncCostManagerClient:
 
     async def list_vendor_services(self, vendor: str) -> Iterable[ServiceOut]:
         data = await self._request("GET", "/services/", params={"vendor": vendor})
+        # Add vendor field to each service object since the API doesn't include it
+        for service in data:
+            service["vendor"] = vendor
         return [ServiceOut.model_validate(i) for i in data]
 
-    async def list_service_costs(self, vendor: str, service: str) -> Iterable[CostUnitOut]:
+    async def list_service_costs(
+        self, vendor: str, service: str
+    ) -> Iterable[CostUnitOut]:
         """Asynchronously list cost units for a service."""
         data = await self._request(
             "GET",

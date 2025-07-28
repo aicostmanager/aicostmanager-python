@@ -63,7 +63,21 @@ class CostManager:
         """Load latest triggered limits from the config manager."""
         try:
             self.triggered_limits = self.config_manager.get_triggered_limits()
+            # Check for LIMIT threshold types that should block API calls
+            blocking_limits = [
+                limit
+                for limit in self.triggered_limits
+                if limit.threshold_type == "limit"
+            ]
+            if blocking_limits:
+                from .client import UsageLimitExceeded
+
+                raise UsageLimitExceeded(blocking_limits)
+        except UsageLimitExceeded:
+            # Re-raise usage limit exceptions
+            raise
         except Exception:
+            # Only catch other types of exceptions
             self.triggered_limits = []
 
     # ------------------------------------------------------------

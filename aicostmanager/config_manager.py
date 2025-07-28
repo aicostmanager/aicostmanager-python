@@ -8,7 +8,7 @@ from typing import List, Optional
 
 import jwt
 
-from .client import CostManagerClient, AICMError
+from .client import AICMError, CostManagerClient
 
 
 class ConfigNotFound(AICMError):
@@ -61,7 +61,7 @@ class CostManagerConfig:
         """Fetch configs from the API and persist to ``AICM.ini``."""
         data = self.client.get_configs()
         if hasattr(data, "model_dump"):
-            payload = data.model_dump()
+            payload = data.model_dump(mode="json")
         else:
             payload = data
         self._config["configs"] = {
