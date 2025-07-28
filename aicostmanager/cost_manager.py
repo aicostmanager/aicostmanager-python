@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Iterator, List, Optional
 
-from .client import CostManagerClient
+from .client import CostManagerClient, UsageLimitExceeded
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
 from .delivery import ResilientDelivery, get_global_delivery
 from .universal_extractor import UniversalExtractor
@@ -70,8 +70,6 @@ class CostManager:
                 if limit.threshold_type == "limit"
             ]
             if blocking_limits:
-                from .client import UsageLimitExceeded
-
                 raise UsageLimitExceeded(blocking_limits)
         except UsageLimitExceeded:
             # Re-raise usage limit exceptions
