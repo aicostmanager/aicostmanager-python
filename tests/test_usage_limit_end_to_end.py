@@ -45,7 +45,20 @@ def test_usage_limit_end_to_end(
 
     services = list(client.list_vendor_services(openai_vendor.name))
     assert services, "No services for OpenAI vendor"
-    service = services[0]
+
+    cheapest_service = services[0]
+    cheapest_cost = None
+    for svc in services:
+        costs = list(client.list_service_costs(openai_vendor.name, svc.service_id))
+        for cu in costs:
+            if not cu.is_active:
+                continue
+            cost_val = float(cu.cost) / max(cu.per_quantity, 1)
+            if cost_val > 0 and (cheapest_cost is None or cost_val < cheapest_cost):
+                cheapest_cost = cost_val
+                cheapest_service = svc
+
+    service = cheapest_service
 
     limit = client.create_usage_limit(
         UsageLimitIn(

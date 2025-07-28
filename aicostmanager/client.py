@@ -22,6 +22,7 @@ from .models import (
     UsageLimitOut,
     VendorOut,
     ServiceOut,
+    CostUnitOut,
     UsageRollup,
     UsageEventFilters,
     RollupFilters,
@@ -322,6 +323,15 @@ class CostManagerClient:
         data = self._request("GET", "/services/", params={"vendor": vendor})
         return [ServiceOut.model_validate(i) for i in data]
 
+    def list_service_costs(self, vendor: str, service: str) -> Iterable[CostUnitOut]:
+        """List cost units for a service."""
+        data = self._request(
+            "GET",
+            "/service-costs/",
+            params={"vendor": vendor, "service": service},
+        )
+        return [CostUnitOut.model_validate(i) for i in data]
+
     def get_openapi_schema(self) -> Any:
         return self._request("GET", "/openapi.json")
 
@@ -565,6 +575,15 @@ class AsyncCostManagerClient:
     async def list_vendor_services(self, vendor: str) -> Iterable[ServiceOut]:
         data = await self._request("GET", "/services/", params={"vendor": vendor})
         return [ServiceOut.model_validate(i) for i in data]
+
+    async def list_service_costs(self, vendor: str, service: str) -> Iterable[CostUnitOut]:
+        """Asynchronously list cost units for a service."""
+        data = await self._request(
+            "GET",
+            "/service-costs/",
+            params={"vendor": vendor, "service": service},
+        )
+        return [CostUnitOut.model_validate(i) for i in data]
 
     async def get_openapi_schema(self) -> Any:
         return await self._request("GET", "/openapi.json")

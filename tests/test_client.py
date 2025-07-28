@@ -258,6 +258,14 @@ def test_methods(monkeypatch):
         ),
         (
             "GET",
+            "/service-costs/",
+            client.list_service_costs,
+            (),
+            {"vendor": "openai", "service": "gpt-4"},
+            [],
+        ),
+        (
+            "GET",
             "/openapi.json",
             client.get_openapi_schema,
             (),
@@ -338,6 +346,9 @@ def test_filter_objects(monkeypatch):
 
     client.list_vendor_services("openai")
     assert captured.get("params") == {"vendor": "openai"}
+
+    client.list_service_costs("openai", "gpt-4")
+    assert captured.get("params") == {"vendor": "openai", "service": "gpt-4"}
 
 
 def test_track_usage_persists_triggered_limits(monkeypatch, tmp_path):

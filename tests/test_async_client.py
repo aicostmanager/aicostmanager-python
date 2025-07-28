@@ -231,6 +231,14 @@ def test_async_methods(monkeypatch):
         ),
         (
             "GET",
+            "/service-costs/",
+            client.list_service_costs,
+            (),
+            {"vendor": "openai", "service": "gpt-4"},
+            [],
+        ),
+        (
+            "GET",
             "/openapi.json",
             client.get_openapi_schema,
             (),
@@ -300,6 +308,12 @@ def test_async_filter_objects(monkeypatch):
 
     asyncio.run(run4())
     assert captured.get("params") == {"vendor": "openai"}
+
+    async def run5():
+        await client.list_service_costs("openai", "gpt-4")
+
+    asyncio.run(run5())
+    assert captured.get("params") == {"vendor": "openai", "service": "gpt-4"}
 
 
 def test_async_error_response(monkeypatch):

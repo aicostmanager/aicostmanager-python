@@ -32,6 +32,7 @@ from .models import (
     UsageLimitOut,
     VendorOut,
     ServiceOut,
+    CostUnitOut,
     UsageRollup,
     ValidationError,
 )
@@ -58,6 +59,7 @@ __all__ = [
     "UsageLimitOut",
     "VendorOut",
     "ServiceOut",
+    "CostUnitOut",
     "ThresholdType",
     "Period",
     "Granularity",
