@@ -31,7 +31,8 @@ class TriggeredLimit:
     threshold_type: str
     amount: float
     period: str
-    vendor: Optional[str]
+    config_id_list: Optional[List[str]]
+    hostname: Optional[str]
     service_id: Optional[str]
     client_customer_key: Optional[str]
     api_key_id: str
@@ -42,7 +43,9 @@ class TriggeredLimit:
 class CostManagerConfig:
     """Manage tracker configuration and triggered limits stored in ``AICM.ini``."""
 
-    def __init__(self, client: CostManagerClient, *, auto_refresh: bool = False) -> None:
+    def __init__(
+        self, client: CostManagerClient, *, auto_refresh: bool = False
+    ) -> None:
         self.client = client
         self.ini_path = client.ini_path
         self.auto_refresh = auto_refresh
@@ -83,13 +86,19 @@ class CostManagerConfig:
     # internal helper
     def _decode(self, token: str, public_key: str) -> Optional[dict]:
         try:
-            return jwt.decode(token, public_key, algorithms=["RS256"], issuer="aicm-api")
+            return jwt.decode(
+                token, public_key, algorithms=["RS256"], issuer="aicm-api"
+            )
         except Exception:
             return None
 
     def get_config(self, api_id: str) -> List[Config]:
         """Return decrypted configs matching ``api_id``."""
-        if self.auto_refresh or "configs" not in self._config or "payload" not in self._config["configs"]:
+        if (
+            self.auto_refresh
+            or "configs" not in self._config
+            or "payload" not in self._config["configs"]
+        ):
             self.refresh()
 
         configs_raw = json.loads(self._config["configs"].get("payload", "[]"))
@@ -140,7 +149,11 @@ class CostManagerConfig:
         client_customer_key: Optional[str] = None,
     ) -> List[TriggeredLimit]:
         """Return triggered limits for the given parameters."""
-        if self.auto_refresh or "triggered_limits" not in self._config or "payload" not in self._config["triggered_limits"]:
+        if (
+            self.auto_refresh
+            or "triggered_limits" not in self._config
+            or "payload" not in self._config["triggered_limits"]
+        ):
             self.refresh()
 
         tl_raw = json.loads(self._config["triggered_limits"].get("payload", "{}"))
@@ -154,11 +167,15 @@ class CostManagerConfig:
         events = payload.get("triggered_limits", [])
         results: List[TriggeredLimit] = []
         for event in events:
+            vendor_info = event.get("vendor") or {}
+            vendor_name = vendor_info.get("name")
+            config_ids = vendor_info.get("config_ids")
+            hostname = vendor_info.get("hostname")
             if (
                 service_id
                 and event.get("service_id") == service_id
                 or service_vendor
-                and event.get("vendor") == service_vendor
+                and vendor_name == service_vendor
                 or client_customer_key
                 and event.get("client_customer_key") == client_customer_key
                 or (not service_id and not service_vendor and not client_customer_key)
@@ -170,7 +187,8 @@ class CostManagerConfig:
                         threshold_type=event.get("threshold_type"),
                         amount=float(event.get("amount", 0)),
                         period=event.get("period"),
-                        vendor=event.get("vendor"),
+                        config_id_list=config_ids,
+                        hostname=hostname,
                         service_id=event.get("service_id"),
                         client_customer_key=event.get("client_customer_key"),
                         api_key_id=event.get("api_key_id"),

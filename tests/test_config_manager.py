@@ -51,7 +51,11 @@ def _make_triggered_limits():
         "threshold_type": "limit",
         "amount": 10.0,
         "period": "day",
-        "vendor": "openai",
+        "vendor": {
+            "name": "openai",
+            "config_ids": ["cfg1"],
+            "hostname": "api.openai.com",
+        },
         "service_id": "gpt-4",
         "client_customer_key": "cust1",
         "api_key_id": "api-key-id",
@@ -98,6 +102,8 @@ def test_get_config_and_limits(monkeypatch, tmp_path):
     limits = cfg_mgr.get_triggered_limits(service_id="gpt-4")
     assert len(limits) == 1
     assert limits[0].service_id == "gpt-4"
+    assert limits[0].config_id_list == ["cfg1"]
+    assert limits[0].hostname == "api.openai.com"
 
     # file written
     cp = configparser.ConfigParser()
