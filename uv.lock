@@ -8,7 +8,7 @@ resolution-markers = [
 
 [[package]]
 name = "aicostmanager"
-version = "0.1.3"
+version = "0.1.4"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
@@ -31,9 +31,11 @@ test = [
     { name = "anthropic" },
     { name = "boto3" },
     { name = "google-genai" },
+    { name = "httpx" },
     { name = "openai" },
     { name = "pytest" },
     { name = "python-dotenv" },
+    { name = "requests" },
 ]
 
 [package.metadata]
@@ -55,9 +57,11 @@ test = [
     { name = "anthropic", specifier = ">=0.25.0" },
     { name = "boto3", specifier = ">=1.34.0" },
     { name = "google-genai", specifier = ">=1.20.0" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "openai", specifier = ">=1.97.1" },
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "requests", specifier = ">=2.32" },
 ]
 
 [[package]]
