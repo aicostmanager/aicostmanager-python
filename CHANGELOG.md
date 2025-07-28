@@ -5,9 +5,6 @@ All notable changes to this project will be documented in this file.
 ## [0.1.5] - 2025-07-24
 ### Changed
 - Added /dist/* to gitignore
-
-## [0.1.6] - 2025-07-24
-### Changed
 - Updated `TriggeredLimit` structure. Vendor details now provide
   `config_id_list` and `hostname` values. The old `vendor` string field
   has been removed.
