@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] - 2025-01-27
+### Added
+- Comprehensive usage limit functionality with real-time enforcement
+- `UsageLimitExceeded` exception for blocking API calls when limits are hit
+- End-to-end integration testing across multiple LLM providers
+- Enhanced event delivery verification in test suite
+
+### Enhanced
+- Real endpoint testing infrastructure for Bedrock and other providers
+- Triggered limits persistence and configuration management
+- Error handling with detailed limit information and blocking behavior
+
 ## [0.1.5] - 2025-07-24
 ### Changed
 - Added /dist/* to gitignore
