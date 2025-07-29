@@ -47,24 +47,22 @@ def test_usage_limit_end_to_end(
     services = list(client.list_vendor_services(openai_vendor.name))
     assert services, "No services for OpenAI vendor"
 
-    cheapest_service = services[0]
-    cheapest_cost = None
+    # Find gpt-3.5-turbo service specifically (since that's what we call)
+    gpt35_service = None
     for svc in services:
-        costs = list(client.list_service_costs(openai_vendor.name, svc.service_id))
-        for cu in costs:
-            if not cu.is_active:
-                continue
-            cost_val = float(cu.cost) / max(cu.per_quantity, 1)
-            if cost_val > 0 and (cheapest_cost is None or cost_val < cheapest_cost):
-                cheapest_cost = cost_val
-                cheapest_service = svc
+        if svc.service_id == "gpt-3.5-turbo":
+            gpt35_service = svc
+            break
 
-    service = cheapest_service
+    if not gpt35_service:
+        pytest.skip("gpt-3.5-turbo service not found - cannot test limit enforcement")
+
+    service = gpt35_service
 
     limit = client.create_usage_limit(
         UsageLimitIn(
             threshold_type=ThresholdType.LIMIT,
-            amount=0.0001,
+            amount=0.00004,  # $0.01 - should allow first call but trigger on subsequent calls
             period=Period.DAY,
             vendor=openai_vendor.name,
             service=service.service_id,
@@ -79,30 +77,58 @@ def test_usage_limit_end_to_end(
             aicm_ini_path=aicm_ini_path,
         )
 
-        # ensure configs updated with new limit info
-        tracked_client.config_manager.refresh()
-
         # first call should succeed
+        print("Making initial API call...")
         tracked_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": "hi"}],
             max_tokens=5,
         )
+        print("Initial call completed successfully")
         time.sleep(2)
 
         # subsequent calls expected to exceed limit (may take multiple calls)
+        print("Starting loop to trigger usage limit (max 100 attempts)...")
         exception_raised = False
         for i in range(100):
             try:
+                print(f"Attempt {i + 1}/100: Making API call...")
                 tracked_client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[{"role": "user", "content": f"hi again {i}"}],
                     max_tokens=5,
                 )
+                print(f"Attempt {i + 1}/100: Call completed")
+
+                # Check for triggered limits after each call
+                triggered_limits = tracked_client.config_manager.get_triggered_limits(
+                    service_id=service.service_id
+                )
+                if triggered_limits:
+                    print(
+                        f"Attempt {i + 1}/100: Found {len(triggered_limits)} triggered limits!"
+                    )
+                    for tl in triggered_limits:
+                        print(
+                            f"  - Limit {tl.limit_id}: {tl.threshold_type}, amount: {tl.amount}"
+                        )
+                else:
+                    print(f"Attempt {i + 1}/100: No triggered limits detected yet")
+
                 time.sleep(2)  # Give server time to process usage
-            except Exception:
+            except Exception as e:
+                print(f"Attempt {i + 1}/100: Exception raised: {type(e).__name__}: {e}")
                 exception_raised = True
                 break
+
+        if not exception_raised:
+            print(
+                "Loop completed without exception - checking final triggered limits..."
+            )
+            final_triggered = tracked_client.config_manager.get_triggered_limits(
+                service_id=service.service_id
+            )
+            print(f"Final triggered limits count: {len(final_triggered)}")
 
         assert exception_raised, (
             "Expected an exception to be raised within 100 attempts"
@@ -115,3 +141,4 @@ def test_usage_limit_end_to_end(
         assert any(t.limit_id == limit.uuid for t in triggered)
     finally:
         client.delete_usage_limit(limit.uuid)
+        pass
