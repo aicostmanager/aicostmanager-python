@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7] - 2025-01-30
+### Fixed
+- Fixed URL serialization issue in `_make_json_serializable` method for httpx.URL objects
+- Resolved 422 validation errors when tracking usage for OpenAI-compatible APIs (DeepSeek, Gemini)
+- Fixed usage event delivery failures that were preventing proper cost tracking
+- All OpenAI and OpenAI-compatible real endpoint tests now pass successfully
+
 ## [0.1.6] - 2025-01-27
 ### Added
 - Comprehensive usage limit functionality with real-time enforcement
