@@ -94,7 +94,7 @@ class CostManagerClient:
         self.ini_path = (
             aicm_ini_path
             or os.getenv("AICM_INI_PATH")
-            or str(Path.home() / ".config" / "aicostmanager" / "AICM.ini")
+            or str(Path.home() / ".config" / "aicostmanager" / "AICM.INI")
         )
         if not self.api_key:
             raise MissingConfiguration(
@@ -374,7 +374,7 @@ class AsyncCostManagerClient:
         self.ini_path = (
             aicm_ini_path
             or os.getenv("AICM_INI_PATH")
-            or str(Path.home() / ".config" / "aicostmanager" / "AICM.ini")
+            or str(Path.home() / ".config" / "aicostmanager" / "AICM.INI")
         )
         if not self.api_key:
             raise MissingConfiguration(
