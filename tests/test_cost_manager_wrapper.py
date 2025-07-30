@@ -39,9 +39,9 @@ def test_tracker_loads_configs(monkeypatch):
 
     tracker = CostManager(dummy)
 
-    assert tracker.api_id == "dummyclient"
+    assert tracker.api_id == "test_cost_manager_wrapper"
     assert tracker.configs == [cfg]
-    assert called["api_id"] == "dummyclient"
+    assert called["api_id"] == "test_cost_manager_wrapper"
 
 
 def test_passthrough_method(monkeypatch):
