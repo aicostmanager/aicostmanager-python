@@ -6,8 +6,12 @@ import asyncio
 import logging
 from typing import Any, Optional, List
 
-from .client import CostManagerClient, AsyncCostManagerClient
-from .config_manager import CostManagerConfig, Config
+from .client import (
+    CostManagerClient,
+    AsyncCostManagerClient,
+    UsageLimitExceeded,
+)
+from .config_manager import CostManagerConfig, Config, TriggeredLimit
 from .universal_extractor import UniversalExtractor
 from .cost_manager import _AsyncStreamIterator
 
@@ -163,6 +167,7 @@ class AsyncCostManager:
         cfg_client.close()
         self.extractor = UniversalExtractor(self.configs)
         self.tracked_payloads: list[dict[str, Any]] = []
+        self.triggered_limits: List[TriggeredLimit] = []
 
         if delivery is not None:
             self.delivery = delivery
@@ -175,6 +180,22 @@ class AsyncCostManager:
                 timeout=delivery_timeout,
             )
         self.delivery.start()
+
+    def _refresh_limits(self) -> None:
+        """Load latest triggered limits from the config manager."""
+        try:
+            self.triggered_limits = self.config_manager.get_triggered_limits()
+            blocking_limits = [
+                limit
+                for limit in self.triggered_limits
+                if limit.threshold_type == "limit"
+            ]
+            if blocking_limits:
+                raise UsageLimitExceeded(blocking_limits)
+        except UsageLimitExceeded:
+            raise
+        except Exception:
+            self.triggered_limits = []
     # ------------------------------------------------------------
     # attribute proxying
     # ------------------------------------------------------------
@@ -182,9 +203,11 @@ class AsyncCostManager:
         attr = getattr(self.client, name)
 
         if not callable(attr):
-            return attr
+            self._refresh_limits()
+            return AsyncNestedAttributeWrapper(attr, self, name)
 
         async def wrapper(*args, **kwargs):
+            self._refresh_limits()
             response = await attr(*args, **kwargs)
             if kwargs.get("stream") and hasattr(response, "__aiter__"):
                 return _AsyncStreamIterator(response, self, name, args, kwargs)
@@ -204,6 +227,71 @@ class AsyncCostManager:
         return list(self.tracked_payloads)
 
     # ------------------------------------------------------------
+    # streaming detection helpers (mirrored from CostManager)
+    # ------------------------------------------------------------
+    def _is_streaming(self, result: Any) -> bool:
+        """Determine if result is streaming using multiple detection methods."""
+        return (
+            self._is_streaming_type(result)
+            or self._appears_to_be_stream(result)
+            or self._has_streaming_interface(result)
+            or self._is_bedrock_streaming(result)
+        )
+
+    def _is_streaming_type(self, result: Any) -> bool:
+        """Check type-based indicators for streaming."""
+        import inspect
+        from typing import AsyncGenerator, AsyncIterator, Generator, Iterator
+
+        if isinstance(result, (Iterator, AsyncIterator, Generator, AsyncGenerator)):
+            return True
+
+        if inspect.isgenerator(result) or inspect.isasyncgen(result):
+            return True
+
+        return False
+
+    def _appears_to_be_stream(self, result: Any) -> bool:
+        """Check duck-typing indicators for streaming."""
+        class_name = type(result).__name__.lower()
+        if any(indicator in class_name for indicator in ["stream", "iterator", "chunk"]):
+            return True
+
+        if hasattr(result, "__iter__") and hasattr(result, "__next__"):
+            return True
+
+        if hasattr(result, "__aiter__") and hasattr(result, "__anext__"):
+            return True
+
+        return False
+
+    def _has_streaming_interface(self, result: Any) -> bool:
+        """Check for streaming-specific methods."""
+        streaming_methods = [
+            "read",
+            "readline",
+            "__stream__",
+            "iter_lines",
+            "iter_content",
+        ]
+        return any(hasattr(result, method) for method in streaming_methods)
+
+    def _is_bedrock_streaming(self, result: Any) -> bool:
+        """Check for Bedrock-specific streaming response structure."""
+        if isinstance(result, dict) and "stream" in result:
+            stream_obj = result["stream"]
+            is_bedrock_stream = (
+                hasattr(stream_obj, "__iter__")
+                and not isinstance(stream_obj, (str, bytes, dict))
+                and (
+                    hasattr(stream_obj, "__next__")
+                    or "EventStream" in str(type(stream_obj))
+                )
+            )
+            return is_bedrock_stream
+        return False
+
+    # ------------------------------------------------------------
     # delivery helpers
     # ------------------------------------------------------------
     def start_delivery(self) -> None:
@@ -220,3 +308,52 @@ class AsyncCostManager:
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.stop_delivery()
+
+
+class AsyncNestedAttributeWrapper:
+    """Async wrapper for nested attributes supporting limit enforcement."""
+
+    def __init__(self, obj: Any, parent_manager: AsyncCostManager, path: str) -> None:
+        self._wrapped_obj = obj
+        self._parent_manager = parent_manager
+        self._path = path
+
+    def __getattr__(self, name: str) -> Any:
+        attr = getattr(self._wrapped_obj, name)
+        full_path = f"{self._path}.{name}"
+
+        if callable(attr):
+
+            async def wrapper(*args, **kwargs):
+                self._parent_manager._refresh_limits()
+                if (
+                    kwargs.get("stream")
+                    and self._parent_manager.api_id == "openai"
+                    and full_path in ["chat.completions.create", "completions.create"]
+                ):
+                    if "stream_options" not in kwargs:
+                        kwargs["stream_options"] = {"include_usage": True}
+
+                response = await attr(*args, **kwargs)
+                if self._parent_manager._is_streaming(response):
+                    return _AsyncStreamIterator(
+                        response, self._parent_manager, full_path, args, kwargs
+                    )
+                payloads = self._parent_manager.extractor.process_call(
+                    full_path,
+                    args,
+                    kwargs,
+                    response,
+                    client=self._parent_manager.client,
+                    is_streaming=False,
+                )
+                if payloads:
+                    self._parent_manager.tracked_payloads.extend(payloads)
+                    for payload in payloads:
+                        self._parent_manager.delivery.deliver({"usage_records": [payload]})
+                return response
+
+            return wrapper
+        else:
+            self._parent_manager._refresh_limits()
+            return AsyncNestedAttributeWrapper(attr, self._parent_manager, full_path)
