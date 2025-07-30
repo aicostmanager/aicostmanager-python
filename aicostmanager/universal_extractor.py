@@ -190,7 +190,7 @@ class UniversalExtractor:
             return None
 
         # Handle URLs
-        if hasattr(value, "__class__.__module__") and "URL" in str(type(value)):
+        if "URL" in str(type(value)):
             return str(value)
 
         # Handle ParseResult (urllib.parse)

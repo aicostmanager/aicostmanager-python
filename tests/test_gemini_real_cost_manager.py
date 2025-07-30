@@ -94,6 +94,8 @@ def verify_track_usage_success(client, payload_data):
 class Gemini:
     """Wrapper for Google GenAI client to provide proper API ID detection."""
 
+    __module__ = "google.genai.client"
+
     def __init__(self, api_key):
         self._client = genai.Client(api_key=api_key)
 
@@ -116,7 +118,7 @@ def test_gemini_cost_manager_configs(
     client = _make_client(google_api_key)
     tracked_client = CostManager(client)
     configs = tracked_client.configs
-    gem_configs = [c for c in configs if c.api_id == "gemini"]
+    gem_configs = [c for c in configs if c.api_id == "google.genai.client"]
     assert gem_configs
 
 
@@ -129,7 +131,7 @@ def test_gemini_config_retrieval_and_extractor_interaction(
     client = _make_client(google_api_key)
     tracked_client = CostManager(client)
     configs = tracked_client.configs
-    gem_configs = [cfg for cfg in configs if cfg.api_id == "gemini"]
+    gem_configs = [cfg for cfg in configs if cfg.api_id == "google.genai.client"]
     assert gem_configs
     extractor = UniversalExtractor(gem_configs)
     for config in gem_configs:
@@ -326,7 +328,7 @@ def test_extractor_payload_generation(
     client = _make_client(google_api_key)
     tracked_client = CostManager(client)
     configs = tracked_client.configs
-    gem_configs = [cfg for cfg in configs if cfg.api_id == "gemini"]
+    gem_configs = [cfg for cfg in configs if cfg.api_id == "google.genai.client"]
     extractor = UniversalExtractor(gem_configs)
 
     response = tracked_client.models.generate_content(
