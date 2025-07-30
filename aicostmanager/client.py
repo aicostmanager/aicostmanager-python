@@ -117,6 +117,18 @@ class CostManagerClient:
         )
         if headers:
             self.session.headers.update(headers)
+        self._configs_etag: str | None = None
+
+    @property
+    def configs_etag(self) -> str | None:
+        """Return the last ETag seen from ``/configs``."""
+        return self._configs_etag
+        self._configs_etag: str | None = None
+
+    @property
+    def configs_etag(self) -> str | None:
+        """Return the last ETag seen from ``/configs``."""
+        return self._configs_etag
 
     @property
     def api_root(self) -> str:
@@ -162,8 +174,29 @@ class CostManagerClient:
             params = {}
 
     # endpoint methods
-    def get_configs(self) -> ServiceConfigListResponse:
-        data = self._request("GET", "/configs")
+    def get_configs(self, *, etag: str | None = None) -> ServiceConfigListResponse | None:
+        """Fetch configuration data with optional caching.
+
+        If ``etag`` is provided it will be sent using ``If-None-Match`` and the
+        method returns ``None`` when the server responds with ``304 Not
+        Modified``.
+        """
+
+        headers: dict[str, str] | None = None
+        if etag:
+            headers = {"If-None-Match": etag}
+        resp = self.session.request("GET", self.api_root + "/configs", headers=headers)
+        if resp.status_code == 304:
+            self._configs_etag = etag
+            return None
+        if not resp.ok:
+            try:
+                detail = resp.json()
+            except Exception:
+                detail = resp.text
+            raise APIRequestError(resp.status_code, detail)
+        self._configs_etag = resp.headers.get("ETag")
+        data = resp.json()
         return ServiceConfigListResponse.model_validate(data)
 
     def track_usage(self, data: ApiUsageRequest | Dict[str, Any]) -> ApiUsageResponse:
@@ -435,8 +468,28 @@ class AsyncCostManagerClient:
                 path = next_url
             params = {}
 
-    async def get_configs(self) -> ServiceConfigListResponse:
-        data = await self._request("GET", "/configs")
+    async def get_configs(
+        self, *, etag: str | None = None
+    ) -> ServiceConfigListResponse | None:
+        """Asynchronously fetch configuration data with optional caching."""
+
+        headers: dict[str, str] | None = None
+        if etag:
+            headers = {"If-None-Match": etag}
+        resp = await self.session.request(
+            "GET", self.api_root + "/configs", headers=headers
+        )
+        if resp.status_code == 304:
+            self._configs_etag = etag
+            return None
+        if not (200 <= resp.status_code < 300):
+            try:
+                detail = resp.json()
+            except Exception:
+                detail = resp.text
+            raise APIRequestError(resp.status_code, detail)
+        self._configs_etag = resp.headers.get("ETag")
+        data = resp.json()
         return ServiceConfigListResponse.model_validate(data)
 
     async def track_usage(

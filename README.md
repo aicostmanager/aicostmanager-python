@@ -307,6 +307,12 @@ def get_recent_usage(aicm_api_key: str, customer_id: str = None):
 | **Tracking** | How usage tracking works under the hood | [Tracking](docs/tracking.md) |
 | **Testing** | Running tests and validation | [Testing](docs/testing.md) |
 
+### API Reference
+
+The full OpenAPI specification is generated at runtime by the service and is
+available from `/api/v1/openapi.json`. No schema file is stored in this
+repository.
+
 ## 💻 Development & Testing
 
 ### Setup

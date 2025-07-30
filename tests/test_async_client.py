@@ -19,22 +19,29 @@ from aicostmanager.models import (
 
 
 class DummyResponse:
-    def __init__(self, status_code=200, data=None):
+    def __init__(self, status_code=200, data=None, headers=None):
         self.status_code = status_code
         self._content = json.dumps(data or {}).encode()
         self.headers = {"Content-Type": "application/json"}
+        if headers:
+            self.headers.update(headers)
         self.text = self._content.decode()
 
     def json(self):
         return json.loads(self._content)
 
 
-def _patch(monkeypatch, method, path, data=None, status=200):
+def _patch(
+    monkeypatch, method, path, data=None, status=200, headers=None, response_headers=None
+):
     async def requester(self, m, url, **kwargs):
         assert m == method
         assert url.endswith(path)
         assert self.headers["Authorization"].startswith("Bearer ")
-        return DummyResponse(status_code=status, data=data)
+        if headers:
+            for k, v in headers.items():
+                assert kwargs["headers"].get(k) == v
+        return DummyResponse(status_code=status, data=data, headers=response_headers)
 
     monkeypatch.setattr("httpx.AsyncClient.request", requester)
 
@@ -259,10 +266,35 @@ def test_async_methods(monkeypatch):
                 assert result is None
             elif isinstance(result, BaseModel):
                 assert isinstance(result, BaseModel)
-            elif isinstance(data, list):
-                assert isinstance(result, list)
-            else:
-                assert isinstance(result, dict)
+        elif isinstance(data, list):
+            assert isinstance(result, list)
+        else:
+            assert isinstance(result, dict)
+
+
+def test_async_get_configs_etag(monkeypatch):
+    monkeypatch.setenv("AICM_API_KEY", "sk-test")
+    client = AsyncCostManagerClient()
+
+    async def first(self, method, url, **kwargs):
+        assert method == "GET" and url.endswith("/configs")
+        return DummyResponse(
+            data={"service_configs": [], "triggered_limits": {}},
+            headers={"ETag": "tag1"},
+        )
+
+    async def second(self, method, url, **kwargs):
+        assert kwargs.get("headers", {}).get("If-None-Match") == "tag1"
+        return DummyResponse(status_code=304, headers={"ETag": "tag1"})
+
+    monkeypatch.setattr("httpx.AsyncClient.request", first)
+    result = asyncio.run(client.get_configs())
+    assert result is not None
+    assert client.configs_etag == "tag1"
+
+    monkeypatch.setattr("httpx.AsyncClient.request", second)
+    result = asyncio.run(client.get_configs(etag=client.configs_etag))
+    assert result is None
 
     asyncio.run(run())
 

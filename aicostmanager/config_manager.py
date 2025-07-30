@@ -211,13 +211,22 @@ class CostManagerConfig:
 
     def _update_config(self) -> None:
         """Fetch configs from the API and persist to ``AICM.ini``."""
-        data = self.client.get_configs()
+        etag = None
+        if self._config.has_section("configs"):
+            etag = self._config["configs"].get("etag")
+
+        data = self.client.get_configs(etag=etag)
+        if data is None:
+            return  # nothing changed
+
         if hasattr(data, "model_dump"):
             payload = data.model_dump(mode="json")
         else:
             payload = data
+
         self._config["configs"] = {
-            "payload": json.dumps(payload.get("service_configs", []))
+            "payload": json.dumps(payload.get("service_configs", [])),
+            "etag": self.client.configs_etag or "",
         }
         self._set_triggered_limits(payload.get("triggered_limits", {}))
         self._write()

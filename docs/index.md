@@ -14,3 +14,4 @@
 ## Reference
 
 - [Changelog](../CHANGELOG.md) - Version history and changes
+- [Live OpenAPI schema](/api/v1/openapi.json) - Generated API specification

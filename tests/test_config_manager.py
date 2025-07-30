@@ -25,7 +25,6 @@ def _make_config_item(api_id: str = "python-client"):
         "iss": "aicm-api",
         "sub": "api-key-id",
         "iat": now,
-        "exp": now + 3600,
         "jti": "config",
         "version": "v1",
         "key_id": "test",
@@ -66,7 +65,6 @@ def _make_triggered_limits():
         "iss": "aicm-api",
         "sub": "api-key-id",
         "iat": now,
-        "exp": now + 3600,
         "jti": "tl",
         "version": "v1",
         "key_id": "test",
@@ -140,7 +138,6 @@ def test_get_triggered_limits_empty(monkeypatch, tmp_path):
         "iss": "aicm-api",
         "sub": "api-key-id",
         "iat": now,
-        "exp": now + 3600,
         "jti": "tl",
         "version": "v1",
         "key_id": "test",
@@ -182,3 +179,30 @@ def test_refresh_and_auto(monkeypatch, tmp_path):
     assert called["count"] == 1
     cfg_mgr.get_config("python-client")
     assert called["count"] == 2  # auto refresh triggered
+
+
+def test_config_manager_etag(monkeypatch, tmp_path):
+    ini = tmp_path / "AICM.INI"
+    client = CostManagerClient(aicm_api_key="sk", aicm_ini_path=str(ini))
+    cfg_mgr = CostManagerConfig(client)
+
+    item, _ = _make_config_item()
+    tl_item, _ = _make_triggered_limits()
+
+    calls: list[str | None] = []
+
+    def fake_get_configs(etag=None):
+        calls.append(etag)
+        if etag == "tag1":
+            client._configs_etag = "tag1"
+            return None
+        client._configs_etag = "tag1"
+        return {"service_configs": [item], "triggered_limits": tl_item}
+
+    monkeypatch.setattr(client, "get_configs", fake_get_configs)
+
+    cfg_mgr.refresh()
+    assert calls == [None]
+
+    cfg_mgr.refresh()
+    assert calls == [None, "tag1"]
