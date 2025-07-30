@@ -49,6 +49,14 @@ for event in client.iter_usage_events(filters):
 cfg = CostManagerConfig(client, auto_refresh=True)
 cfg.refresh()
 
+# subsequent calls can use the ETag header for caching
+cfgs = client.get_configs()
+etag = client.configs_etag
+unchanged = client.get_configs(etag=etag)  # returns None when unchanged
+
+The `/configs` endpoint returns an `ETag` header. Send this value back in
+`If-None-Match` to avoid downloading configuration when nothing has changed.
+
 # using CostManager with automatic delivery
 from aicostmanager import CostManager
 
