@@ -25,7 +25,7 @@ client = aicm(
     aicm_api_key="sk-api01-...",
     aicm_api_base="https://staging.aicostmanager.com",
     aicm_api_url="/api/v1",
-    aicm_ini_path="/path/to/AICM.ini",
+    aicm_ini_path="/path/to/AICM.INI",
     proxies={"http": "http://proxy"},
     headers={"X-Test": "1"},
 )

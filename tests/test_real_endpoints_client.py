@@ -1,4 +1,5 @@
 import pytest
+
 from aicostmanager.client import (
     APIRequestError,
     CostManagerClient,
@@ -22,7 +23,7 @@ def test_env_var_configuration(aicm_api_key, aicm_api_base, aicm_ini_path):
 
 def test_default_ini_path(aicm_api_key, aicm_api_base, aicm_ini_path):
     client = make_client(aicm_api_key, aicm_api_base, aicm_ini_path)
-    assert client.ini_path.endswith("AICM.ini")
+    assert client.ini_path.endswith("AICM.INI")
 
 
 def test_methods(aicm_api_key, aicm_api_base, aicm_ini_path):

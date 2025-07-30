@@ -1,5 +1,5 @@
-import json
 import configparser
+import json
 from typing import Any
 
 import pytest
@@ -63,7 +63,7 @@ def test_default_ini_path(monkeypatch):
     monkeypatch.setenv("AICM_API_KEY", "sk-test")
     monkeypatch.delenv("AICM_INI_PATH", raising=False)
     client = CostManagerClient()
-    assert client.ini_path.endswith(".config/aicostmanager/AICM.ini")
+    assert client.ini_path.endswith(".config/aicostmanager/AICM.INI")
 
 
 def test_methods(monkeypatch):
@@ -353,12 +353,15 @@ def test_filter_objects(monkeypatch):
 
 def test_track_usage_persists_triggered_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("AICM_API_KEY", "sk-test")
-    ini = tmp_path / "AICM.ini"
+    ini = tmp_path / "AICM.INI"
     client = CostManagerClient(aicm_api_key="sk-test", aicm_ini_path=str(ini))
 
     def fake_request(self, method, path, **kwargs):
         assert method == "POST" and path == "/track-usage"
-        return {"event_ids": [], "triggered_limits": {"encrypted_payload": "tok", "public_key": "pk"}}
+        return {
+            "event_ids": [],
+            "triggered_limits": {"encrypted_payload": "tok", "public_key": "pk"},
+        }
 
     monkeypatch.setattr(CostManagerClient, "_request", fake_request)
 

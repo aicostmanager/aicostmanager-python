@@ -152,7 +152,7 @@ def test_gemini_generate_content_with_dad_joke(
     tracked_client = CostManager(client)
 
     response = tracked_client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         contents="Tell me a dad joke.",
         config=types.GenerateContentConfig(temperature=0.7),
     )
@@ -173,7 +173,7 @@ def test_gemini_generate_content_streaming_with_dad_joke(
     tracked_client = CostManager(client)
 
     stream = tracked_client.models.generate_content_stream(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         contents="Tell me a dad joke.",
         config=types.GenerateContentConfig(temperature=0.7),
     )
@@ -211,7 +211,7 @@ def test_gemini_generate_content_usage_delivery(
     tracked_client.config_manager.refresh()
 
     response = tracked_client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         contents="Tell me a dad joke.",
         config=types.GenerateContentConfig(temperature=0.7),
     )
@@ -272,7 +272,7 @@ def test_gemini_generate_content_streaming_usage_delivery(
     tracked_client.config_manager.refresh()
 
     stream = tracked_client.models.generate_content_stream(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         contents="Tell me a dad joke.",
         config=types.GenerateContentConfig(temperature=0.7),
     )
@@ -330,7 +330,7 @@ def test_extractor_payload_generation(
     extractor = UniversalExtractor(gem_configs)
 
     response = tracked_client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         contents="Tell me a dad joke.",
         config=types.GenerateContentConfig(temperature=0.7),
     )
@@ -341,7 +341,7 @@ def test_extractor_payload_generation(
             "models.generate_content",
             (),
             {
-                "model": "gemini-1.5-flash",
+                "model": "gemini-2.0-flash-lite",
                 "contents": "Tell me a dad joke.",
                 "config": types.GenerateContentConfig(temperature=0.7),
             },

@@ -100,7 +100,7 @@ def aicm_ini_path(tmp_path_factory):
         return ini_path
     # If not set, use a temp file
     tmp_dir = tmp_path_factory.mktemp("aicm_ini")
-    return str(tmp_dir / "AICM.ini")
+    return str(tmp_dir / "AICM.INI")
 
 
 @pytest.fixture

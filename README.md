@@ -333,7 +333,7 @@ pip install -e .
    ANTHROPIC_API_KEY=your-anthropic-api-key
    # optional overrides
    # AICM_API_BASE=https://aicostmanager.com
-   # AICM_INI_PATH=/path/to/AICM.ini
+   # AICM_INI_PATH=/path/to/AICM.INI
    ```
 
 2. Install test dependencies:

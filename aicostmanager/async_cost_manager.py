@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Optional, List
+from typing import Any, List, Optional
 
 from .client import (
-    CostManagerClient,
     AsyncCostManagerClient,
+    CostManagerClient,
     UsageLimitExceeded,
 )
-from .config_manager import CostManagerConfig, Config, TriggeredLimit
-from .universal_extractor import UniversalExtractor
+from .config_manager import Config, CostManagerConfig, TriggeredLimit
 from .cost_manager import _AsyncStreamIterator
+from .universal_extractor import UniversalExtractor
 
 
 class AsyncResilientDelivery:
@@ -162,7 +162,7 @@ class AsyncCostManager:
             aicm_ini_path=aicm_ini_path,
         )
         self.config_manager = CostManagerConfig(cfg_client)
-        self.api_id = client.__class__.__name__.lower()
+        self.api_id = client.__class__.__module__.lower()
         self.configs: List[Config] = self.config_manager.get_config(self.api_id)
         cfg_client.close()
         self.extractor = UniversalExtractor(self.configs)
@@ -196,6 +196,7 @@ class AsyncCostManager:
             raise
         except Exception:
             self.triggered_limits = []
+
     # ------------------------------------------------------------
     # attribute proxying
     # ------------------------------------------------------------
@@ -254,7 +255,9 @@ class AsyncCostManager:
     def _appears_to_be_stream(self, result: Any) -> bool:
         """Check duck-typing indicators for streaming."""
         class_name = type(result).__name__.lower()
-        if any(indicator in class_name for indicator in ["stream", "iterator", "chunk"]):
+        if any(
+            indicator in class_name for indicator in ["stream", "iterator", "chunk"]
+        ):
             return True
 
         if hasattr(result, "__iter__") and hasattr(result, "__next__"):
@@ -350,7 +353,9 @@ class AsyncNestedAttributeWrapper:
                 if payloads:
                     self._parent_manager.tracked_payloads.extend(payloads)
                     for payload in payloads:
-                        self._parent_manager.delivery.deliver({"usage_records": [payload]})
+                        self._parent_manager.delivery.deliver(
+                            {"usage_records": [payload]}
+                        )
                 return response
 
             return wrapper

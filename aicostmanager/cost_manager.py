@@ -43,7 +43,7 @@ class CostManager:
             aicm_ini_path=aicm_ini_path,
         )
         self.config_manager = CostManagerConfig(self.cm_client)
-        self.api_id = client.__class__.__name__.lower()
+        self.api_id = client.__class__.__module__.lower()
         self.configs: List[Config] = self.config_manager.get_config(self.api_id)
         self.extractor = UniversalExtractor(self.configs)
         self.tracked_payloads: list[dict[str, Any]] = []

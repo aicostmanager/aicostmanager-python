@@ -355,7 +355,7 @@ def test_gemini_openai_chat_completion_with_dad_joke(
     tracked_client = CostManager(client)
 
     response = tracked_client.chat.completions.create(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         messages=[{"role": "user", "content": "Tell me a dad joke."}],
         temperature=0.7,
         max_tokens=100,
@@ -378,7 +378,7 @@ def test_gemini_openai_chat_completion_streaming_with_dad_joke(
     tracked_client = CostManager(client)
 
     stream = tracked_client.chat.completions.create(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         messages=[{"role": "user", "content": "Tell me a dad joke."}],
         temperature=0.7,
         max_tokens=100,
@@ -418,7 +418,7 @@ def test_gemini_openai_chat_completion_usage_delivery(
     tracked_client.config_manager.refresh()
 
     response = tracked_client.chat.completions.create(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         messages=[{"role": "user", "content": "Tell me a dad joke."}],
         temperature=0.7,
         max_tokens=100,
@@ -473,7 +473,7 @@ def test_gemini_openai_chat_completion_streaming_usage_delivery(
     tracked_client.config_manager.refresh()
 
     stream = tracked_client.chat.completions.create(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         messages=[{"role": "user", "content": "Tell me a dad joke."}],
         temperature=0.7,
         max_tokens=100,
@@ -589,7 +589,7 @@ def test_gemini_openai_extractor_payload_generation(
     extractor = UniversalExtractor(gemini_configs)
 
     response = tracked_client.chat.completions.create(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         messages=[{"role": "user", "content": "Tell me a dad joke."}],
         temperature=0.7,
         max_tokens=100,
@@ -601,7 +601,7 @@ def test_gemini_openai_extractor_payload_generation(
             "chat.completions.create",
             (),
             {
-                "model": "gemini-1.5-flash",
+                "model": "gemini-2.0-flash-lite",
                 "messages": [{"role": "user", "content": "Tell me a dad joke."}],
                 "temperature": 0.7,
                 "max_tokens": 100,

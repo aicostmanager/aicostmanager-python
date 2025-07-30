@@ -83,7 +83,7 @@ def _make_triggered_limits():
 
 
 def test_get_config_and_limits(monkeypatch, tmp_path):
-    ini = tmp_path / "AICM.ini"
+    ini = tmp_path / "AICM.INI"
     client = CostManagerClient(aicm_api_key="sk-test", aicm_ini_path=str(ini))
     cfg_mgr = CostManagerConfig(client)
 
@@ -113,7 +113,7 @@ def test_get_config_and_limits(monkeypatch, tmp_path):
 
 
 def test_config_not_found(monkeypatch, tmp_path):
-    ini = tmp_path / "AICM.ini"
+    ini = tmp_path / "AICM.INI"
     client = CostManagerClient(aicm_api_key="sk-test", aicm_ini_path=str(ini))
     cfg_mgr = CostManagerConfig(client)
 
@@ -130,7 +130,7 @@ def test_config_not_found(monkeypatch, tmp_path):
 
 
 def test_get_triggered_limits_empty(monkeypatch, tmp_path):
-    ini = tmp_path / "AICM.ini"
+    ini = tmp_path / "AICM.INI"
     client = CostManagerClient(aicm_api_key="sk-test", aicm_ini_path=str(ini))
     cfg_mgr = CostManagerConfig(client)
 
@@ -164,7 +164,7 @@ def test_get_triggered_limits_empty(monkeypatch, tmp_path):
 
 
 def test_refresh_and_auto(monkeypatch, tmp_path):
-    ini = tmp_path / "AICM.ini"
+    ini = tmp_path / "AICM.INI"
     client = CostManagerClient(aicm_api_key="sk", aicm_ini_path=str(ini))
     cfg_mgr = CostManagerConfig(client, auto_refresh=True)
 
