@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8] - 2025-01-30
+### Fixed
+- Fixed syntax error in `test_async_client.py` where elif statement had incorrect indentation
+- Fixed config manager test mock functions to properly accept `etag` parameter
+- Added missing `configs_etag` attribute and property to `AsyncCostManagerClient` class
+- Fixed real test failures in `test_anthropic_real_cost_manager.py` by adding triggered limits cleanup
+- Resolved ETag payload validation issues in comprehensive testing scenarios
+
+### Added
+- Comprehensive ETag functionality test suite (`test_real_endpoints_etag.py`) with 13 real API tests
+- New `clear_triggered_limits` fixture in `conftest.py` for cleaner test isolation
+- Manual ETag manipulation and corruption recovery testing capabilities
+- Direct server response validation for invalid ETag scenarios
+
+### Enhanced
+- ETag caching functionality now thoroughly validated with real server interactions
+- Both sync and async client ETag behavior verification across multiple test scenarios
+- INI file lifecycle testing (creation, corruption, recovery, validation)
+- Test coverage for edge cases including empty ETags, concurrent access, and multiple refresh cycles
+
 ## [0.1.7] - 2025-01-30
 ### Fixed
 - Fixed URL serialization issue in `_make_json_serializable` method for httpx.URL objects
