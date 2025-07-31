@@ -217,7 +217,15 @@ class CostManagerConfig:
 
         data = self.client.get_configs(etag=etag)
         if data is None:
-            return  # nothing changed
+            try:
+                tl_payload = self.client.get_triggered_limits() or {}
+                if isinstance(tl_payload, dict):
+                    tl_data = tl_payload.get("triggered_limits", tl_payload)
+                    self._set_triggered_limits(tl_data)
+                    self._write()
+            except Exception:
+                pass
+            return
 
         if hasattr(data, "model_dump"):
             payload = data.model_dump(mode="json")
