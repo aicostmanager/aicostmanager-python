@@ -123,3 +123,30 @@ def clean_delivery():
         except Exception:
             pass
         mod._global_delivery = None
+
+
+@pytest.fixture
+def clear_triggered_limits(aicm_ini_path):
+    """Clear triggered limits from the INI file to prevent test interference from usage limits."""
+    import configparser
+
+    # Read the current INI file
+    cp = configparser.ConfigParser()
+    try:
+        cp.read(aicm_ini_path)
+    except Exception:
+        # File doesn't exist yet, that's fine
+        pass
+
+    # Remove triggered_limits section if it exists
+    if "triggered_limits" in cp:
+        cp.remove_section("triggered_limits")
+
+    # Write the cleaned config back
+    os.makedirs(os.path.dirname(aicm_ini_path), exist_ok=True)
+    with open(aicm_ini_path, "w") as f:
+        cp.write(f)
+
+    yield
+
+    # Cleanup: optionally restore original state or leave clean for next tests

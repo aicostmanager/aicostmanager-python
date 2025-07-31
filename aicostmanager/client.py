@@ -123,12 +123,6 @@ class CostManagerClient:
     def configs_etag(self) -> str | None:
         """Return the last ETag seen from ``/configs``."""
         return self._configs_etag
-        self._configs_etag: str | None = None
-
-    @property
-    def configs_etag(self) -> str | None:
-        """Return the last ETag seen from ``/configs``."""
-        return self._configs_etag
 
     @property
     def api_root(self) -> str:
@@ -174,7 +168,9 @@ class CostManagerClient:
             params = {}
 
     # endpoint methods
-    def get_configs(self, *, etag: str | None = None) -> ServiceConfigListResponse | None:
+    def get_configs(
+        self, *, etag: str | None = None
+    ) -> ServiceConfigListResponse | None:
         """Fetch configuration data with optional caching.
 
         If ``etag`` is provided it will be sent using ``If-None-Match`` and the
@@ -427,6 +423,12 @@ class AsyncCostManagerClient:
         )
         if headers:
             self.session.headers.update(headers)
+        self._configs_etag: str | None = None
+
+    @property
+    def configs_etag(self) -> str | None:
+        """Return the last ETag seen from ``/configs``."""
+        return self._configs_etag
 
     @property
     def api_root(self) -> str:

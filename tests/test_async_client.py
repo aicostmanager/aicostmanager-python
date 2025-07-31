@@ -32,7 +32,13 @@ class DummyResponse:
 
 
 def _patch(
-    monkeypatch, method, path, data=None, status=200, headers=None, response_headers=None
+    monkeypatch,
+    method,
+    path,
+    data=None,
+    status=200,
+    headers=None,
+    response_headers=None,
 ):
     async def requester(self, m, url, **kwargs):
         assert m == method
@@ -266,10 +272,10 @@ def test_async_methods(monkeypatch):
                 assert result is None
             elif isinstance(result, BaseModel):
                 assert isinstance(result, BaseModel)
-        elif isinstance(data, list):
-            assert isinstance(result, list)
-        else:
-            assert isinstance(result, dict)
+            elif isinstance(data, list):
+                assert isinstance(result, list)
+            else:
+                assert isinstance(result, dict)
 
 
 def test_async_get_configs_etag(monkeypatch):
@@ -295,8 +301,6 @@ def test_async_get_configs_etag(monkeypatch):
     monkeypatch.setattr("httpx.AsyncClient.request", second)
     result = asyncio.run(client.get_configs(etag=client.configs_etag))
     assert result is None
-
-    asyncio.run(run())
 
 
 def test_async_filter_objects(monkeypatch):

@@ -88,7 +88,7 @@ def test_get_config_and_limits(monkeypatch, tmp_path):
     config_item, cfg_payload = _make_config_item()
     tl_item, tl_events = _make_triggered_limits()
 
-    def fake_get_configs():
+    def fake_get_configs(etag=None):
         return {"service_configs": [config_item], "triggered_limits": tl_item}
 
     monkeypatch.setattr(client, "get_configs", fake_get_configs)
@@ -120,7 +120,10 @@ def test_config_not_found(monkeypatch, tmp_path):
     monkeypatch.setattr(
         client,
         "get_configs",
-        lambda: {"service_configs": [config_item], "triggered_limits": tl_item},
+        lambda etag=None: {
+            "service_configs": [config_item],
+            "triggered_limits": tl_item,
+        },
     )
 
     with pytest.raises(ConfigNotFound):
@@ -153,7 +156,10 @@ def test_get_triggered_limits_empty(monkeypatch, tmp_path):
     monkeypatch.setattr(
         client,
         "get_configs",
-        lambda: {"service_configs": [config_item], "triggered_limits": tl_item},
+        lambda etag=None: {
+            "service_configs": [config_item],
+            "triggered_limits": tl_item,
+        },
     )
 
     limits = cfg_mgr.get_triggered_limits()
@@ -167,7 +173,7 @@ def test_refresh_and_auto(monkeypatch, tmp_path):
 
     called = {}
 
-    def fake_get_configs():
+    def fake_get_configs(etag=None):
         called["count"] = called.get("count", 0) + 1
         item, _ = _make_config_item()
         tl_item, _ = _make_triggered_limits()

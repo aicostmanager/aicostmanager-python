@@ -102,7 +102,11 @@ def test_anthropic_config_retrieval_and_extractor_interaction(
 
 
 def test_anthropic_messages_with_dad_joke(
-    anthropic_api_key, aicm_api_key, aicm_api_base, aicm_ini_path
+    anthropic_api_key,
+    aicm_api_key,
+    aicm_api_base,
+    aicm_ini_path,
+    clear_triggered_limits,
 ):
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
@@ -119,7 +123,11 @@ def test_anthropic_messages_with_dad_joke(
 
 
 def test_anthropic_messages_streaming_with_dad_joke(
-    anthropic_api_key, aicm_api_key, aicm_api_base, aicm_ini_path
+    anthropic_api_key,
+    aicm_api_key,
+    aicm_api_base,
+    aicm_ini_path,
+    clear_triggered_limits,
 ):
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
@@ -145,7 +153,11 @@ def test_anthropic_messages_streaming_with_dad_joke(
 
 
 def test_extractor_payload_generation(
-    anthropic_api_key, aicm_api_key, aicm_api_base, aicm_ini_path
+    anthropic_api_key,
+    aicm_api_key,
+    aicm_api_base,
+    aicm_ini_path,
+    clear_triggered_limits,
 ):
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
@@ -182,7 +194,12 @@ def test_extractor_payload_generation(
 
 
 def test_anthropic_messages_usage_delivery(
-    anthropic_api_key, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery
+    anthropic_api_key,
+    aicm_api_key,
+    aicm_api_base,
+    aicm_ini_path,
+    clean_delivery,
+    clear_triggered_limits,
 ):
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
@@ -206,7 +223,12 @@ def test_anthropic_messages_usage_delivery(
 
 
 def test_anthropic_messages_streaming_usage_delivery(
-    anthropic_api_key, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery
+    anthropic_api_key,
+    aicm_api_key,
+    aicm_api_base,
+    aicm_ini_path,
+    clean_delivery,
+    clear_triggered_limits,
 ):
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
@@ -246,7 +268,12 @@ def test_anthropic_messages_streaming_usage_delivery(
 
 
 def test_usage_payload_delivery_verification(
-    anthropic_api_key, aicm_api_key, aicm_api_base, aicm_ini_path, clean_delivery
+    anthropic_api_key,
+    aicm_api_key,
+    aicm_api_base,
+    aicm_ini_path,
+    clean_delivery,
+    clear_triggered_limits,
 ):
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
