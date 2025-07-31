@@ -57,6 +57,10 @@ unchanged = client.get_configs(etag=etag)  # returns None when unchanged
 The `/configs` endpoint returns an `ETag` header. Send this value back in
 `If-None-Match` to avoid downloading configuration when nothing has changed.
 
+If the ETag is unchanged, the SDK automatically queries the `/triggered-limits`
+endpoint so that any newly triggered usage limits are still persisted to
+`AICM.INI`.
+
 # using CostManager with automatic delivery
 from aicostmanager import CostManager
 

@@ -195,6 +195,10 @@ class CostManagerClient:
         data = resp.json()
         return ServiceConfigListResponse.model_validate(data)
 
+    def get_triggered_limits(self) -> Dict[str, Any]:
+        """Fetch triggered limit information from the API."""
+        return self._request("GET", "/triggered-limits")
+
     def track_usage(self, data: ApiUsageRequest | Dict[str, Any]) -> ApiUsageResponse:
         payload = (
             data.model_dump(mode="json") if isinstance(data, ApiUsageRequest) else data
@@ -493,6 +497,10 @@ class AsyncCostManagerClient:
         self._configs_etag = resp.headers.get("ETag")
         data = resp.json()
         return ServiceConfigListResponse.model_validate(data)
+
+    async def get_triggered_limits(self) -> Dict[str, Any]:
+        """Asynchronously fetch triggered limit information."""
+        return await self._request("GET", "/triggered-limits")
 
     async def track_usage(
         self, data: ApiUsageRequest | Dict[str, Any]

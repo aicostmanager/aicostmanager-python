@@ -1,6 +1,8 @@
 import configparser
+import json
 import pathlib
 import time
+from typing import Any
 
 import jwt
 import pytest
@@ -195,20 +197,33 @@ def test_config_manager_etag(monkeypatch, tmp_path):
     item, _ = _make_config_item()
     tl_item, _ = _make_triggered_limits()
 
-    calls: list[str | None] = []
+    calls: dict[str, Any] = {"configs": [], "limits": 0}
 
     def fake_get_configs(etag=None):
-        calls.append(etag)
+        calls["configs"].append(etag)
         if etag == "tag1":
             client._configs_etag = "tag1"
             return None
         client._configs_etag = "tag1"
         return {"service_configs": [item], "triggered_limits": tl_item}
 
+    tl_item2 = {"encrypted_payload": "tok2", "public_key": "pk2"}
+
+    def fake_get_triggered_limits():
+        calls["limits"] += 1
+        return {"triggered_limits": tl_item2}
+
     monkeypatch.setattr(client, "get_configs", fake_get_configs)
+    monkeypatch.setattr(client, "get_triggered_limits", fake_get_triggered_limits)
 
     cfg_mgr.refresh()
-    assert calls == [None]
+    assert calls["configs"] == [None]
+    assert calls["limits"] == 0
 
     cfg_mgr.refresh()
-    assert calls == [None, "tag1"]
+    assert calls["configs"] == [None, "tag1"]
+    assert calls["limits"] == 1
+
+    cp = configparser.ConfigParser()
+    cp.read(ini)
+    assert json.loads(cp["triggered_limits"]["payload"]) == tl_item2
