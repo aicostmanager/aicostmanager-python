@@ -213,19 +213,15 @@ class CostManagerConfig:
 
         data = self.client.get_configs(etag=etag)
         if data is None:
-            # No config changes. Only fetch triggered limits if they are missing
-            if (
-                "triggered_limits" not in self._config
-                or "payload" not in self._config["triggered_limits"]
-            ):
-                try:
-                    tl_payload = self.client.get_triggered_limits() or {}
-                    if isinstance(tl_payload, dict):
-                        tl_data = tl_payload.get("triggered_limits", tl_payload)
-                        self._set_triggered_limits(tl_data)
-                        self._write()
-                except Exception:
-                    pass
+            # Config unchanged - always refresh triggered limits from the API
+            try:
+                tl_payload = self.client.get_triggered_limits() or {}
+                if isinstance(tl_payload, dict):
+                    tl_data = tl_payload.get("triggered_limits", tl_payload)
+                    self._set_triggered_limits(tl_data)
+                    self._write()
+            except Exception:
+                pass
             return
 
         if hasattr(data, "model_dump"):
