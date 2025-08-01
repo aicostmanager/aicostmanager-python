@@ -46,7 +46,7 @@ for event in client.iter_usage_events(filters):
     print(event.event_id)
 
 # manually refresh configuration
-cfg = CostManagerConfig(client, auto_refresh=True)
+cfg = CostManagerConfig(client)
 cfg.refresh()
 
 # subsequent calls can use the ETag header for caching
@@ -56,10 +56,10 @@ unchanged = client.get_configs(etag=etag)  # returns None when unchanged
 
 The `/configs` endpoint returns an `ETag` header. Send this value back in
 `If-None-Match` to avoid downloading configuration when nothing has changed.
-
-If the ETag is unchanged, the SDK automatically queries the `/triggered-limits`
-endpoint so that any newly triggered usage limits are still persisted to
-`AICM.INI`.
+Triggered limit information is read from `AICM.INI` each time it is needed.
+It is fetched from the server on the initial configuration refresh (or if the
+INI file lacks the section) and whenever usage is recorded via the
+`/track-usage` endpoint.
 
 # using CostManager with automatic delivery
 from aicostmanager import CostManager

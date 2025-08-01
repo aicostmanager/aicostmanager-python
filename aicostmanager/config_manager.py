@@ -184,13 +184,9 @@ def _atomic_write(file_path: str, content: str):
 class CostManagerConfig:
     """Manage tracker configuration and triggered limits stored in ``AICM.ini``."""
 
-    def __init__(self, client: CostManagerClient, *, auto_refresh: bool = True) -> None:
+    def __init__(self, client: CostManagerClient) -> None:
         self.client = client
         self.ini_path = client.ini_path
-        self.auto_refresh = auto_refresh
-        self._has_refreshed_this_session = (
-            False  # Track if we've refreshed triggered limits
-        )
 
         # Initialize with safe reading
         with _file_lock(self.ini_path):
@@ -217,14 +213,19 @@ class CostManagerConfig:
 
         data = self.client.get_configs(etag=etag)
         if data is None:
-            try:
-                tl_payload = self.client.get_triggered_limits() or {}
-                if isinstance(tl_payload, dict):
-                    tl_data = tl_payload.get("triggered_limits", tl_payload)
-                    self._set_triggered_limits(tl_data)
-                    self._write()
-            except Exception:
-                pass
+            # No config changes. Only fetch triggered limits if they are missing
+            if (
+                "triggered_limits" not in self._config
+                or "payload" not in self._config["triggered_limits"]
+            ):
+                try:
+                    tl_payload = self.client.get_triggered_limits() or {}
+                    if isinstance(tl_payload, dict):
+                        tl_data = tl_payload.get("triggered_limits", tl_payload)
+                        self._set_triggered_limits(tl_data)
+                        self._write()
+                except Exception:
+                    pass
             return
 
         if hasattr(data, "model_dump"):
@@ -236,7 +237,21 @@ class CostManagerConfig:
             "payload": json.dumps(payload.get("service_configs", [])),
             "etag": self.client.configs_etag or "",
         }
-        self._set_triggered_limits(payload.get("triggered_limits", {}))
+
+        if (
+            "triggered_limits" not in self._config
+            or "payload" not in self._config["triggered_limits"]
+        ):
+            tl_payload = payload.get("triggered_limits")
+            if tl_payload is None:
+                try:
+                    tl_payload = self.client.get_triggered_limits() or {}
+                except Exception:
+                    tl_payload = {}
+            if isinstance(tl_payload, dict):
+                tl_data = tl_payload.get("triggered_limits", tl_payload)
+                self._set_triggered_limits(tl_data)
+
         self._write()
 
     def _set_triggered_limits(self, data: dict) -> None:
@@ -268,11 +283,7 @@ class CostManagerConfig:
 
     def get_config(self, api_id: str) -> List[Config]:
         """Return decrypted configs matching ``api_id``."""
-        if (
-            self.auto_refresh
-            or "configs" not in self._config
-            or "payload" not in self._config["configs"]
-        ):
+        if "configs" not in self._config or "payload" not in self._config["configs"]:
             self.refresh()
 
         configs_raw = json.loads(self._config["configs"].get("payload", "[]"))
@@ -328,8 +339,7 @@ class CostManagerConfig:
             self._config = _safe_read_config(self.ini_path)
 
         if (
-            self.auto_refresh
-            or "triggered_limits" not in self._config
+            "triggered_limits" not in self._config
             or "payload" not in self._config["triggered_limits"]
         ):
             self.refresh()

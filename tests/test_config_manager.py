@@ -168,10 +168,10 @@ def test_get_triggered_limits_empty(monkeypatch, tmp_path):
     assert limits == []
 
 
-def test_refresh_and_auto(monkeypatch, tmp_path):
+def test_refresh_only_when_needed(monkeypatch, tmp_path):
     ini = tmp_path / "AICM.INI"
     client = CostManagerClient(aicm_api_key="sk", aicm_ini_path=str(ini))
-    cfg_mgr = CostManagerConfig(client, auto_refresh=True)
+    cfg_mgr = CostManagerConfig(client)
 
     called = {}
 
@@ -186,7 +186,7 @@ def test_refresh_and_auto(monkeypatch, tmp_path):
     cfg_mgr.refresh()
     assert called["count"] == 1
     cfg_mgr.get_config("python-client")
-    assert called["count"] == 2  # auto refresh triggered
+    assert called["count"] == 1  # no additional refresh
 
 
 def test_config_manager_etag(monkeypatch, tmp_path):
@@ -194,7 +194,6 @@ def test_config_manager_etag(monkeypatch, tmp_path):
     client = CostManagerClient(aicm_api_key="sk", aicm_ini_path=str(ini))
     cfg_mgr = CostManagerConfig(client)
 
-    item, _ = _make_config_item()
     tl_item, _ = _make_triggered_limits()
 
     calls: dict[str, Any] = {"configs": [], "limits": 0}
@@ -222,8 +221,68 @@ def test_config_manager_etag(monkeypatch, tmp_path):
 
     cfg_mgr.refresh()
     assert calls["configs"] == [None, "tag1"]
-    assert calls["limits"] == 1
+    # triggered limits already stored, second refresh should not fetch them
+    assert calls["limits"] == 0
 
     cp = configparser.ConfigParser()
     cp.read(ini)
-    assert json.loads(cp["triggered_limits"]["payload"]) == tl_item2
+    assert json.loads(cp["triggered_limits"]["payload"]) == tl_item
+
+
+def test_fetch_limits_when_missing(monkeypatch, tmp_path):
+    """If triggered limits are absent and configs haven't changed, fetch them."""
+    ini = tmp_path / "AICM.INI"
+    client = CostManagerClient(aicm_api_key="sk", aicm_ini_path=str(ini))
+    cfg_mgr = CostManagerConfig(client)
+
+    tl_item, _ = _make_triggered_limits()
+
+    calls = {"configs": 0, "limits": 0}
+
+    def fake_get_configs(etag=None):
+        calls["configs"] += 1
+        client._configs_etag = "tag1"
+        return None
+
+    def fake_get_triggered_limits():
+        calls["limits"] += 1
+        return {"triggered_limits": tl_item}
+
+    monkeypatch.setattr(client, "get_configs", fake_get_configs)
+    monkeypatch.setattr(client, "get_triggered_limits", fake_get_triggered_limits)
+
+    cfg_mgr.refresh()
+    assert calls == {"configs": 1, "limits": 1}
+    cp = configparser.ConfigParser()
+    cp.read(ini)
+    assert json.loads(cp["triggered_limits"]["payload"]) == tl_item
+
+def test_triggered_limits_from_ini(monkeypatch, tmp_path):
+    ini = tmp_path / "AICM.INI"
+    client = CostManagerClient(aicm_api_key="sk", aicm_ini_path=str(ini))
+    cfg_mgr = CostManagerConfig(client)
+
+    item, _ = _make_config_item()
+    tl_item, _ = _make_triggered_limits()
+
+    calls = {"configs": 0, "limits": 0}
+
+    def fake_get_configs(etag=None):
+        calls["configs"] += 1
+        return {"service_configs": [item], "triggered_limits": tl_item}
+
+    def fake_get_triggered_limits():
+        calls["limits"] += 1
+        return {"triggered_limits": tl_item}
+
+    monkeypatch.setattr(client, "get_configs", fake_get_configs)
+    monkeypatch.setattr(client, "get_triggered_limits", fake_get_triggered_limits)
+
+    cfg_mgr.get_config("python-client")
+    assert calls == {"configs": 1, "limits": 0}
+    calls["configs"] = 0
+    calls["limits"] = 0
+
+    limits = cfg_mgr.get_triggered_limits()
+    assert calls == {"configs": 0, "limits": 0}
+    assert len(limits) == 1
