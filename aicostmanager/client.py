@@ -176,15 +176,30 @@ class CostManagerClient:
                     # Don't fail initialization if triggered limits call fails
                     pass
             else:
-                # If configs changed, update INI with new configs
+                # If configs changed, update INI with new configs AND triggered_limits
                 self._update_ini_configs(configs_response)
-                # If no triggered_limits section exists, fetch them
-                if not self._ini_has_triggered_limits():
-                    try:
+                # Always update triggered_limits when configs change
+                try:
+                    if hasattr(configs_response, "model_dump"):
+                        payload = configs_response.model_dump(mode="json")
+                    else:
+                        payload = configs_response
+
+                    tl_payload = payload.get("triggered_limits")
+                    if tl_payload is not None:
+                        # Use triggered_limits from configs response
+                        if isinstance(tl_payload, dict):
+                            tl_data = tl_payload.get("triggered_limits", tl_payload)
+                        else:
+                            tl_data = tl_payload
+                        self._update_ini_triggered_limits(tl_data)
+                    else:
+                        # Configs response didn't include triggered_limits, fetch separately
                         triggered_limits_response = self.get_triggered_limits()
                         self._update_ini_triggered_limits(triggered_limits_response)
-                    except Exception:
-                        pass
+                except Exception:
+                    # Don't fail initialization if triggered limits update fails
+                    pass
 
             # Reset ETag to None so first explicit user call behaves as initial call
             self._configs_etag = None

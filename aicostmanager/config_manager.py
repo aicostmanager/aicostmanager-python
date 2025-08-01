@@ -235,20 +235,31 @@ class CostManagerConfig:
             "etag": self.client.configs_etag or "",
         }
 
-        # Only fetch triggered_limits if they don't exist in INI file
-        if (
-            "triggered_limits" not in self._config
-            or "payload" not in self._config["triggered_limits"]
-        ):
+        # Always update triggered_limits when configs change (same logic as client initialization)
+        try:
             tl_payload = payload.get("triggered_limits")
-            if tl_payload is None:
-                try:
-                    tl_payload = self.client.get_triggered_limits() or {}
-                except Exception:
-                    tl_payload = {}
-            if isinstance(tl_payload, dict):
-                tl_data = tl_payload.get("triggered_limits", tl_payload)
+            if tl_payload is not None:
+                # Use triggered_limits from configs response
+                if isinstance(tl_payload, dict):
+                    tl_data = tl_payload.get("triggered_limits", tl_payload)
+                else:
+                    tl_data = tl_payload
                 self._set_triggered_limits(tl_data)
+            else:
+                # Configs response didn't include triggered_limits, fetch separately
+                try:
+                    tl_response = self.client.get_triggered_limits() or {}
+                    if isinstance(tl_response, dict):
+                        tl_data = tl_response.get("triggered_limits", tl_response)
+                    else:
+                        tl_data = tl_response
+                    self._set_triggered_limits(tl_data)
+                except Exception:
+                    # Don't fail if triggered limits fetch fails
+                    pass
+        except Exception:
+            # Don't fail config update if triggered limits update fails
+            pass
 
         self._write()
 
