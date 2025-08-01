@@ -3,6 +3,7 @@
 __version__ = "0.1.8"
 
 from .async_cost_manager import AsyncCostManager
+from .rest_cost_manager import AsyncRestCostManager, RestCostManager
 from .client import (
     AICMError,
     APIRequestError,
@@ -51,6 +52,8 @@ __all__ = [
     "AsyncCostManager",
     "AsyncCostManagerClient",
     "CostManager",
+    "RestCostManager",
+    "AsyncRestCostManager",
     "CostManagerClient",
     "MissingConfiguration",
     "UsageLimitExceeded",

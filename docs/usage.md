@@ -92,3 +92,20 @@ for vendor in vendors:
         print(" -", svc.service_id)
 ```
 
+## Tracking Plain REST APIs
+
+Use ``RestCostManager`` (or ``AsyncRestCostManager`` for async) to track any
+service accessed via ``requests`` or ``httpx``:
+
+```python
+import requests
+from aicostmanager import RestCostManager
+
+session = requests.Session()
+tracker = RestCostManager(session, base_url="https://api.heygen.com")
+data = tracker.get("/v2/streaming.list").json()
+```
+
+The wrapper automatically extracts payloads from each call and sends them to
+AICostManager just like when using ``CostManager``.
+
