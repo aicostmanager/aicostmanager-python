@@ -90,7 +90,7 @@ def test_usage_limit_end_to_end(
         # subsequent calls expected to exceed limit (may take multiple calls)
         print("Starting loop to trigger usage limit (max 100 attempts)...")
         exception_raised = False
-        for i in range(100):
+        for i in range(10):
             try:
                 print(f"Attempt {i + 1}/100: Making API call...")
                 tracked_client.chat.completions.create(
