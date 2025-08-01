@@ -205,7 +205,7 @@ class CostManagerConfig:
             # Atomic write
             _atomic_write(self.ini_path, content_str)
 
-    def _update_config(self) -> None:
+    def _update_config(self, force_refresh_limits: bool = False) -> None:
         """Fetch configs from the API and persist to ``AICM.ini``."""
         etag = None
         if self._config.has_section("configs"):
@@ -213,15 +213,16 @@ class CostManagerConfig:
 
         data = self.client.get_configs(etag=etag)
         if data is None:
-            # Config unchanged - always refresh triggered limits from the API
-            try:
-                tl_payload = self.client.get_triggered_limits() or {}
-                if isinstance(tl_payload, dict):
-                    tl_data = tl_payload.get("triggered_limits", tl_payload)
-                    self._set_triggered_limits(tl_data)
-                    self._write()
-            except Exception:
-                pass
+            # Config unchanged - only refresh triggered limits if explicitly requested (via refresh())
+            if force_refresh_limits:
+                try:
+                    tl_payload = self.client.get_triggered_limits() or {}
+                    if isinstance(tl_payload, dict):
+                        tl_data = tl_payload.get("triggered_limits", tl_payload)
+                        self._set_triggered_limits(tl_data)
+                        self._write()
+                except Exception:
+                    pass
             return
 
         if hasattr(data, "model_dump"):
@@ -234,6 +235,7 @@ class CostManagerConfig:
             "etag": self.client.configs_etag or "",
         }
 
+        # Only fetch triggered_limits if they don't exist in INI file
         if (
             "triggered_limits" not in self._config
             or "payload" not in self._config["triggered_limits"]
@@ -264,7 +266,7 @@ class CostManagerConfig:
 
     def refresh(self) -> None:
         """Force refresh of local configuration from the API."""
-        self._update_config()
+        self._update_config(force_refresh_limits=True)
         with _file_lock(self.ini_path):
             self._config = _safe_read_config(self.ini_path)
 

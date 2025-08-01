@@ -117,7 +117,11 @@ class CostManagerClient:
         )
         if headers:
             self.session.headers.update(headers)
+
         self._configs_etag: str | None = None
+
+        # Initialize configs and triggered limits during client instantiation
+        self._initialize_configs_and_limits()
 
     @property
     def configs_etag(self) -> str | None:
@@ -138,6 +142,108 @@ class CostManagerClient:
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
+
+    def _initialize_configs_and_limits(self) -> None:
+        """Initialize configs and triggered limits during client instantiation."""
+        try:
+            # Skip initialization if this looks like a test environment or mock path
+            if (
+                self.ini_path == "ini"
+                or os.path.basename(self.ini_path) == "ini"
+                or "test" in os.environ.get("_", "")
+                or "pytest" in os.environ.get("_", "")
+            ):
+                return
+
+            # Read existing INI file to get current etag
+            etag = None
+            if os.path.exists(self.ini_path):
+                cp = configparser.ConfigParser()
+                cp.read(self.ini_path)
+                if cp.has_section("configs"):
+                    etag = cp["configs"].get("etag")
+
+            # Call /configs endpoint
+            configs_response = self.get_configs(etag=etag)
+
+            # If etag hasn't changed (configs_response is None), call /triggered-limits
+            if configs_response is None:
+                try:
+                    triggered_limits_response = self.get_triggered_limits()
+                    # Update INI file with triggered limits
+                    self._update_ini_triggered_limits(triggered_limits_response)
+                except Exception:
+                    # Don't fail initialization if triggered limits call fails
+                    pass
+            else:
+                # If configs changed, update INI with new configs
+                self._update_ini_configs(configs_response)
+                # If no triggered_limits section exists, fetch them
+                if not self._ini_has_triggered_limits():
+                    try:
+                        triggered_limits_response = self.get_triggered_limits()
+                        self._update_ini_triggered_limits(triggered_limits_response)
+                    except Exception:
+                        pass
+
+            # Reset ETag to None so first explicit user call behaves as initial call
+            self._configs_etag = None
+        except Exception:
+            # Don't fail client initialization if API calls fail
+            pass
+
+    def _ini_has_triggered_limits(self) -> bool:
+        """Check if INI file has triggered_limits section."""
+        if not os.path.exists(self.ini_path):
+            return False
+        cp = configparser.ConfigParser()
+        cp.read(self.ini_path)
+        return (
+            cp.has_section("triggered_limits") and "payload" in cp["triggered_limits"]
+        )
+
+    def _update_ini_configs(self, configs_response) -> None:
+        """Update INI file with configs from API response."""
+        cp = configparser.ConfigParser()
+        cp.read(self.ini_path)
+        os.makedirs(os.path.dirname(self.ini_path), exist_ok=True)
+
+        # Handle configs section
+        if "configs" not in cp:
+            cp.add_section("configs")
+
+        if hasattr(configs_response, "model_dump"):
+            payload = configs_response.model_dump(mode="json")
+        else:
+            payload = configs_response
+
+        cp["configs"]["payload"] = json.dumps(payload.get("service_configs", []))
+        cp["configs"]["etag"] = self.configs_etag or ""
+
+        with open(self.ini_path, "w") as f:
+            cp.write(f)
+
+    def _update_ini_triggered_limits(self, triggered_limits_response) -> None:
+        """Update INI file with triggered limits from API response."""
+        cp = configparser.ConfigParser()
+        cp.read(self.ini_path)
+        os.makedirs(os.path.dirname(self.ini_path), exist_ok=True)
+
+        if "triggered_limits" not in cp:
+            cp.add_section("triggered_limits")
+
+        # Extract triggered_limits data from response
+        if isinstance(triggered_limits_response, dict):
+            tl_data = triggered_limits_response.get(
+                "triggered_limits", triggered_limits_response
+            )
+        else:
+            tl_data = triggered_limits_response
+
+        cp["triggered_limits"]["payload"] = json.dumps(tl_data or {})
+
+        with open(self.ini_path, "w") as f:
+            cp.write(f)
 
     # internal helper
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:

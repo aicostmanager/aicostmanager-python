@@ -194,6 +194,7 @@ def test_config_manager_etag(monkeypatch, tmp_path):
     client = CostManagerClient(aicm_api_key="sk", aicm_ini_path=str(ini))
     cfg_mgr = CostManagerConfig(client)
 
+    item, _ = _make_config_item()
     tl_item, _ = _make_triggered_limits()
 
     calls: dict[str, Any] = {"configs": [], "limits": 0}
@@ -256,6 +257,7 @@ def test_fetch_limits_when_missing(monkeypatch, tmp_path):
     cp = configparser.ConfigParser()
     cp.read(ini)
     assert json.loads(cp["triggered_limits"]["payload"]) == tl_item
+
 
 def test_triggered_limits_from_ini(monkeypatch, tmp_path):
     ini = tmp_path / "AICM.INI"

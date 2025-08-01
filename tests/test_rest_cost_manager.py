@@ -1,9 +1,10 @@
 import asyncio
+
 import pytest
 
+from aicostmanager.client import AsyncCostManagerClient, CostManagerClient
 from aicostmanager.config_manager import Config, CostManagerConfig
-from aicostmanager.rest_cost_manager import RestCostManager, AsyncRestCostManager
-from aicostmanager.client import CostManagerClient, AsyncCostManagerClient
+from aicostmanager.rest_cost_manager import AsyncRestCostManager, RestCostManager
 
 
 class DummyResponse:
@@ -30,6 +31,27 @@ class DummySession:
         self.calls.append((method, url, kwargs))
         return DummyResponse()
 
+    def get(self, url, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+    def put(self, url, **kwargs):
+        return self.request("PUT", url, **kwargs)
+
+    def patch(self, url, **kwargs):
+        return self.request("PATCH", url, **kwargs)
+
+    def delete(self, url, **kwargs):
+        return self.request("DELETE", url, **kwargs)
+
+    def head(self, url, **kwargs):
+        return self.request("HEAD", url, **kwargs)
+
+    def options(self, url, **kwargs):
+        return self.request("OPTIONS", url, **kwargs)
+
     def close(self):
         pass
 
@@ -52,6 +74,27 @@ class DummyAsyncSession:
 
         return R()
 
+    async def get(self, url, **kwargs):
+        return await self.request("GET", url, **kwargs)
+
+    async def post(self, url, **kwargs):
+        return await self.request("POST", url, **kwargs)
+
+    async def put(self, url, **kwargs):
+        return await self.request("PUT", url, **kwargs)
+
+    async def patch(self, url, **kwargs):
+        return await self.request("PATCH", url, **kwargs)
+
+    async def delete(self, url, **kwargs):
+        return await self.request("DELETE", url, **kwargs)
+
+    async def head(self, url, **kwargs):
+        return await self.request("HEAD", url, **kwargs)
+
+    async def options(self, url, **kwargs):
+        return await self.request("OPTIONS", url, **kwargs)
+
     async def aclose(self):
         pass
 
@@ -71,7 +114,7 @@ def config(monkeypatch):
         last_updated="2025-01-01T00:00:00Z",
         handling_config={
             "tracked_methods": ["GET /foo"],
-            "response_fields": [{"key": "value", "path": ""}],
+            "response_fields": [{"key": "value", "path": "value"}],
             "payload_mapping": {
                 "config": "config_identifier",
                 "timestamp": "timestamp",
@@ -83,7 +126,17 @@ def config(monkeypatch):
 
 
 class DummyClientInit:
-    def __init__(self, *, aicm_api_key=None, aicm_api_base=None, aicm_api_url=None, aicm_ini_path=None, session=None, proxies=None, headers=None):
+    def __init__(
+        self,
+        *,
+        aicm_api_key=None,
+        aicm_api_base=None,
+        aicm_api_url=None,
+        aicm_ini_path=None,
+        session=None,
+        proxies=None,
+        headers=None,
+    ):
         self.api_key = aicm_api_key
         self.api_base = "http://x"
         self.api_url = "/api"
@@ -92,7 +145,17 @@ class DummyClientInit:
 
 
 class DummyAsyncClientInit:
-    def __init__(self, *, aicm_api_key=None, aicm_api_base=None, aicm_api_url=None, aicm_ini_path=None, session=None, proxies=None, headers=None):
+    def __init__(
+        self,
+        *,
+        aicm_api_key=None,
+        aicm_api_base=None,
+        aicm_api_url=None,
+        aicm_ini_path=None,
+        session=None,
+        proxies=None,
+        headers=None,
+    ):
         self.api_key = aicm_api_key
         self.api_base = "http://x"
         self.api_url = "/api"
@@ -112,7 +175,9 @@ def test_rest_manager_tracks(monkeypatch, config):
 
 
 def test_async_rest_manager_tracks(monkeypatch, config):
-    monkeypatch.setattr(AsyncCostManagerClient, "__init__", DummyAsyncClientInit.__init__)
+    monkeypatch.setattr(
+        AsyncCostManagerClient, "__init__", DummyAsyncClientInit.__init__
+    )
     monkeypatch.setattr(CostManagerClient, "__init__", DummyClientInit.__init__)
 
     async def run():
