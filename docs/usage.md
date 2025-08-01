@@ -56,10 +56,12 @@ unchanged = client.get_configs(etag=etag)  # returns None when unchanged
 
 The `/configs` endpoint returns an `ETag` header. Send this value back in
 `If-None-Match` to avoid downloading configuration when nothing has changed.
-Triggered limit information is read from `AICM.INI` each time it is needed.
-It is fetched from the server on the initial configuration refresh (or if the
-INI file lacks the section) and whenever usage is recorded via the
-`/track-usage` endpoint.
+If the configuration is unchanged, the SDK will still refresh the
+`triggered_limits` section by calling `/triggered-limits`.
+Triggered limit information is read from `AICM.INI` each time it is needed and
+is fetched from the server only when the client is initialized (including the
+etag check described above) or when usage is recorded via the `/track-usage`
+endpoint.
 
 # using CostManager with automatic delivery
 from aicostmanager import CostManager

@@ -221,12 +221,12 @@ def test_config_manager_etag(monkeypatch, tmp_path):
 
     cfg_mgr.refresh()
     assert calls["configs"] == [None, "tag1"]
-    # triggered limits already stored, second refresh should not fetch them
-    assert calls["limits"] == 0
+    # second refresh should fetch triggered limits to refresh the INI
+    assert calls["limits"] == 1
 
     cp = configparser.ConfigParser()
     cp.read(ini)
-    assert json.loads(cp["triggered_limits"]["payload"]) == tl_item
+    assert json.loads(cp["triggered_limits"]["payload"]) == tl_item2
 
 
 def test_fetch_limits_when_missing(monkeypatch, tmp_path):
