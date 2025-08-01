@@ -27,11 +27,19 @@ def test_usage_limit_end_to_end(
     aicm_api_base,
     aicm_ini_path,
     openai_api_key,
+    clean_delivery,
 ):
+    import os
+
     if not openai_api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
     if not _endpoint_live(aicm_api_base):
         pytest.skip("AICM endpoint not reachable")
+
+    # Ensure clean start - delete INI file if it exists to prevent interference from other tests
+    if os.path.exists(aicm_ini_path):
+        os.remove(aicm_ini_path)
+        print(f"Deleted existing INI file: {aicm_ini_path}")
 
     client = CostManagerClient(
         aicm_api_key=aicm_api_key,
@@ -88,17 +96,17 @@ def test_usage_limit_end_to_end(
         time.sleep(2)
 
         # subsequent calls expected to exceed limit (may take multiple calls)
-        print("Starting loop to trigger usage limit (max 100 attempts)...")
+        print("Starting loop to trigger usage limit (max 10 attempts)...")
         exception_raised = False
         for i in range(10):
             try:
-                print(f"Attempt {i + 1}/100: Making API call...")
+                print(f"Attempt {i + 1}/10: Making API call...")
                 tracked_client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[{"role": "user", "content": f"hi again {i}"}],
                     max_tokens=5,
                 )
-                print(f"Attempt {i + 1}/100: Call completed")
+                print(f"Attempt {i + 1}/10: Call completed")
 
                 # Check for triggered limits after each call
                 triggered_limits = tracked_client.config_manager.get_triggered_limits(
@@ -106,18 +114,18 @@ def test_usage_limit_end_to_end(
                 )
                 if triggered_limits:
                     print(
-                        f"Attempt {i + 1}/100: Found {len(triggered_limits)} triggered limits!"
+                        f"Attempt {i + 1}/10: Found {len(triggered_limits)} triggered limits!"
                     )
                     for tl in triggered_limits:
                         print(
                             f"  - Limit {tl.limit_id}: {tl.threshold_type}, amount: {tl.amount}"
                         )
                 else:
-                    print(f"Attempt {i + 1}/100: No triggered limits detected yet")
+                    print(f"Attempt {i + 1}/10: No triggered limits detected yet")
 
                 time.sleep(2)  # Give server time to process usage
             except Exception as e:
-                print(f"Attempt {i + 1}/100: Exception raised: {type(e).__name__}: {e}")
+                print(f"Attempt {i + 1}/10: Exception raised: {type(e).__name__}: {e}")
                 exception_raised = True
                 break
 
@@ -130,9 +138,7 @@ def test_usage_limit_end_to_end(
             )
             print(f"Final triggered limits count: {len(final_triggered)}")
 
-        assert exception_raised, (
-            "Expected an exception to be raised within 100 attempts"
-        )
+        assert exception_raised, "Expected an exception to be raised within 10 attempts"
 
         # refresh triggered limits and check limit uuid
         triggered = tracked_client.config_manager.get_triggered_limits(

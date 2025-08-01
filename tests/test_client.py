@@ -38,7 +38,13 @@ class DummyResponse:
 
 
 def _patch(
-    monkeypatch, method, path, data=None, status=200, headers=None, response_headers=None
+    monkeypatch,
+    method,
+    path,
+    data=None,
+    status=200,
+    headers=None,
+    response_headers=None,
 ):
     def requester(self, m, url, **kwargs):
         assert m == method
@@ -64,6 +70,8 @@ def test_env_var_configuration(monkeypatch):
     client = CostManagerClient()
     assert client.api_key == "sk-test"
     assert client.ini_path == "/tmp/custom.ini"
+    # Clean up environment variable to prevent interference with other tests
+    monkeypatch.delenv("AICM_INI_PATH", raising=False)
 
 
 def test_default_ini_path(monkeypatch):

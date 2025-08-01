@@ -146,13 +146,10 @@ class CostManagerClient:
     def _initialize_configs_and_limits(self) -> None:
         """Initialize configs and triggered limits during client instantiation."""
         try:
-            # Skip initialization if this looks like a test environment or mock path
-            if (
-                self.ini_path == "ini"
-                or os.path.basename(self.ini_path) == "ini"
-                or "test" in os.environ.get("_", "")
-                or "pytest" in os.environ.get("_", "")
-            ):
+            # Skip initialization only for mock objects that use "ini" as the literal path
+            # This prevents creating files in test environments while still allowing
+            # real clients with proper paths to initialize correctly
+            if self.ini_path == "ini" or os.path.basename(self.ini_path) == "ini":
                 return
 
             # Read existing INI file to get current etag
