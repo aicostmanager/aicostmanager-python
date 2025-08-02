@@ -17,6 +17,12 @@ All notable changes to this project will be documented in this file.
 - Added robust test isolation with `clean_delivery` fixture to prevent cross-test pollution
 - Improved mock test safety by preventing file system operations with literal "ini" paths
 
+### Added
+- `RestCostManager` class for tracking costs of generic REST API calls using `requests.Session`
+- `AsyncRestCostManager` class for tracking costs of async REST API calls using `httpx.AsyncClient`
+- Universal REST API cost tracking capabilities for non-LLM services and custom APIs
+- Support for tracking HTTP method calls (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS) with automatic usage extraction
+
 ### Technical Improvements
 - All 81 core tests now pass reliably regardless of execution order
 - Usage limit enforcement works consistently across different test scenarios
