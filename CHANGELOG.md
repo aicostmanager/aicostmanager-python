@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.9] - 2025-01-30
+### Fixed
+- Fixed triggered limits initialization reliability during `CostManagerClient` instantiation
+- Resolved test execution order dependency in `test_usage_limit_end_to_end` that caused intermittent failures
+- Fixed global delivery state interference between test suites by adding proper test isolation
+- Prevented spurious "ini" file creation in project root directory during mock testing
+- Enhanced environment variable cleanup in client configuration tests
+
+### Enhanced
+- Improved triggered limits lifecycle management with consistent ETag-based fetching logic
+- Strengthened client initialization to always call `/configs` endpoint and conditionally fetch `/triggered-limits`
+- Enhanced config manager alignment with client initialization for better state consistency
+- Added robust test isolation with `clean_delivery` fixture to prevent cross-test pollution
+- Improved mock test safety by preventing file system operations with literal "ini" paths
+
+### Technical Improvements
+- All 81 core tests now pass reliably regardless of execution order
+- Usage limit enforcement works consistently across different test scenarios
+- Better separation between mock and real client behavior in test environment
+- Enhanced triggered limits state management in INI file persistence layer
+
 ## [0.1.8] - 2025-01-30
 ### Fixed
 - Fixed syntax error in `test_async_client.py` where elif statement had incorrect indentation
