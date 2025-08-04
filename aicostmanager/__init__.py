@@ -1,9 +1,8 @@
 """Python SDK for the AICostManager API."""
 
-__version__ = "0.2.0"
+__version__ = "0.1.11"
 
 from .async_cost_manager import AsyncCostManager
-from .rest_cost_manager import AsyncRestCostManager, RestCostManager
 from .client import (
     AICMError,
     APIRequestError,
@@ -44,6 +43,7 @@ from .models import (
     ValidationError,
     VendorOut,
 )
+from .rest_cost_manager import AsyncRestCostManager, RestCostManager
 from .universal_extractor import UniversalExtractor
 
 __all__ = [

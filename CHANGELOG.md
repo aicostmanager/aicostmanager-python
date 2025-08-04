@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.11] - 2025-08-04
+### Fixed
+- Fixed the version number in the __init__
+
+
 ## [0.1.10] - 2025-08-04
 ### Added
 - Custom client metadata support with `client_customer_key` and `context` parameters
