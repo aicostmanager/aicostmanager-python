@@ -486,6 +486,8 @@ def test_openai_chat_completion_usage_delivery(
         aicm_api_key=aicm_api_key,
         aicm_api_base=aicm_api_base,
         aicm_ini_path=aicm_ini_path,
+        client_customer_key="test_client",
+        context={"foo": "bar"},
     )
 
     # Make a test API call that should trigger automatic usage delivery
@@ -511,6 +513,8 @@ def test_openai_chat_completion_usage_delivery(
         assert event.get("config_id") == "openai_chat"
         assert event.get("service_id") == response.model
         assert event.get("response_id") == response.id
+        assert event.get("client_customer_key") == "test_client"
+        assert event.get("context", {}).get("foo") == "bar"
         assert "usage" in event
         assert "timestamp" in event
 
@@ -535,6 +539,8 @@ def test_openai_chat_completion_streaming_usage_delivery(
         aicm_api_key=aicm_api_key,
         aicm_api_base=aicm_api_base,
         aicm_ini_path=aicm_ini_path,
+        client_customer_key="test_client",
+        context={"foo": "bar"},
     )
 
     # Test streaming chat completion API
@@ -585,6 +591,8 @@ def test_openai_chat_completion_streaming_usage_delivery(
             # Verify event structure
             assert event.get("config_id") == "openai_chat"
             assert event.get("response_id") == response_id
+            assert event.get("client_customer_key") == "test_client"
+            assert event.get("context", {}).get("foo") == "bar"
             assert "usage" in event
             assert "timestamp" in event
 

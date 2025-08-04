@@ -191,3 +191,51 @@ def test_async_rest_manager_tracks(monkeypatch, config):
         await manager.stop_delivery()
 
     asyncio.run(run())
+
+
+def test_rest_client_customer_key_and_context(monkeypatch, config):
+    monkeypatch.setattr(CostManagerClient, "__init__", DummyClientInit.__init__)
+    session = DummySession()
+    manager = RestCostManager(
+        session,
+        base_url="https://api.example.com",
+        client_customer_key="c1",
+        context={"foo": "bar"},
+    )
+    manager.get("/foo")
+    manager.set_client_customer_key("c2")
+    manager.set_context({"baz": "qux"})
+    manager.get("/foo")
+    payloads = manager.get_tracked_payloads()
+    assert payloads[0]["client_customer_key"] == "c1"
+    assert payloads[0]["context"] == {"foo": "bar"}
+    assert payloads[1]["client_customer_key"] == "c2"
+    assert payloads[1]["context"] == {"baz": "qux"}
+
+
+def test_async_rest_client_customer_key_and_context(monkeypatch, config):
+    monkeypatch.setattr(
+        AsyncCostManagerClient, "__init__", DummyAsyncClientInit.__init__
+    )
+    monkeypatch.setattr(CostManagerClient, "__init__", DummyClientInit.__init__)
+
+    async def run():
+        session = DummyAsyncSession()
+        manager = AsyncRestCostManager(
+            session,
+            base_url="https://api.example.com",
+            client_customer_key="c1",
+            context={"foo": "bar"},
+        )
+        await manager.get("/foo")
+        manager.set_client_customer_key("c2")
+        manager.set_context({"baz": "qux"})
+        await manager.get("/foo")
+        payloads = manager.get_tracked_payloads()
+        assert payloads[0]["client_customer_key"] == "c1"
+        assert payloads[0]["context"] == {"foo": "bar"}
+        assert payloads[1]["client_customer_key"] == "c2"
+        assert payloads[1]["context"] == {"baz": "qux"}
+        await manager.stop_delivery()
+
+    asyncio.run(run())

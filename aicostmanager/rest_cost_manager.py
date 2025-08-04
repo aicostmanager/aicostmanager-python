@@ -97,6 +97,18 @@ class RestCostManager:
         except Exception:
             self.triggered_limits = []
 
+    def set_client_customer_key(self, client_customer_key: Optional[str]) -> None:
+        self.client_customer_key = client_customer_key
+
+    def set_context(self, context: Optional[Dict[str, Any]]) -> None:
+        self.context = context
+
+    def _augment_payload(self, payload: dict[str, Any]) -> None:
+        if self.client_customer_key and "client_customer_key" not in payload:
+            payload["client_customer_key"] = self.client_customer_key
+        if self.context and "context" not in payload:
+            payload["context"] = self.context
+
     def _full_url(self, url: str) -> str:
         if url.startswith("http"):
             return url
@@ -130,10 +142,7 @@ class RestCostManager:
         for payload in payloads:
             if "service_id" not in payload:
                 payload["service_id"] = service_id
-            if self.client_customer_key and "client_customer_key" not in payload:
-                payload["client_customer_key"] = self.client_customer_key
-            if self.context and "context" not in payload:
-                payload["context"] = self.context
+            self._augment_payload(payload)
         if payloads:
             self.tracked_payloads.extend(payloads)
             for p in payloads:
@@ -255,6 +264,18 @@ class AsyncRestCostManager:
         except Exception:
             self.triggered_limits = []
 
+    def set_client_customer_key(self, client_customer_key: Optional[str]) -> None:
+        self.client_customer_key = client_customer_key
+
+    def set_context(self, context: Optional[Dict[str, Any]]) -> None:
+        self.context = context
+
+    def _augment_payload(self, payload: dict[str, Any]) -> None:
+        if self.client_customer_key and "client_customer_key" not in payload:
+            payload["client_customer_key"] = self.client_customer_key
+        if self.context and "context" not in payload:
+            payload["context"] = self.context
+
     # main request ------------------------------------------------
     async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         full = self._full_url(url)
@@ -277,10 +298,7 @@ class AsyncRestCostManager:
         for payload in payloads:
             if "service_id" not in payload:
                 payload["service_id"] = service_id
-            if self.client_customer_key and "client_customer_key" not in payload:
-                payload["client_customer_key"] = self.client_customer_key
-            if self.context and "context" not in payload:
-                payload["context"] = self.context
+            self._augment_payload(payload)
         if payloads:
             self.tracked_payloads.extend(payloads)
             for p in payloads:

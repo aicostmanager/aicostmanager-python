@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Iterator, List, Optional
+from typing import Any, Dict, Iterable, Iterator, List, Optional
 
 from .client import CostManagerClient, UsageLimitExceeded
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
@@ -30,6 +30,8 @@ class CostManager:
         aicm_api_base: Optional[str] = None,
         aicm_api_url: Optional[str] = None,
         aicm_ini_path: Optional[str] = None,
+        client_customer_key: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
         delivery: ResilientDelivery | None = None,
         delivery_queue_size: int = 1000,
         delivery_max_retries: int = 5,
@@ -48,6 +50,8 @@ class CostManager:
         self.extractor = UniversalExtractor(self.configs)
         self.tracked_payloads: list[dict[str, Any]] = []
         self.triggered_limits: List[TriggeredLimit] = []
+        self.client_customer_key = client_customer_key
+        self.context = context
 
         if delivery is not None:
             self.delivery = delivery
@@ -62,7 +66,9 @@ class CostManager:
     def _refresh_limits(self) -> None:
         """Load latest triggered limits from the config manager."""
         try:
-            self.triggered_limits = self.config_manager.get_triggered_limits()
+            self.triggered_limits = self.config_manager.get_triggered_limits(
+                client_customer_key=self.client_customer_key
+            )
             # Check for LIMIT threshold types that should block API calls
             blocking_limits = [
                 limit
@@ -77,6 +83,18 @@ class CostManager:
         except Exception:
             # Only catch other types of exceptions
             self.triggered_limits = []
+
+    def set_client_customer_key(self, client_customer_key: Optional[str]) -> None:
+        self.client_customer_key = client_customer_key
+
+    def set_context(self, context: Optional[Dict[str, Any]]) -> None:
+        self.context = context
+
+    def _augment_payload(self, payload: dict[str, Any]) -> None:
+        if self.client_customer_key and "client_customer_key" not in payload:
+            payload["client_customer_key"] = self.client_customer_key
+        if self.context and "context" not in payload:
+            payload["context"] = self.context
 
     # ------------------------------------------------------------
     # attribute proxying
@@ -107,6 +125,7 @@ class CostManager:
                 if payloads:
                     self.tracked_payloads.extend(payloads)
                     for payload in payloads:
+                        self._augment_payload(payload)
                         self.delivery.deliver({"usage_records": [payload]})
                 return response
 
@@ -286,6 +305,7 @@ class _StreamIterator:
         if payloads:
             self._manager.tracked_payloads.extend(payloads)
             for payload in payloads:
+                self._manager._augment_payload(payload)
                 self._manager.delivery.deliver({"usage_records": [payload]})
 
 
@@ -349,6 +369,7 @@ class _AsyncStreamIterator:
         if payloads:
             self._manager.tracked_payloads.extend(payloads)
             for payload in payloads:
+                self._manager._augment_payload(payload)
                 self._manager.delivery.deliver({"usage_records": [payload]})
 
 
@@ -394,6 +415,7 @@ class NestedAttributeWrapper:
                 if payloads:
                     self._parent_manager.tracked_payloads.extend(payloads)
                     for payload in payloads:
+                        self._parent_manager._augment_payload(payload)
                         self._parent_manager.delivery.deliver(
                             {"usage_records": [payload]}
                         )
