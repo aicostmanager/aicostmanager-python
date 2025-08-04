@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.10] - 2025-08-04
+### Added
+- Custom client metadata support with `client_customer_key` and `context` parameters
+- New `set_client_customer_key()` and `set_context()` methods for all cost manager classes
+- Automatic augmentation of usage payloads with client metadata for tracking and identification
+- Client metadata support across all cost manager types: `CostManager`, `AsyncCostManager`, `RestCostManager`, and `AsyncRestCostManager`
+
+### Enhanced
+- Updated project dependencies to latest versions for improved compatibility and security
+- Enhanced test coverage with comprehensive client metadata validation across all LLM providers
+- Improved payload tracking with consistent metadata injection across sync and async operations
+
+### Technical Improvements
+- Unified `_augment_payload()` method implementation across all cost manager classes
+- Comprehensive test suite covering client metadata functionality for OpenAI, Anthropic, Bedrock, Gemini, and OpenAI-compatible providers
+- Enhanced delivery verification tests to validate client metadata presence in usage events
+
 ## [0.1.9] - 2025-01-30
 ### Fixed
 - Fixed triggered limits initialization reliability during `CostManagerClient` instantiation
