@@ -91,9 +91,9 @@ class CostManager:
         self.context = context
 
     def _augment_payload(self, payload: dict[str, Any]) -> None:
-        if self.client_customer_key and "client_customer_key" not in payload:
+        if self.client_customer_key and payload.get("client_customer_key") is None:
             payload["client_customer_key"] = self.client_customer_key
-        if self.context and "context" not in payload:
+        if self.context and payload.get("context") is None:
             payload["context"] = self.context
 
     # ------------------------------------------------------------

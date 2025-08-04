@@ -150,3 +150,25 @@ def clear_triggered_limits(aicm_ini_path):
     yield
 
     # Cleanup: optionally restore original state or leave clean for next tests
+
+
+@pytest.fixture(autouse=True)
+def cleanup_ini_files():
+    """Automatically clean up any test ini files created during testing."""
+    import glob
+
+    yield
+
+    # Clean up any ini files in project root that might have been created accidentally
+    for ini_file in glob.glob("ini*"):
+        try:
+            os.remove(ini_file)
+        except OSError:
+            pass
+
+    # Clean up any test ini files in /tmp
+    for ini_file in glob.glob("/tmp/test_*ini*"):
+        try:
+            os.remove(ini_file)
+        except OSError:
+            pass

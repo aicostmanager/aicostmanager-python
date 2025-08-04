@@ -18,7 +18,6 @@ from .config_manager import Config, CostManagerConfig, TriggeredLimit
 from .delivery import ResilientDelivery, get_global_delivery
 from .universal_extractor import UniversalExtractor
 
-
 _HTTP_METHODS = {
     "get",
     "post",
@@ -52,7 +51,9 @@ class RestCostManager:
     ) -> None:
         self.session = session or requests.Session()
         self.base_url = base_url.rstrip("/")
-        parsed = urlparse(self.base_url if "//" in self.base_url else f"https://{self.base_url}")
+        parsed = urlparse(
+            self.base_url if "//" in self.base_url else f"https://{self.base_url}"
+        )
         self.hostname = parsed.netloc or parsed.path
         self.api_id = self.hostname.lower()
         self.client_customer_key = client_customer_key
@@ -104,9 +105,9 @@ class RestCostManager:
         self.context = context
 
     def _augment_payload(self, payload: dict[str, Any]) -> None:
-        if self.client_customer_key and "client_customer_key" not in payload:
+        if self.client_customer_key and payload.get("client_customer_key") is None:
             payload["client_customer_key"] = self.client_customer_key
-        if self.context and "context" not in payload:
+        if self.context and payload.get("context") is None:
             payload["context"] = self.context
 
     def _full_url(self, url: str) -> str:
@@ -155,10 +156,12 @@ class RestCostManager:
     def __getattr__(self, name: str) -> Any:
         attr = getattr(self.session, name)
         if name.lower() in _HTTP_METHODS and callable(attr):
+
             def wrapper(*args, **kwargs):
                 method = name if name != "request" else args[0]
                 url = args[1] if name == "request" else args[0]
                 return self.request(method, url, **kwargs)
+
             return wrapper
         return attr
 
@@ -203,7 +206,9 @@ class AsyncRestCostManager:
     ) -> None:
         self.session = session or httpx.AsyncClient()
         self.base_url = base_url.rstrip("/")
-        parsed = urlparse(self.base_url if "//" in self.base_url else f"https://{self.base_url}")
+        parsed = urlparse(
+            self.base_url if "//" in self.base_url else f"https://{self.base_url}"
+        )
         self.hostname = parsed.netloc or parsed.path
         self.api_id = self.hostname.lower()
         self.client_customer_key = client_customer_key
@@ -271,9 +276,9 @@ class AsyncRestCostManager:
         self.context = context
 
     def _augment_payload(self, payload: dict[str, Any]) -> None:
-        if self.client_customer_key and "client_customer_key" not in payload:
+        if self.client_customer_key and payload.get("client_customer_key") is None:
             payload["client_customer_key"] = self.client_customer_key
-        if self.context and "context" not in payload:
+        if self.context and payload.get("context") is None:
             payload["context"] = self.context
 
     # main request ------------------------------------------------
@@ -309,10 +314,12 @@ class AsyncRestCostManager:
     def __getattr__(self, name: str) -> Any:
         attr = getattr(self.session, name)
         if name.lower() in _HTTP_METHODS and callable(attr):
+
             async def wrapper(*args, **kwargs):
                 method = name if name != "request" else args[0]
                 url = args[1] if name == "request" else args[0]
                 return await self.request(method, url, **kwargs)
+
             return wrapper
         return attr
 

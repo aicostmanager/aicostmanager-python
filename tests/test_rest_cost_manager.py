@@ -141,7 +141,8 @@ class DummyClientInit:
         self.api_base = "http://x"
         self.api_url = "/api"
         self.session = session or DummySession()
-        self.ini_path = "ini"
+        # Use provided path or a safe default that won't create files in project root
+        self.ini_path = aicm_ini_path or "/tmp/test_ini"
 
 
 class DummyAsyncClientInit:
@@ -160,7 +161,8 @@ class DummyAsyncClientInit:
         self.api_base = "http://x"
         self.api_url = "/api"
         self.session = session or DummyAsyncSession()
-        self.ini_path = "ini"
+        # Use provided path or a safe default that won't create files in project root
+        self.ini_path = aicm_ini_path or "/tmp/test_ini"
 
 
 def test_rest_manager_tracks(monkeypatch, config):

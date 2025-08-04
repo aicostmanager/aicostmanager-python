@@ -51,7 +51,8 @@ def test_async_manager_tracks(monkeypatch):
         self.api_base = "http://x"
         self.api_url = "/api"
         self.session = session or DummySession()
-        self.ini_path = "ini"
+        # Use provided path or a safe default that won't create files in project root
+        self.ini_path = aicm_ini_path or "/tmp/test_async_ini"
 
     def fake_sync_init(
         self,
@@ -68,7 +69,8 @@ def test_async_manager_tracks(monkeypatch):
         self.api_base = "http://x"
         self.api_url = "/api"
         self.session = session or DummySession()
-        self.ini_path = "ini"
+        # Use provided path or a safe default that won't create files in project root
+        self.ini_path = aicm_ini_path or "/tmp/test_sync_ini"
 
     monkeypatch.setattr(AsyncCostManagerClient, "__init__", fake_async_init)
     monkeypatch.setattr(CostManagerClient, "__init__", fake_sync_init)
@@ -121,7 +123,8 @@ def test_async_delivery(monkeypatch):
         self.api_base = "http://x"
         self.api_url = "/api"
         self.session = session or session_obj
-        self.ini_path = "ini"
+        # Use provided path or a safe default that won't create files in project root
+        self.ini_path = aicm_ini_path or "/tmp/test_async_delivery_ini"
 
     def fake_sync_init(
         self,
@@ -138,7 +141,8 @@ def test_async_delivery(monkeypatch):
         self.api_base = "http://x"
         self.api_url = "/api"
         self.session = session or session_obj
-        self.ini_path = "ini"
+        # Use provided path or a safe default that won't create files in project root
+        self.ini_path = aicm_ini_path or "/tmp/test_sync_delivery_ini"
 
     session_obj = session
     monkeypatch.setattr(AsyncCostManagerClient, "__init__", fake_async_init)

@@ -31,7 +31,7 @@ def set_key(monkeypatch):
     yield
 
 
-def test_cost_manager_queues_payload(monkeypatch):
+def test_cost_manager_queues_payload(monkeypatch, tmp_path):
     reset_global()
     session = DummySession()
 
@@ -48,7 +48,7 @@ def test_cost_manager_queues_payload(monkeypatch):
         self.api_base = "http://x"
         self.api_url = "/api"
         self.session = session or session_obj
-        self.ini_path = "ini"
+        self.ini_path = aicm_ini_path or str(tmp_path / "test_ini")
 
     session_obj = session
     monkeypatch.setattr(CostManagerClient, "__init__", fake_init)
