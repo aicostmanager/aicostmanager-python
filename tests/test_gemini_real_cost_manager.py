@@ -207,6 +207,8 @@ def test_gemini_generate_content_usage_delivery(
         aicm_api_key=aicm_api_key,
         aicm_api_base=aicm_api_base,
         aicm_ini_path=aicm_ini_path,
+        client_customer_key="test_client",
+        context={"foo": "bar"},
     )
 
     # Refresh config to pick up server changes
@@ -250,6 +252,8 @@ def test_gemini_generate_content_usage_delivery(
         assert event is not None, (
             f"Usage event {response_id} was not delivered to server"
         )
+        assert event.get("client_customer_key") == "test_client"
+        assert event.get("context", {}).get("foo") == "bar"
         assert "usage" in event
 
 
@@ -268,6 +272,8 @@ def test_gemini_generate_content_streaming_usage_delivery(
         aicm_api_key=aicm_api_key,
         aicm_api_base=aicm_api_base,
         aicm_ini_path=aicm_ini_path,
+        client_customer_key="test_client",
+        context={"foo": "bar"},
     )
 
     # Refresh config to pick up server changes
@@ -315,6 +321,8 @@ def test_gemini_generate_content_streaming_usage_delivery(
         assert event is not None, (
             f"Streaming usage event {response_id} was not delivered to server"
         )
+        assert event.get("client_customer_key") == "test_client"
+        assert event.get("context", {}).get("foo") == "bar"
         assert "usage" in event
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .client import (
     AsyncCostManagerClient,
@@ -142,6 +142,8 @@ class AsyncCostManager:
         aicm_api_base: Optional[str] = None,
         aicm_api_url: Optional[str] = None,
         aicm_ini_path: Optional[str] = None,
+        client_customer_key: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
         delivery: AsyncResilientDelivery | None = None,
         delivery_queue_size: int = 1000,
         delivery_max_retries: int = 5,
@@ -168,6 +170,8 @@ class AsyncCostManager:
         self.extractor = UniversalExtractor(self.configs)
         self.tracked_payloads: list[dict[str, Any]] = []
         self.triggered_limits: List[TriggeredLimit] = []
+        self.client_customer_key = client_customer_key
+        self.context = context
 
         if delivery is not None:
             self.delivery = delivery
@@ -184,7 +188,9 @@ class AsyncCostManager:
     def _refresh_limits(self) -> None:
         """Load latest triggered limits from the config manager."""
         try:
-            self.triggered_limits = self.config_manager.get_triggered_limits()
+            self.triggered_limits = self.config_manager.get_triggered_limits(
+                client_customer_key=self.client_customer_key
+            )
             blocking_limits = [
                 limit
                 for limit in self.triggered_limits
@@ -196,6 +202,18 @@ class AsyncCostManager:
             raise
         except Exception:
             self.triggered_limits = []
+
+    def set_client_customer_key(self, client_customer_key: Optional[str]) -> None:
+        self.client_customer_key = client_customer_key
+
+    def set_context(self, context: Optional[Dict[str, Any]]) -> None:
+        self.context = context
+
+    def _augment_payload(self, payload: dict[str, Any]) -> None:
+        if self.client_customer_key and "client_customer_key" not in payload:
+            payload["client_customer_key"] = self.client_customer_key
+        if self.context and "context" not in payload:
+            payload["context"] = self.context
 
     # ------------------------------------------------------------
     # attribute proxying
@@ -218,6 +236,7 @@ class AsyncCostManager:
             if payloads:
                 self.tracked_payloads.extend(payloads)
                 for payload in payloads:
+                    self._augment_payload(payload)
                     self.delivery.deliver({"usage_records": [payload]})
             return response
 
@@ -353,6 +372,7 @@ class AsyncNestedAttributeWrapper:
                 if payloads:
                     self._parent_manager.tracked_payloads.extend(payloads)
                     for payload in payloads:
+                        self._parent_manager._augment_payload(payload)
                         self._parent_manager.delivery.deliver(
                             {"usage_records": [payload]}
                         )

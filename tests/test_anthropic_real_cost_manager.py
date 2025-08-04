@@ -211,6 +211,8 @@ def test_anthropic_messages_usage_delivery(
         aicm_api_key=aicm_api_key,
         aicm_api_base=aicm_api_base,
         aicm_ini_path=aicm_ini_path,
+        client_customer_key="test_client",
+        context={"foo": "bar"},
     )
     resp = tracked_client.messages.create(
         model="claude-3-haiku-20240307",
@@ -219,6 +221,8 @@ def test_anthropic_messages_usage_delivery(
     )
     event = verify_event_delivered(aicm_api_key, aicm_api_base, resp.id)
     assert event is not None
+    assert event.get("client_customer_key") == "test_client"
+    assert event.get("context", {}).get("foo") == "bar"
     assert "usage" in event
 
 
@@ -240,6 +244,8 @@ def test_anthropic_messages_streaming_usage_delivery(
         aicm_api_key=aicm_api_key,
         aicm_api_base=aicm_api_base,
         aicm_ini_path=aicm_ini_path,
+        client_customer_key="test_client",
+        context={"foo": "bar"},
     )
     stream = tracked_client.messages.create(
         model="claude-3-haiku-20240307",
@@ -264,6 +270,8 @@ def test_anthropic_messages_streaming_usage_delivery(
     if response_id:
         event = verify_event_delivered(aicm_api_key, aicm_api_base, response_id)
         assert event is not None
+        assert event.get("client_customer_key") == "test_client"
+        assert event.get("context", {}).get("foo") == "bar"
         assert "usage" in event
 
 
