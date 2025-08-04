@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aicostmanager"
-version = "0.1.11"
+version = "0.1.12"
 description = "Python SDK for the AICostManager API"
 authors = [{name = "AICostManager", email = "support@aicostmanager.com"}]
 readme = "README.md"
@@ -23,7 +23,8 @@ Homepage = "https://aicostmanager.com"
 Source = "https://github.com/aicostmanager/aicostmanager"
 
 [tool.setuptools.packages.find]
-where = ["aicostmanager"]
+where = ["."]
+exclude = ["tests*", "scripts*", "docs*", "dist*", "build*"]
 
 [tool.pytest.ini_options]
 addopts = "-v"
@@ -52,7 +53,7 @@ dev = [
 ]
 
 [tool.bumpversion]
-current_version = "0.1.11"
+current_version = "0.1.12"
 commit = true
 tag = true
 

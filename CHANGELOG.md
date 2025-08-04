@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.12] - 2025-01-05
+### Fixed
+- **CRITICAL**: Fixed empty package builds by correcting setuptools package discovery configuration
+- Packages built with previous versions (0.1.10 and earlier) contained only metadata without actual Python source code
+- This resolves issues where `uv add aicostmanager` and `pip install aicostmanager` resulted in empty package installations
+- Updated `pyproject.toml` to properly include source files in wheel distributions
+
 ## [0.1.11] - 2025-08-04
 ### Fixed
 - Fixed the version number in the __init__
