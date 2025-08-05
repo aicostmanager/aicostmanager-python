@@ -193,3 +193,22 @@ def test_delivery_uses_api_root(monkeypatch):
     delivery.stop()
 
     assert sess.calls[0][0] == "http://base/api/track-usage"
+
+
+def test_registers_after_fork(monkeypatch):
+    reset_global()
+    calls: list[tuple[object, object]] = []
+
+    def fake_register(obj, fn):
+        calls.append((obj, fn))
+
+    monkeypatch.setattr("multiprocessing.util.register_after_fork", fake_register)
+
+    sess = DummySession()
+    client = CostManagerClient(aicm_api_key="sk-test", session=sess)
+
+    get_global_delivery(client)
+    # Subsequent calls shouldn't register again
+    get_global_delivery(client)
+
+    assert len(calls) == 1

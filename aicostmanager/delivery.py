@@ -189,6 +189,26 @@ def get_global_delivery(
             ini_path=client.ini_path,
         )
         _global_delivery.start()
+
+        # Ensure the delivery thread is restarted in forked worker processes
+        try:  # pragma: no cover - optional multiprocessing hook
+            from multiprocessing import util as mp_util
+
+            mp_util.register_after_fork(
+                client, lambda _: get_global_delivery(client).start()
+            )
+        except Exception:  # pragma: no cover - environment may not support fork
+            pass
+
+        # Celery uses a separate signal for worker process initialisation
+        try:  # pragma: no cover - optional Celery integration
+            from celery.signals import worker_process_init
+
+            worker_process_init.connect(
+                lambda **_: get_global_delivery(client).start(), weak=False
+            )
+        except Exception:  # pragma: no cover - Celery not installed
+            pass
     else:
         # Ensure the worker is actually running.  Tests may stop the
         # singleton leaving the object assigned but the thread stopped.

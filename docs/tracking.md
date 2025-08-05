@@ -72,3 +72,10 @@ async with AsyncCostManagerClient() as client:
     async with AsyncCostManager(client) as tracker:
         await tracker.client.some_call()
 ```
+
+## Multiprocessing Environments
+
+In applications that fork worker processes (such as those using the
+``multiprocessing`` module or Celery), create the ``CostManager`` instance
+inside a worker-initialisation hook. This ensures each worker has its own
+delivery thread and avoids race conditions when processes start.
