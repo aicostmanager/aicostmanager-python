@@ -6,6 +6,8 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
+from .delivery import _ini_get_or_set
+
 from .client import (
     AsyncCostManagerClient,
     CostManagerClient,
@@ -28,12 +30,25 @@ class AsyncResilientDelivery:
         max_retries: int = 5,
         queue_size: int = 1000,
         timeout: float = 10.0,
+        ini_path: Optional[str] = None,
+        batch_interval: float | None = None,
+        max_batch_size: int = 100,
     ) -> None:
         self.session = session
         self.api_root = api_root.rstrip("/")
         self.endpoint = endpoint
         self.max_retries = max_retries
         self.timeout = timeout
+        self.ini_path = ini_path
+        self.max_batch_size = max_batch_size
+        if ini_path:
+            default_interval = batch_interval if batch_interval is not None else 0.05
+            override = batch_interval is not None
+            self.batch_interval = _ini_get_or_set(
+                ini_path, "delivery", "timeout", default_interval, override=override
+            )
+        else:
+            self.batch_interval = batch_interval if batch_interval is not None else 0.05
         self._queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=queue_size)
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -76,13 +91,17 @@ class AsyncResilientDelivery:
                 self._queue.task_done()
                 break
             batch = [item]
-            while True:
-                try:
-                    nxt = self._queue.get_nowait()
-                except asyncio.QueueEmpty:
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + self.batch_interval
+            while len(batch) < self.max_batch_size:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
                     break
-                else:
+                try:
+                    nxt = await asyncio.wait_for(self._queue.get(), timeout=remaining)
                     batch.append(nxt)
+                except asyncio.TimeoutError:
+                    break
             try:
                 payload = {"usage_records": []}
                 for p in batch:
@@ -148,6 +167,8 @@ class AsyncCostManager:
         delivery_queue_size: int = 1000,
         delivery_max_retries: int = 5,
         delivery_timeout: float = 10.0,
+        delivery_batch_interval: float | None = None,
+        delivery_max_batch_size: int = 100,
     ) -> None:
         self.client = client
         # synchronous client used for configuration loading only
@@ -182,6 +203,9 @@ class AsyncCostManager:
                 max_retries=delivery_max_retries,
                 queue_size=delivery_queue_size,
                 timeout=delivery_timeout,
+                ini_path=aicm_ini_path,
+                batch_interval=delivery_batch_interval,
+                max_batch_size=delivery_max_batch_size,
             )
         self.delivery.start()
 

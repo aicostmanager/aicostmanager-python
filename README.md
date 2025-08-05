@@ -233,6 +233,8 @@ tracked_client = CostManager(
     delivery_queue_size=1000,      # Queue size for batching
     delivery_max_retries=5,        # Retry failed deliveries
     delivery_timeout=10.0,         # Request timeout in seconds
+    delivery_batch_interval=0.05,  # Wait up to 50ms for more items
+    delivery_max_batch_size=100,   # Flush when batch reaches this size
     # delivery_mode="async",       # Use async delivery (or set AICM_DELIVERY_MODE)
     # delivery_on_full="backpressure",  # Block, raise, or backpressure when full
 )
@@ -273,6 +275,8 @@ tracked_client = CostManager(
     aicm_api_base="https://custom.url",    # Custom API base
     delivery_queue_size=2000,              # Larger queue
     delivery_max_retries=10,               # More retries
+    delivery_batch_interval=0.1,           # Custom batch window
+    delivery_max_batch_size=50,            # Custom batch size limit
     delivery_on_full="raise",             # Block, raise, or backpressure
 )
 ```

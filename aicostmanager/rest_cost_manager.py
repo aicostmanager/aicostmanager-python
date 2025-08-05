@@ -48,6 +48,8 @@ class RestCostManager:
         delivery_queue_size: int = 1000,
         delivery_max_retries: int = 5,
         delivery_timeout: float = 10.0,
+        delivery_batch_interval: float | None = None,
+        delivery_max_batch_size: int = 100,
         delivery_mode: str | None = None,
         delivery_on_full: str = "backpressure",
     ) -> None:
@@ -81,6 +83,8 @@ class RestCostManager:
                 max_retries=delivery_max_retries,
                 queue_size=delivery_queue_size,
                 timeout=delivery_timeout,
+                batch_interval=delivery_batch_interval,
+                max_batch_size=delivery_max_batch_size,
                 delivery_mode=delivery_mode,
                 on_full=delivery_on_full,
             )

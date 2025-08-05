@@ -101,6 +101,22 @@ sys.modules.setdefault(
     ),
 )
 
+
+class _DummyHttpxAsyncClient:
+    def __init__(self, *a, **k):
+        self.headers = {}
+
+    async def post(self, *a, **k):
+        return DummyAsyncResponse()
+
+    async def aclose(self):
+        return None
+
+
+sys.modules.setdefault(
+    "httpx", types.SimpleNamespace(AsyncClient=_DummyHttpxAsyncClient)
+)
+
 from aicostmanager.client import CostManagerClient
 from aicostmanager.delivery import ResilientDelivery, get_global_delivery
 
@@ -160,11 +176,16 @@ def reset_global():
     mod._global_delivery = None
 
 
-def test_delivery_batches(monkeypatch):
+def test_delivery_batches(monkeypatch, tmp_path):
     reset_global()
     sess = DummySession()
-    client = CostManagerClient(aicm_api_key="sk-test", session=sess)
-    delivery = get_global_delivery(client, queue_size=10)
+    ini_path = tmp_path / "AICM.INI"
+    client = CostManagerClient(
+        aicm_api_key="sk-test", session=sess, aicm_ini_path=str(ini_path)
+    )
+    delivery = get_global_delivery(
+        client, queue_size=10, batch_interval=0.01, max_batch_size=10
+    )
 
     delivery.deliver({"usage_records": [{"id": 1}]})
     delivery.deliver({"usage_records": [{"id": 2}]})
@@ -175,6 +196,38 @@ def test_delivery_batches(monkeypatch):
 
     assert len(sess.calls) == 1
     assert sess.calls[0][1]["usage_records"] == [{"id": 1}, {"id": 2}]
+
+
+def test_delivery_time_window():
+    sess = DummySession()
+    delivery = ResilientDelivery(
+        sess, "http://x", batch_interval=0.01, max_batch_size=10
+    )
+    delivery.start()
+    delivery.deliver({"usage_records": [{"id": 1}]})
+    time.sleep(0.02)
+    delivery.deliver({"usage_records": [{"id": 2}]})
+    delivery._queue.join()
+    delivery.stop()
+
+    assert len(sess.calls) == 2
+
+
+def test_delivery_batch_size_limit():
+    sess = DummySession()
+    delivery = ResilientDelivery(
+        sess, "http://x", batch_interval=0.01, max_batch_size=2
+    )
+    delivery.start()
+    delivery.deliver({"usage_records": [{"id": 1}]})
+    delivery.deliver({"usage_records": [{"id": 2}]})
+    delivery.deliver({"usage_records": [{"id": 3}]})
+    delivery._queue.join()
+    delivery.stop()
+
+    assert len(sess.calls) == 2
+    assert len(sess.calls[0][1]["usage_records"]) == 2
+    assert len(sess.calls[1][1]["usage_records"]) == 1
 
 
 def test_delivery_retries_success(monkeypatch):
@@ -229,20 +282,24 @@ def test_async_delivery_retries_success(monkeypatch):
     assert info["total_failed"] == 0
 
 
-def test_global_singleton(monkeypatch):
+def test_global_singleton(monkeypatch, tmp_path):
     reset_global()
     sess = DummySession()
-    client1 = CostManagerClient(aicm_api_key="sk-test", session=sess)
+    client1 = CostManagerClient(
+        aicm_api_key="sk-test", session=sess, aicm_ini_path=str(tmp_path / "AICM.INI")
+    )
     d1 = get_global_delivery(client1)
     d2 = get_global_delivery(client1)
     assert d1 is d2
     d1.stop()
 
 
-def test_global_restart(monkeypatch):
+def test_global_restart(monkeypatch, tmp_path):
     reset_global()
     sess = DummySession()
-    client = CostManagerClient(aicm_api_key="sk-test", session=sess)
+    client = CostManagerClient(
+        aicm_api_key="sk-test", session=sess, aicm_ini_path=str(tmp_path / "AICM.INI")
+    )
     delivery = get_global_delivery(client, queue_size=10)
     delivery.stop()
 
@@ -255,7 +312,7 @@ def test_global_restart(monkeypatch):
     assert len(sess.calls) == 1
 
 
-def test_delivery_uses_api_root(monkeypatch):
+def test_delivery_uses_api_root(monkeypatch, tmp_path):
     reset_global()
     sess = DummySession()
     client = CostManagerClient(
@@ -263,6 +320,7 @@ def test_delivery_uses_api_root(monkeypatch):
         aicm_api_base="http://base",
         aicm_api_url="/api",
         session=sess,
+        aicm_ini_path=str(tmp_path / "AICM.INI"),
     )
     delivery = get_global_delivery(client, queue_size=10)
 
@@ -273,7 +331,7 @@ def test_delivery_uses_api_root(monkeypatch):
     assert sess.calls[0][0] == "http://base/api/track-usage"
 
 
-def test_registers_after_fork(monkeypatch):
+def test_registers_after_fork(monkeypatch, tmp_path):
     reset_global()
     calls: list[tuple[object, object]] = []
 
@@ -283,7 +341,9 @@ def test_registers_after_fork(monkeypatch):
     monkeypatch.setattr("multiprocessing.util.register_after_fork", fake_register)
 
     sess = DummySession()
-    client = CostManagerClient(aicm_api_key="sk-test", session=sess)
+    client = CostManagerClient(
+        aicm_api_key="sk-test", session=sess, aicm_ini_path=str(tmp_path / "AICM.INI")
+    )
 
     get_global_delivery(client)
     # Subsequent calls shouldn't register again
