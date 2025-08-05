@@ -233,8 +233,13 @@ tracked_client = CostManager(
     delivery_queue_size=1000,      # Queue size for batching
     delivery_max_retries=5,        # Retry failed deliveries
     delivery_timeout=10.0,         # Request timeout in seconds
+    # delivery_mode="async",       # Use async delivery (or set AICM_DELIVERY_MODE)
 )
 ```
+
+Set the environment variable ``AICM_DELIVERY_MODE=async`` (or pass
+``delivery_mode="async"`` as shown above) to use an ``httpx.AsyncClient`` with
+non-blocking retries—ideal for eventlet/gevent worker pools.
 
 When using process-based workers such as Celery or the ``multiprocessing``
 module, create the ``CostManager`` inside the worker's initialisation hook.

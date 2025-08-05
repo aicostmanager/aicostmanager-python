@@ -8,6 +8,7 @@ creating a new worker per wrapper.
 
 from __future__ import annotations
 
+import asyncio
 import configparser
 import json
 import os
@@ -18,7 +19,13 @@ import time
 from contextlib import contextmanager
 from typing import Any, Optional
 
-from tenacity import Retrying, stop_after_attempt, wait_exponential_jitter
+import httpx
+from tenacity import (
+    AsyncRetrying,
+    Retrying,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from .client import CostManagerClient
 
@@ -170,6 +177,7 @@ def get_global_delivery(
     queue_size: int = 1000,
     endpoint: str = "/track-usage",
     timeout: float = 10.0,
+    delivery_mode: str | None = None,
 ) -> "ResilientDelivery":
     """Return the shared delivery queue initialised with ``client``.
 
@@ -178,15 +186,23 @@ def get_global_delivery(
     creation.
     """
     global _global_delivery
-    if _global_delivery is None:
+    if delivery_mode is None:
+        delivery_mode = os.getenv("AICM_DELIVERY_MODE", "sync")
+    async_mode = delivery_mode.lower() == "async"
+    if _global_delivery is None or _global_delivery.async_mode != async_mode:
+        session = client.session
+        if async_mode:
+            session = httpx.AsyncClient()
+            session.headers.update(client.session.headers)
         _global_delivery = ResilientDelivery(
-            client.session,
+            session,
             client.api_root,
             max_retries=max_retries,
             queue_size=queue_size,
             endpoint=endpoint,
             timeout=timeout,
             ini_path=client.ini_path,
+            async_mode=async_mode,
         )
         _global_delivery.start()
 
@@ -243,8 +259,23 @@ class ResilientDelivery:
         queue_size: int = 1000,
         timeout: float = 10.0,
         ini_path: Optional[str] = None,
+        async_mode: bool | None = None,
     ) -> None:
-        self.session = session
+        if async_mode is None:
+            async_mode = (
+                os.getenv("AICM_DELIVERY_MODE", "sync").lower() == "async"
+            )
+        self.async_mode = async_mode
+
+        if self.async_mode and not hasattr(session, "aclose"):
+            async_session = httpx.AsyncClient()
+            try:
+                async_session.headers.update(getattr(session, "headers", {}))
+            except Exception:
+                pass
+            self.session = async_session
+        else:
+            self.session = session
         self.api_root = api_root.rstrip("/")
         self.endpoint = endpoint
         self.max_retries = max_retries
@@ -275,6 +306,16 @@ class ResilientDelivery:
         self._queue.put({})  # sentinel
         self._thread.join()
         self._thread = None
+        if self.async_mode and hasattr(self.session, "aclose"):
+            try:
+                asyncio.run(self.session.aclose())
+            except Exception:
+                try:
+                    loop = asyncio.new_event_loop()
+                    loop.run_until_complete(self.session.aclose())
+                    loop.close()
+                except Exception:
+                    pass
 
     def deliver(self, payload: dict[str, Any]) -> None:
         """Queue ``payload`` for delivery without blocking."""
@@ -303,7 +344,10 @@ class ResilientDelivery:
                 payload = {"usage_records": []}
                 for p in batch:
                     payload["usage_records"].extend(p.get("usage_records", []))
-                self._send_with_retry(payload)
+                if self.async_mode:
+                    asyncio.run(self._send_with_retry_async(payload))
+                else:
+                    self._send_with_retry(payload)
             finally:
                 for _ in batch:
                     self._queue.task_done()
@@ -335,6 +379,37 @@ class ResilientDelivery:
                             self._update_triggered_limits(triggered_limits or {})
                         except Exception:
                             # Don't fail delivery for triggered_limits processing errors
+                            pass
+
+            self._total_sent += 1
+        except Exception as exc:  # pragma: no cover - network failure
+            self._total_failed += 1
+            self._last_error = str(exc)
+
+    async def _send_with_retry_async(self, payload: dict[str, Any]) -> None:
+        url = f"{self.api_root}{self.endpoint}"
+        retry = AsyncRetrying(
+            stop=stop_after_attempt(self.max_retries),
+            wait=wait_exponential_jitter(initial=1, max=30),
+            reraise=True,
+        )
+        try:
+            async for attempt in retry:
+                with attempt:
+                    response = await self.session.post(
+                        url,
+                        json=payload,
+                        timeout=self.timeout,
+                    )
+                    if hasattr(response, "raise_for_status"):
+                        response.raise_for_status()
+
+                    if self.ini_path and hasattr(response, "json"):
+                        try:
+                            response_data = response.json()
+                            triggered_limits = response_data.get("triggered_limits")
+                            self._update_triggered_limits(triggered_limits or {})
+                        except Exception:
                             pass
 
             self._total_sent += 1

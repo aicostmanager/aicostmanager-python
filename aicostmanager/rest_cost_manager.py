@@ -48,6 +48,7 @@ class RestCostManager:
         delivery_queue_size: int = 1000,
         delivery_max_retries: int = 5,
         delivery_timeout: float = 10.0,
+        delivery_mode: str | None = None,
     ) -> None:
         self.session = session or requests.Session()
         self.base_url = base_url.rstrip("/")
@@ -79,6 +80,7 @@ class RestCostManager:
                 max_retries=delivery_max_retries,
                 queue_size=delivery_queue_size,
                 timeout=delivery_timeout,
+                delivery_mode=delivery_mode,
             )
 
     # ------------------------------------------------------------
