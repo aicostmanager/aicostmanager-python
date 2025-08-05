@@ -6,7 +6,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import os
 
 import pytest
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    def load_dotenv(*args, **kwargs):
+        return None
 
 # Load .env file from the current directory (sdks/python/tests)
 ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
@@ -26,8 +30,6 @@ print("AWS_DEFAULT_REGION:", os.environ.get("AWS_DEFAULT_REGION"))
 @pytest.fixture(scope="session", autouse=True)
 def force_api_keys():
     # Always force the .env value for AICM_API_KEY and OPENAI_API_KEY
-    from dotenv import load_dotenv
-
     ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
     load_dotenv(ENV_PATH, override=True)
     aicm_key = os.environ.get("AICM_API_KEY")

@@ -17,6 +17,7 @@ import tempfile
 import threading
 import time
 import logging
+import io
 from contextlib import contextmanager
 from typing import Any, Optional
 
@@ -171,6 +172,30 @@ def _atomic_write(file_path: str, content: str):
         raise
 
 
+def _ini_get_or_set(
+    ini_path: str,
+    section: str,
+    option: str,
+    value: float | int,
+    override: bool = False,
+) -> float:
+    """Retrieve or store a numeric option in an INI file."""
+    with _file_lock(ini_path):
+        cp = _safe_read_config(ini_path)
+        if section not in cp:
+            cp.add_section(section)
+        if option in cp[section] and not override:
+            try:
+                return float(cp[section][option])
+            except ValueError:
+                pass
+        cp[section][option] = str(value)
+        buf = io.StringIO()
+        cp.write(buf)
+        _atomic_write(ini_path, buf.getvalue())
+        return float(value)
+
+
 def get_global_delivery(
     client: CostManagerClient,
     *,
@@ -178,6 +203,8 @@ def get_global_delivery(
     queue_size: int = 1000,
     endpoint: str = "/track-usage",
     timeout: float = 10.0,
+    batch_interval: float | None = None,
+    max_batch_size: int = 100,
     delivery_mode: str | None = None,
     on_full: str = "backpressure",
 ) -> "ResilientDelivery":
@@ -206,6 +233,8 @@ def get_global_delivery(
             ini_path=client.ini_path,
             async_mode=async_mode,
             on_full=on_full,
+            batch_interval=batch_interval,
+            max_batch_size=max_batch_size,
         )
         _global_delivery.start()
 
@@ -264,6 +293,8 @@ class ResilientDelivery:
         ini_path: Optional[str] = None,
         async_mode: bool | None = None,
         on_full: str = "backpressure",
+        batch_interval: float | None = None,
+        max_batch_size: int = 100,
     ) -> None:
         if async_mode is None:
             async_mode = (
@@ -285,6 +316,15 @@ class ResilientDelivery:
         self.max_retries = max_retries
         self.timeout = timeout
         self.ini_path = ini_path
+        self.max_batch_size = max_batch_size
+        if ini_path:
+            default_interval = batch_interval if batch_interval is not None else 0.05
+            override = batch_interval is not None
+            self.batch_interval = _ini_get_or_set(
+                ini_path, "delivery", "timeout", default_interval, override=override
+            )
+        else:
+            self.batch_interval = batch_interval if batch_interval is not None else 0.05
         if on_full not in {"block", "raise", "backpressure"}:
             raise ValueError("on_full must be 'block', 'raise', or 'backpressure'")
         self.on_full = on_full
@@ -356,9 +396,13 @@ class ResilientDelivery:
                 self._queue.task_done()
                 break
             batch = [item]
-            while True:
+            deadline = time.time() + self.batch_interval
+            while len(batch) < self.max_batch_size:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    break
                 try:
-                    nxt = self._queue.get_nowait()
+                    nxt = self._queue.get(timeout=remaining)
                     batch.append(nxt)
                 except queue.Empty:
                     break

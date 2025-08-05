@@ -60,8 +60,14 @@ is to drop the oldest payload and log a warning. Set
 propagate ``queue.Full`` back to the caller.
 
 ``ResilientDelivery`` uses the client's ``api_root`` to construct the
-``/track-usage`` URL.  Payloads added to the queue are batched whenever
-possible and sent with a configurable timeout (default 10 seconds).
+``/track-usage`` URL.  The worker waits a short configurable window
+(``delivery_batch_interval``) for additional payloads and flushes the
+batch when either the window expires or ``delivery_max_batch_size`` items
+have been collected. Requests are sent with a configurable timeout
+(``delivery_timeout``) which defaults to 10 seconds.
+
+The batch interval is persisted in ``AICM.INI`` under the ``[delivery]``
+section so it can be tuned once and reused across runs.
 
 ## Selecting Delivery Mode
 
