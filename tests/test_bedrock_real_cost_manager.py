@@ -119,7 +119,7 @@ def test_bedrock_cost_manager_configs(
     client = _make_client(aws_region)
     tracked_client = CostManager(client)
     configs = tracked_client.configs
-    br_configs = [c for c in configs if c.api_id == "bedrockruntime"]
+    br_configs = [c for c in configs if c.config_id == "bedrock"]
     assert br_configs
 
 
@@ -131,7 +131,7 @@ def test_bedrock_config_retrieval_and_extractor_interaction(
     client = _make_client(aws_region)
     tracked_client = CostManager(client)
     configs = tracked_client.configs
-    br_configs = [cfg for cfg in configs if cfg.api_id == "bedrockruntime"]
+    br_configs = [cfg for cfg in configs if cfg.config_id == "bedrock"]
     assert br_configs
     extractor = UniversalExtractor(br_configs)
     for config in br_configs:
@@ -308,7 +308,7 @@ def test_extractor_payload_generation(
     client = _make_client(aws_region)
     tracked_client = CostManager(client)
     configs = tracked_client.configs
-    br_configs = [cfg for cfg in configs if cfg.api_id == "bedrockruntime"]
+    br_configs = [cfg for cfg in configs if cfg.config_id == "bedrock"]
     extractor = UniversalExtractor(br_configs)
 
     response = tracked_client.converse(
