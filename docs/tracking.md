@@ -60,6 +60,19 @@ application.  The queue size and retry policy can be tuned via
 ``/track-usage`` URL.  Payloads added to the queue are batched whenever
 possible and sent with a configurable timeout (default 10 seconds).
 
+## Selecting Delivery Mode
+
+``ResilientDelivery`` supports two modes:
+
+* **sync** (default) – uses a standard ``requests`` session.
+* **async** – performs delivery using ``httpx.AsyncClient`` together with
+  ``tenacity.AsyncRetrying`` for non-blocking retries.
+
+Set ``AICM_DELIVERY_MODE=async`` (or pass ``delivery_mode="async"`` when
+constructing ``CostManager``/``RestCostManager``) to enable the async mode.
+This is useful for eventlet or gevent worker pools where blocking network
+operations should be avoided.
+
 An asynchronous variant ``AsyncCostManager`` is available for wrapping
 async API clients.  It behaves the same as ``CostManager`` but uses an
 ``asyncio`` delivery queue and ``AsyncCostManagerClient`` for network

@@ -95,6 +95,33 @@ class DummySession:
         return resp
 
 
+class DummyAsyncResponse:
+    def __init__(self, status_code=200):
+        self.status_code = status_code
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise Exception(f"HTTP {self.status_code}")
+
+    def json(self):
+        return {}
+
+
+class DummyAsyncSession:
+    def __init__(self, responses=None):
+        self.calls = []
+        self.headers = {}
+        self._responses = responses or [DummyAsyncResponse()]
+
+    async def post(self, url, json=None, timeout=None):
+        self.calls.append((url, json))
+        resp = self._responses.pop(0)
+        return resp
+
+    async def aclose(self):
+        return None
+
+
 def reset_global():
     # helper to clear global between tests
     from aicostmanager import delivery as mod
@@ -149,6 +176,26 @@ def test_delivery_retries_failure(monkeypatch):
     info = delivery.get_health_info()
     assert info["total_sent"] == 0
     assert info["total_failed"] == 1
+
+
+def test_async_delivery_retries_success(monkeypatch):
+    reset_global()
+    responses = [
+        DummyAsyncResponse(500),
+        DummyAsyncResponse(500),
+        DummyAsyncResponse(200),
+    ]
+    sess = DummyAsyncSession(responses)
+    delivery = ResilientDelivery(sess, "http://x", timeout=0.01, async_mode=True)
+    delivery.start()
+    delivery.deliver({"usage_records": [{}]})
+    delivery._queue.join()
+    delivery.stop()
+
+    assert len(sess.calls) == 3
+    info = delivery.get_health_info()
+    assert info["total_sent"] == 1
+    assert info["total_failed"] == 0
 
 
 def test_global_singleton(monkeypatch):
