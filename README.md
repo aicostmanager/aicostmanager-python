@@ -236,6 +236,11 @@ tracked_client = CostManager(
 )
 ```
 
+When using process-based workers such as Celery or the ``multiprocessing``
+module, create the ``CostManager`` inside the worker's initialisation hook.
+This ensures the background delivery thread is started for every worker
+process and avoids race conditions after forking.
+
 ## 👨‍💻 Advanced Usage
 
 ### Async Support
