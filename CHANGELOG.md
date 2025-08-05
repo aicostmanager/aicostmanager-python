@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.13] - 2025-01-06
+### Enhanced
+- Updated build and deployment documentation with comprehensive step-by-step release process
+- Added detailed prerequisites, troubleshooting, and verification steps for releases
+- Improved documentation for `bump-my-version` integration and GitHub Actions workflow
+- Added quick reference commands for common release tasks
+
 ## [0.1.12] - 2025-01-05
 ### Fixed
 - **CRITICAL**: Fixed empty package builds by correcting setuptools package discovery configuration
