@@ -1,5 +1,11 @@
 import sys
 import types
+import logging
+import queue
+import threading
+import time
+
+import pytest
 
 
 # Provide a minimal requests.Session stub so CostManagerClient can be imported
@@ -30,26 +36,50 @@ class _DummyAttempt:
             self.parent._success = True
             return False
         self.failed = True
-        self.exception = exc
+        self.parent._last_exc = exc
         return True
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return self.__exit__(exc_type, exc, tb)
 
 
 class _DummyRetrying:
     def __init__(self, stop=None, wait=None, reraise=False):
         self.attempts = getattr(stop, "attempts", 1)
         self._success = False
+        self._last_exc = None
+        self._counter = 0
 
     def __iter__(self):
-        last_exc = None
-        for _ in range(self.attempts):
-            attempt = _DummyAttempt(self)
-            yield attempt
-            if self._success:
-                last_exc = None
-                break
-            last_exc = getattr(attempt, "exception", None)
-        if last_exc:
-            raise last_exc
+        self._counter = 0
+        return self
+
+    def __next__(self):
+        if self._success:
+            raise StopIteration
+        if self._counter >= self.attempts:
+            if self._last_exc:
+                raise self._last_exc
+            raise StopIteration
+        self._counter += 1
+        return _DummyAttempt(self)
+
+    def __aiter__(self):
+        self._counter = 0
+        return self
+
+    async def __anext__(self):
+        if self._success:
+            raise StopAsyncIteration
+        if self._counter >= self.attempts:
+            if self._last_exc:
+                raise self._last_exc
+            raise StopAsyncIteration
+        self._counter += 1
+        return _DummyAttempt(self)
 
 
 class _StopAfterAttempt:
@@ -65,6 +95,7 @@ sys.modules.setdefault(
     "tenacity",
     types.SimpleNamespace(
         Retrying=_DummyRetrying,
+        AsyncRetrying=_DummyRetrying,
         stop_after_attempt=_StopAfterAttempt,
         wait_exponential_jitter=_wait_exponential_jitter,
     ),
@@ -259,3 +290,51 @@ def test_registers_after_fork(monkeypatch):
     get_global_delivery(client)
 
     assert len(calls) == 1
+
+
+def test_queue_full_raise(caplog):
+    caplog.set_level(logging.WARNING)
+    sess = DummySession()
+    delivery = ResilientDelivery(sess, "http://x", queue_size=1, on_full="raise")
+    delivery.deliver({"usage_records": [{}]})
+    with pytest.raises(queue.Full):
+        delivery.deliver({"usage_records": [{}]})
+    assert "Delivery queue full" in caplog.text
+
+
+def test_queue_full_backpressure(caplog):
+    caplog.set_level(logging.WARNING)
+    sess = DummySession()
+    delivery = ResilientDelivery(sess, "http://x", queue_size=1, on_full="backpressure")
+    delivery.deliver({"usage_records": [{"id": 1}]})
+    delivery.deliver({"usage_records": [{"id": 2}]})
+    assert "Delivery queue full" in caplog.text
+    assert delivery._queue.qsize() == 1
+    item = delivery._queue.get_nowait()
+    assert item["usage_records"][0]["id"] == 2
+    delivery._queue.task_done()
+
+
+def test_queue_full_block(caplog):
+    caplog.set_level(logging.WARNING)
+    sess = DummySession()
+    delivery = ResilientDelivery(sess, "http://x", queue_size=1, on_full="block")
+    delivery.deliver({"usage_records": [{"id": 1}]})
+    done = threading.Event()
+
+    def deliver_second():
+        delivery.deliver({"usage_records": [{"id": 2}]})
+        done.set()
+
+    t = threading.Thread(target=deliver_second)
+    t.start()
+    time.sleep(0.1)
+    assert not done.is_set()
+    item = delivery._queue.get_nowait()
+    delivery._queue.task_done()
+    t.join(timeout=1)
+    assert done.is_set()
+    assert "Delivery queue full" in caplog.text
+    item2 = delivery._queue.get_nowait()
+    assert item2["usage_records"][0]["id"] == 2
+    delivery._queue.task_done()

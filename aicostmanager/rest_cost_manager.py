@@ -49,6 +49,7 @@ class RestCostManager:
         delivery_max_retries: int = 5,
         delivery_timeout: float = 10.0,
         delivery_mode: str | None = None,
+        delivery_on_full: str = "backpressure",
     ) -> None:
         self.session = session or requests.Session()
         self.base_url = base_url.rstrip("/")
@@ -81,6 +82,7 @@ class RestCostManager:
                 queue_size=delivery_queue_size,
                 timeout=delivery_timeout,
                 delivery_mode=delivery_mode,
+                on_full=delivery_on_full,
             )
 
     # ------------------------------------------------------------
