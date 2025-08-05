@@ -16,6 +16,7 @@ import queue
 import tempfile
 import threading
 import time
+import logging
 from contextlib import contextmanager
 from typing import Any, Optional
 
@@ -178,6 +179,7 @@ def get_global_delivery(
     endpoint: str = "/track-usage",
     timeout: float = 10.0,
     delivery_mode: str | None = None,
+    on_full: str = "backpressure",
 ) -> "ResilientDelivery":
     """Return the shared delivery queue initialised with ``client``.
 
@@ -203,6 +205,7 @@ def get_global_delivery(
             timeout=timeout,
             ini_path=client.ini_path,
             async_mode=async_mode,
+            on_full=on_full,
         )
         _global_delivery.start()
 
@@ -260,6 +263,7 @@ class ResilientDelivery:
         timeout: float = 10.0,
         ini_path: Optional[str] = None,
         async_mode: bool | None = None,
+        on_full: str = "backpressure",
     ) -> None:
         if async_mode is None:
             async_mode = (
@@ -281,6 +285,9 @@ class ResilientDelivery:
         self.max_retries = max_retries
         self.timeout = timeout
         self.ini_path = ini_path
+        if on_full not in {"block", "raise", "backpressure"}:
+            raise ValueError("on_full must be 'block', 'raise', or 'backpressure'")
+        self.on_full = on_full
         self._queue: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=queue_size)
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
@@ -322,7 +329,22 @@ class ResilientDelivery:
         try:
             self._queue.put_nowait(payload)
         except queue.Full:
-            pass  # Drop payload if queue is full
+            logging.warning("Delivery queue full")
+            if self.on_full == "block":
+                self._queue.put(payload)
+            elif self.on_full == "raise":
+                raise
+            else:  # backpressure
+                try:
+                    self._queue.get_nowait()
+                    self._queue.task_done()
+                except queue.Empty:
+                    pass
+                try:
+                    self._queue.put_nowait(payload)
+                except queue.Full:
+                    # If still full after dropping an item, drop this payload
+                    pass
 
     # ------------------------------------------------------------------
     # Worker implementation

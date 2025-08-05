@@ -54,7 +54,10 @@ The implementation focuses on reliability rather than throughput.
 Payloads are sent via a background thread with a bounded queue so that
 usage tracking will not exhaust memory when used inside a web
 application.  The queue size and retry policy can be tuned via
-``CostManager`` parameters.
+``CostManager`` parameters. When the queue is full the default behaviour
+is to drop the oldest payload and log a warning. Set
+``delivery_on_full`` to ``"block"`` to wait for space or ``"raise"`` to
+propagate ``queue.Full`` back to the caller.
 
 ``ResilientDelivery`` uses the client's ``api_root`` to construct the
 ``/track-usage`` URL.  Payloads added to the queue are batched whenever

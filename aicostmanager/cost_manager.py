@@ -37,6 +37,7 @@ class CostManager:
         delivery_max_retries: int = 5,
         delivery_timeout: float = 10.0,
         delivery_mode: str | None = None,
+        delivery_on_full: str = "backpressure",
     ) -> None:
         self.client = client
         self.cm_client = CostManagerClient(
@@ -63,6 +64,7 @@ class CostManager:
                 queue_size=delivery_queue_size,
                 timeout=delivery_timeout,
                 delivery_mode=delivery_mode,
+                on_full=delivery_on_full,
             )
 
     def _refresh_limits(self) -> None:
