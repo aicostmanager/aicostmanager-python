@@ -1,9 +1,9 @@
-import sys
-import types
 import logging
 import queue
+import sys
 import threading
 import time
+import types
 
 import pytest
 
@@ -55,6 +55,8 @@ class _DummyRetrying:
 
     def __iter__(self):
         self._counter = 0
+        self._success = False
+        self._last_exc = None
         return self
 
     def __next__(self):
@@ -69,6 +71,8 @@ class _DummyRetrying:
 
     def __aiter__(self):
         self._counter = 0
+        self._success = False
+        self._last_exc = None
         return self
 
     async def __anext__(self):
@@ -138,7 +142,11 @@ class DummySession:
 
     def post(self, url, json=None, timeout=None):
         self.calls.append((url, json))
-        resp = self._responses.pop(0)
+        if self._responses:
+            resp = self._responses.pop(0)
+        else:
+            # Provide a default response if no more responses are available
+            resp = DummyResponse()
         return resp
 
 
