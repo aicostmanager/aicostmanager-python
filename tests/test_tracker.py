@@ -111,3 +111,35 @@ def test_tracker_close(monkeypatch):
 
     tracker.close()
     assert delivery.stopped
+
+
+def test_tracker_refresh_schema_on_failure(monkeypatch):
+    # initial schema only expects tokens
+    cfg1 = Config(
+        uuid="u1",
+        config_id="cfg",
+        api_id="api",
+        last_updated="now",
+        handling_config={},
+        manual_usage_schema={"tokens": "int"},
+    )
+    # refreshed schema adds required model field
+    cfg2 = Config(
+        uuid="u2",
+        config_id="cfg",
+        api_id="api",
+        last_updated="later",
+        handling_config={},
+        manual_usage_schema={"tokens": "int", "model": "str"},
+    )
+
+    configs = [cfg1, cfg2]
+
+    def fake_get_config_by_id(self, config_id):
+        return configs.pop(0)
+
+    monkeypatch.setattr(CostManagerConfig, "get_config_by_id", fake_get_config_by_id)
+    delivery = DummyDelivery()
+    tracker = Tracker("cfg", "svc", aicm_api_key="sk-test", delivery=delivery)
+    tracker.track({"tokens": 10, "model": "gpt"})
+    assert len(delivery.payloads) == 1

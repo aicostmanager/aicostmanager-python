@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 import asyncio
+import time
 from uuid import uuid4
 
 from .client import CostManagerClient
@@ -72,6 +73,10 @@ class Tracker:
         cfg: Config = self.config_manager.get_config_by_id(config_id)
         self.manual_usage_schema: Dict[str, str] = cfg.manual_usage_schema or {}
         self._validator = TypeValidator()
+        # track when the schema was last refreshed so we can periodically update it
+        self._last_schema_refresh = time.monotonic()
+        # refresh every hour by default
+        self._schema_refresh_interval = 3600.0
         if delivery is not None:
             self.delivery = delivery
         else:
@@ -130,6 +135,12 @@ class Tracker:
             delivery_on_full=delivery_on_full,
         )
 
+    def refresh_schema(self) -> None:
+        """Reload the manual usage schema from configuration."""
+        cfg: Config = self.config_manager.get_config_by_id(self.config_id)
+        self.manual_usage_schema = cfg.manual_usage_schema or {}
+        self._last_schema_refresh = time.monotonic()
+
     def track(
         self,
         usage: Dict[str, Any],
@@ -138,20 +149,35 @@ class Tracker:
         context: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Validate and deliver a usage record."""
+        # Periodically refresh schema to keep it current
+        now = time.monotonic()
+        if now - self._last_schema_refresh > self._schema_refresh_interval:
+            self.refresh_schema()
+
         if self.manual_usage_schema:
-            errors: Dict[str, str] = {}
-            missing: list[str] = []
-            for field, type_str in self.manual_usage_schema.items():
-                if field not in usage:
-                    if "Optional" not in type_str:
-                        missing.append(field)
-                    continue
-                is_valid, err = self._validator.validate_value(usage[field], type_str)
-                if not is_valid:
-                    errors[field] = err
-            extra = [f for f in usage if f not in self.manual_usage_schema]
+            def _validate() -> tuple[Dict[str, str], list[str], list[str]]:
+                errors: Dict[str, str] = {}
+                missing: list[str] = []
+                for field, type_str in self.manual_usage_schema.items():
+                    if field not in usage:
+                        if "Optional" not in type_str:
+                            missing.append(field)
+                        continue
+                    is_valid, err = self._validator.validate_value(
+                        usage[field], type_str
+                    )
+                    if not is_valid:
+                        errors[field] = err
+                extra = [f for f in usage if f not in self.manual_usage_schema]
+                return errors, missing, extra
+
+            errors, missing, extra = _validate()
             if errors or missing or extra:
-                raise UsageValidationError(errors, missing, extra)
+                # refresh schema and validate once more
+                self.refresh_schema()
+                errors, missing, extra = _validate()
+                if errors or missing or extra:
+                    raise UsageValidationError(errors, missing, extra)
 
         record: Dict[str, Any] = {
             "config_id": self.config_id,
