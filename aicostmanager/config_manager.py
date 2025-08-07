@@ -396,12 +396,33 @@ class CostManagerConfig:
             or "payload" not in self._config["triggered_limits"]
         ):
             self.refresh()
+            with _file_lock(self.ini_path):
+                self._config = _safe_read_config(self.ini_path)
 
         tl_raw = json.loads(self._config["triggered_limits"].get("payload", "{}"))
         token = tl_raw.get("encrypted_payload")
         public_key = tl_raw.get("public_key")
+
+        # If INI doesn't contain encrypted payload, fetch directly from API
+        if not token or not public_key:
+            try:
+                tl_payload = self.client.get_triggered_limits() or {}
+                if isinstance(tl_payload, dict):
+                    tl_data = tl_payload.get("triggered_limits", tl_payload)
+                else:
+                    tl_data = tl_payload
+                self.store_triggered_limits(tl_data)
+                with _file_lock(self.ini_path):
+                    self._config = _safe_read_config(self.ini_path)
+                tl_raw = json.loads(self._config["triggered_limits"].get("payload", "{}"))
+                token = tl_raw.get("encrypted_payload")
+                public_key = tl_raw.get("public_key")
+            except Exception:
+                return []
+
         if not token or not public_key:
             return []
+
         payload = self._decode(token, public_key)
         if not payload:
             return []
