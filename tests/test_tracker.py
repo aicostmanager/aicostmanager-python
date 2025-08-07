@@ -13,6 +13,15 @@ class DummyDelivery:
         self.payloads.append(payload)
 
 
+class StopDelivery(DummyDelivery):
+    def __init__(self):
+        super().__init__()
+        self.stopped = False
+
+    def stop(self):
+        self.stopped = True
+
+
 def test_tracker_valid_usage(monkeypatch):
     cfg = Config(
         uuid="u",
@@ -81,3 +90,24 @@ def test_tracker_async_factory(monkeypatch):
         assert len(delivery.payloads) == 1
 
     asyncio.run(run())
+
+
+def test_tracker_close(monkeypatch):
+    cfg = Config(
+        uuid="u",
+        config_id="cfg",
+        api_id="api",
+        last_updated="now",
+        handling_config={},
+        manual_usage_schema={}
+    )
+
+    def fake_get_config_by_id(self, config_id):
+        return cfg
+
+    monkeypatch.setattr(CostManagerConfig, "get_config_by_id", fake_get_config_by_id)
+    delivery = StopDelivery()
+    tracker = Tracker("cfg", "svc", aicm_api_key="sk-test", delivery=delivery)
+
+    tracker.close()
+    assert delivery.stopped
