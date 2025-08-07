@@ -7,7 +7,7 @@ import tempfile
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import jwt
 
@@ -25,6 +25,7 @@ class Config:
     api_id: str
     last_updated: str
     handling_config: dict
+    manual_usage_schema: Dict[str, str] | None = None
 
 
 @dataclass
@@ -310,6 +311,7 @@ class CostManagerConfig:
                             api_id=cfg.get("api_id"),
                             last_updated=cfg.get("last_updated"),
                             handling_config=cfg.get("handling_config", {}),
+                            manual_usage_schema=cfg.get("manual_usage_schema"),
                         )
                     )
 
@@ -330,11 +332,53 @@ class CostManagerConfig:
                                 api_id=cfg.get("api_id"),
                                 last_updated=cfg.get("last_updated"),
                                 handling_config=cfg.get("handling_config", {}),
+                                manual_usage_schema=cfg.get("manual_usage_schema"),
                             )
                         )
             if not results:
                 raise ConfigNotFound(f"No configuration found for api_id '{api_id}'")
         return results
+
+    def get_config_by_id(self, config_id: str) -> Config:
+        """Return decrypted config matching ``config_id``."""
+        if "configs" not in self._config or "payload" not in self._config["configs"]:
+            self.refresh()
+
+        configs_raw = json.loads(self._config["configs"].get("payload", "[]"))
+        for item in configs_raw:
+            payload = self._decode(item["encrypted_payload"], item["public_key"])
+            if not payload:
+                continue
+            for cfg in payload.get("configs", []):
+                if cfg.get("config_id") == config_id:
+                    return Config(
+                        uuid=cfg.get("uuid"),
+                        config_id=cfg.get("config_id"),
+                        api_id=cfg.get("api_id"),
+                        last_updated=cfg.get("last_updated"),
+                        handling_config=cfg.get("handling_config", {}),
+                        manual_usage_schema=cfg.get("manual_usage_schema"),
+                    )
+
+        # Refresh once if not found
+        self.refresh()
+        configs_raw = json.loads(self._config["configs"].get("payload", "[]"))
+        for item in configs_raw:
+            payload = self._decode(item["encrypted_payload"], item["public_key"])
+            if not payload:
+                continue
+            for cfg in payload.get("configs", []):
+                if cfg.get("config_id") == config_id:
+                    return Config(
+                        uuid=cfg.get("uuid"),
+                        config_id=cfg.get("config_id"),
+                        api_id=cfg.get("api_id"),
+                        last_updated=cfg.get("last_updated"),
+                        handling_config=cfg.get("handling_config", {}),
+                        manual_usage_schema=cfg.get("manual_usage_schema"),
+                    )
+
+        raise ConfigNotFound(f"No configuration found for config_id '{config_id}'")
 
     def get_triggered_limits(
         self,
