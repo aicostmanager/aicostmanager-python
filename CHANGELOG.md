@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.15] - 2025-01-07
+### Enhanced
+- Documentation updated to be uv-first across the project (installation and dev workflows)
+- README now recommends `uv pip install` / `uv add` for installation and adds queue health examples
+- Usage guide now shows uv-first install instructions
+- Build & Deploy guide updated to use `uv pip` for dev and release verification commands
+- Testing guide aligned on `uv venv` and `uv pip` for dependency installs
+
+### Added
+- New `docs/configuration.md` covering environment variables, INI behavior, delivery modes, and overflow handling
+- New `docs/tracker.md` with comprehensive manual usage tracking guide, validation, async init, and FastAPI lifecycle
+
+### Fixed
+- Changelog wording referencing pip updated to `uv pip install` where appropriate
+
 ## [0.1.14] - 2025-01-07
 ### Added
 - **New `Tracker` class** for manual usage tracking with configurable validation schema
@@ -42,7 +57,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **CRITICAL**: Fixed empty package builds by correcting setuptools package discovery configuration
 - Packages built with previous versions (0.1.10 and earlier) contained only metadata without actual Python source code
-- This resolves issues where `uv add aicostmanager` and `pip install aicostmanager` resulted in empty package installations
+- This resolves issues where `uv add aicostmanager` and `uv pip install aicostmanager` resulted in empty package installations
 - Updated `pyproject.toml` to properly include source files in wheel distributions
 
 ## [0.1.11] - 2025-08-04

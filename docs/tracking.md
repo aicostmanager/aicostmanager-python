@@ -59,9 +59,11 @@ application.  The queue size and retry policy can be tuned via
 ``CostManager`` parameters. When the queue is full the default behaviour
 is to drop the oldest payload and log a warning. Set
 ``delivery_on_full`` to ``"block"`` to wait for space or ``"raise"`` to
-propagate ``queue.Full`` back to the caller.  You can also set the
+propagate ``queue.Full`` back to the caller. You can also set the
 environment variable ``AICM_DELIVERY_ON_FULL`` to control this default
-globally.
+globally. When using ``backpressure``, dropped payloads are counted and can be
+observed via delivery health metrics; an ``on_discard`` callback may also be
+configured to capture discarded payloads for monitoring.
 
 ``ResilientDelivery`` uses the client's ``api_root`` to construct the
 ``/track-usage`` URL.  The worker waits a short configurable window
@@ -97,6 +99,16 @@ from aicostmanager import AsyncCostManager, AsyncCostManagerClient
 async with AsyncCostManagerClient() as client:
     async with AsyncCostManager(client) as tracker:
         await tracker.client.some_call()
+```
+## Health & Metrics
+
+Use the helper to inspect queue state and metrics such as total sent, failed,
+and discarded payloads:
+
+```python
+from aicostmanager import get_global_delivery_health
+
+print(get_global_delivery_health())
 ```
 
 ## Multiprocessing Environments

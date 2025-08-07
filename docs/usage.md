@@ -3,14 +3,17 @@
 Install with:
 
 ```bash
-pip install aicostmanager
+# Using uv (recommended)
+uv pip install aicostmanager
+# or add to a project
+uv add aicostmanager
 ```
 
 Create a client:
 
 ```python
-from aicostmanager import CostManagerClient as aicm
-client = aicm()
+from aicostmanager import CostManagerClient
+client = CostManagerClient()
 
 # asynchronous
 from aicostmanager import AsyncCostManagerClient
@@ -56,12 +59,9 @@ unchanged = client.get_configs(etag=etag)  # returns None when unchanged
 
 The `/configs` endpoint returns an `ETag` header. Send this value back in
 `If-None-Match` to avoid downloading configuration when nothing has changed.
-If the configuration is unchanged, the SDK will still refresh the
-`triggered_limits` section by calling `/triggered-limits`.
-Triggered limit information is read from `AICM.INI` each time it is needed and
-is fetched from the server only when the client is initialized (including the
-etag check described above) or when usage is recorded via the `/track-usage`
-endpoint.
+If configuration payload is unchanged, triggered limits can still be refreshed
+via `/triggered-limits`. The SDK also falls back to fetching triggered limits
+from the API if the local INI cache is empty or missing fields.
 
 # using CostManager with automatic delivery
 from aicostmanager import CostManager
@@ -81,7 +81,7 @@ async def async_example():
 
 ## FastAPI integration
 
-See [Manual Usage Tracking](tracker.md) for a detailed guide on using the Tracker class.
+See [Manual Usage Tracking](tracker.md) for a detailed guide on using the `Tracker` class.
 
 When recording custom usage with :class:`Tracker` in a FastAPI application,
 create the tracker during application startup so configuration loading doesn't

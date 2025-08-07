@@ -8,7 +8,7 @@ Before you begin, ensure you have:
 
 1. **Development dependencies installed:**
    ```bash
-   uv pip install -e .[dev]  # or `pip install -e .[dev]`
+   uv pip install -e .[dev]
    ```
    This installs: `build`, `twine`, and `bump-my-version`
 
@@ -117,8 +117,8 @@ bump-my-version bump major
 
 3. **Test the published package:**
    ```bash
-   # In a fresh virtual environment
-   pip install aicostmanager==0.1.13  # Use your new version
+   # In a fresh virtual environment (uv)
+   uv pip install aicostmanager==0.1.14  # Use your new version
    python -c "import aicostmanager; print(aicostmanager.__version__)"
    ```
 
@@ -162,7 +162,7 @@ twine upload dist/*
 1. **Version bump fails:** Ensure you're on the main branch with a clean working directory
 2. **GitHub Actions fails:** Check that `PYPI_API_TOKEN` secret is set in repository settings
 3. **PyPI upload rejected:** Version might already exist (PyPI doesn't allow overwriting)
-4. **Import errors after install:** Verify package contents with `pip show -f aicostmanager`
+4. **Import errors after install:** Verify package contents with `uv pip show -f aicostmanager` (or `pip show -f aicostmanager`)
 
 ## Quick Reference Commands
 

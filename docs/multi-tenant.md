@@ -14,7 +14,7 @@ Multi-tenant cost tracking allows you to:
 
 ## Basic Client Tracking
 
-### Method 1: Constructor Parameters (Planned Feature)
+### Method 1: Constructor Parameters
 
 The most straightforward way to track client usage is by setting client information when creating the `CostManager`:
 

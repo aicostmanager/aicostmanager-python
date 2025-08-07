@@ -54,7 +54,10 @@ Unlike free cost tracking from LangChain or other frameworks, AICostManager prov
 ### Installation
 
 ```bash
-pip install aicostmanager
+# Using uv (recommended)
+uv pip install aicostmanager
+# or add to a project
+uv add aicostmanager
 ```
 
 ### Environment Setup
@@ -165,7 +168,7 @@ import openai
 
 client = openai.OpenAI(api_key="your-key")
 
-# Option 1: Set client info via constructor (planned feature)
+# Option 1: Set client info via constructor
 tracked_client = CostManager(
     client,
     client_customer_key="customer_acme_corp",
@@ -285,6 +288,30 @@ tracked_client = CostManager(
 )
 ```
 
+### Manual Usage Tracking (Tracker)
+
+Use the `Tracker` when you need to record custom usage events that are not tied to a wrapped SDK call (e.g., batch jobs, internal services, or custom metrics). It validates payloads against your configuration’s `manual_usage_schema` and delivers them using the same resilient queue:
+
+```python
+from aicostmanager import Tracker
+
+tracker = Tracker(
+    config_id="your-config-id",
+    service_id="your-service-id",
+)
+
+tracker.track({
+    "tokens": 123,
+    "model": "gpt-4o-mini",
+})
+
+# Async initialization for web apps
+# tracker = await Tracker.create_async("cfg", "svc")
+# tracker.close()  # during shutdown
+```
+
+See the dedicated guide: [Manual Usage Tracking](docs/tracker.md).
+
 ### Querying Usage Events
 
 Access your usage data programmatically:
@@ -317,6 +344,7 @@ def get_recent_usage(aicm_api_key: str, customer_id: str = None):
 - **[📊 Usage Examples](docs/usage.md)** - API usage and basic examples
 - **[🔧 Tracking System](docs/tracking.md)** - How the tracking system works
 - **[📐 Manual Usage Tracking](docs/tracker.md)** - Record custom usage events
+- **[⚙️ Configuration & Env Vars](docs/configuration.md)** - Environment variables and INI behavior
 - **[🌐 REST API Tracking](docs/rest.md)** - Wrap requests or httpx sessions
 - **[🧪 Testing Guide](docs/testing.md)** - Running tests and validation
 
@@ -330,6 +358,7 @@ def get_recent_usage(aicm_api_key: str, customer_id: str = None):
 | **Manual Tracking** | Send custom usage records without wrappers | [Tracker](docs/tracker.md) |
 | **REST API** | Track raw HTTP requests | [REST Tracking](docs/rest.md) |
 | **Testing** | Running tests and validation | [Testing](docs/testing.md) |
+| **Configuration** | Env vars, INI, delivery modes | [Configuration](docs/configuration.md) |
 
 ### API Reference
 
@@ -381,6 +410,18 @@ pip install -e .
    ```
 
 **🔒 Testing Privacy**: Tests use YOUR provider API keys locally to verify functionality. These keys never leave your machine—they're only used for local testing.
+
+### Queue Health and Metrics
+
+You can inspect background delivery metrics programmatically:
+
+```python
+from aicostmanager import get_global_delivery_health
+
+health = get_global_delivery_health()
+if health:
+    print(health["queue_size"], health["total_discarded"], health["last_error"])
+```
 
 ## 🤝 Contributing
 

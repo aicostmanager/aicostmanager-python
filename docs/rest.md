@@ -63,3 +63,16 @@ Handling configuration for this endpoint:
   }
 }
 ```
+
+## Asynchronous Example
+
+```python
+import httpx
+from aicostmanager import AsyncRestCostManager
+
+async def main():
+    async with httpx.AsyncClient() as aclient:
+        tracker = AsyncRestCostManager(aclient, base_url="https://api.heygen.com")
+        response = await tracker.get("/v2/streaming.list", params={"page": 1})
+        # payloads delivered asynchronously
+```
