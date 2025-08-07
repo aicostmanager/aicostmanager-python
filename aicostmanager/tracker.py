@@ -58,7 +58,7 @@ class Tracker:
         delivery_batch_interval: float | None = None,
         delivery_max_batch_size: int = 100,
         delivery_mode: str | None = None,
-        delivery_on_full: str = "backpressure",
+        delivery_on_full: str | None = None,
     ) -> None:
         self.config_id = config_id
         self.service_id = service_id
@@ -103,7 +103,7 @@ class Tracker:
         delivery_batch_interval: float | None = None,
         delivery_max_batch_size: int = 100,
         delivery_mode: str | None = None,
-        delivery_on_full: str = "backpressure",
+        delivery_on_full: str | None = None,
     ) -> "Tracker":
         """Asynchronously create a fully initialized :class:`Tracker`.
 

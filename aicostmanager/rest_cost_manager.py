@@ -51,7 +51,7 @@ class RestCostManager:
         delivery_batch_interval: float | None = None,
         delivery_max_batch_size: int = 100,
         delivery_mode: str | None = None,
-        delivery_on_full: str = "backpressure",
+        delivery_on_full: str | None = None,
     ) -> None:
         self.session = session or requests.Session()
         self.base_url = base_url.rstrip("/")

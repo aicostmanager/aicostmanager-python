@@ -22,6 +22,15 @@ sys.modules.setdefault(
     "jwt",
     types.SimpleNamespace(decode=lambda *a, **k: {}, encode=lambda *a, **k: ""),
 )
+class _BaseModel:
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+sys.modules.setdefault(
+    "pydantic",
+    types.SimpleNamespace(BaseModel=_BaseModel, ConfigDict=dict, Field=lambda *a, **k: None),
+)
 
 
 class _DummyAttempt:
@@ -406,3 +415,31 @@ def test_queue_full_block(caplog):
     item2 = delivery._queue.get_nowait()
     assert item2["usage_records"][0]["id"] == 2
     delivery._queue.task_done()
+
+
+def test_discard_callback_and_metrics():
+    discarded = []
+
+    def on_discard(payload):
+        discarded.append(payload)
+
+    sess = DummySession()
+    delivery = ResilientDelivery(
+        sess, "http://x", queue_size=1, on_full="backpressure", on_discard=on_discard
+    )
+    delivery.deliver({"usage_records": [{"id": 1}]})
+    delivery.deliver({"usage_records": [{"id": 2}]})
+    assert discarded[0]["usage_records"][0]["id"] == 1
+    assert delivery.get_health_info()["total_discarded"] == 1
+    item = delivery._queue.get_nowait()
+    assert item["usage_records"][0]["id"] == 2
+    delivery._queue.task_done()
+
+
+def test_env_on_full(monkeypatch):
+    monkeypatch.setenv("AICM_DELIVERY_ON_FULL", "raise")
+    sess = DummySession()
+    delivery = ResilientDelivery(sess, "http://x", queue_size=1)
+    delivery.deliver({"usage_records": [{}]})
+    with pytest.raises(queue.Full):
+        delivery.deliver({"usage_records": [{}]})

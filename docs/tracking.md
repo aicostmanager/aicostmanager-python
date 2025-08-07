@@ -57,7 +57,9 @@ application.  The queue size and retry policy can be tuned via
 ``CostManager`` parameters. When the queue is full the default behaviour
 is to drop the oldest payload and log a warning. Set
 ``delivery_on_full`` to ``"block"`` to wait for space or ``"raise"`` to
-propagate ``queue.Full`` back to the caller.
+propagate ``queue.Full`` back to the caller.  You can also set the
+environment variable ``AICM_DELIVERY_ON_FULL`` to control this default
+globally.
 
 ``ResilientDelivery`` uses the client's ``api_root`` to construct the
 ``/track-usage`` URL.  The worker waits a short configurable window

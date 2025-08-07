@@ -19,7 +19,7 @@ import time
 import logging
 import io
 from contextlib import contextmanager
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 
 import httpx
 from tenacity import (
@@ -206,7 +206,7 @@ def get_global_delivery(
     batch_interval: float | None = None,
     max_batch_size: int = 100,
     delivery_mode: str | None = None,
-    on_full: str = "backpressure",
+    on_full: str | None = None,
 ) -> "ResilientDelivery":
     """Return the shared delivery queue initialised with ``client``.
 
@@ -217,6 +217,8 @@ def get_global_delivery(
     global _global_delivery
     if delivery_mode is None:
         delivery_mode = os.getenv("AICM_DELIVERY_MODE", "sync")
+    if on_full is None:
+        on_full = os.getenv("AICM_DELIVERY_ON_FULL", "backpressure")
     async_mode = delivery_mode.lower() == "async"
     if _global_delivery is None or _global_delivery.async_mode != async_mode:
         session = client.session
@@ -292,9 +294,10 @@ class ResilientDelivery:
         timeout: float = 10.0,
         ini_path: Optional[str] = None,
         async_mode: bool | None = None,
-        on_full: str = "backpressure",
+        on_full: str | None = None,
         batch_interval: float | None = None,
         max_batch_size: int = 100,
+        on_discard: Optional[Callable[[dict[str, Any]], None]] = None,
     ) -> None:
         if async_mode is None:
             async_mode = (
@@ -325,15 +328,19 @@ class ResilientDelivery:
             )
         else:
             self.batch_interval = batch_interval if batch_interval is not None else 0.05
+        if on_full is None:
+            on_full = os.getenv("AICM_DELIVERY_ON_FULL", "backpressure")
         if on_full not in {"block", "raise", "backpressure"}:
             raise ValueError("on_full must be 'block', 'raise', or 'backpressure'")
         self.on_full = on_full
+        self.on_discard = on_discard
         self._queue: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=queue_size)
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
         self._total_sent = 0
         self._total_failed = 0
         self._last_error: Optional[str] = None
+        self._total_discarded = 0
 
     # ------------------------------------------------------------------
     # Public API
@@ -375,16 +382,28 @@ class ResilientDelivery:
             elif self.on_full == "raise":
                 raise
             else:  # backpressure
+                dropped = None
                 try:
-                    self._queue.get_nowait()
+                    dropped = self._queue.get_nowait()
                     self._queue.task_done()
                 except queue.Empty:
                     pass
+                if dropped is not None:
+                    self._total_discarded += 1
+                    if self.on_discard:
+                        try:
+                            self.on_discard(dropped)
+                        except Exception:
+                            logging.exception("Discard callback failed")
                 try:
                     self._queue.put_nowait(payload)
                 except queue.Full:
-                    # If still full after dropping an item, drop this payload
-                    pass
+                    self._total_discarded += 1
+                    if self.on_discard:
+                        try:
+                            self.on_discard(payload)
+                        except Exception:
+                            logging.exception("Discard callback failed")
 
     # ------------------------------------------------------------------
     # Worker implementation
@@ -522,5 +541,6 @@ class ResilientDelivery:
             "queue_utilization": self._queue.qsize() / self._queue.maxsize,
             "total_sent": self._total_sent,
             "total_failed": self._total_failed,
+            "total_discarded": self._total_discarded,
             "last_error": self._last_error,
         }
