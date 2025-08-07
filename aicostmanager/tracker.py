@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+import asyncio
 from uuid import uuid4
 
 from .client import CostManagerClient
@@ -84,6 +85,50 @@ class Tracker:
                 delivery_mode=delivery_mode,
                 on_full=delivery_on_full,
             )
+
+    @classmethod
+    async def create_async(
+        cls,
+        config_id: str,
+        service_id: str,
+        *,
+        aicm_api_key: Optional[str] = None,
+        aicm_api_base: Optional[str] = None,
+        aicm_api_url: Optional[str] = None,
+        aicm_ini_path: Optional[str] = None,
+        delivery: ResilientDelivery | None = None,
+        delivery_queue_size: int = 1000,
+        delivery_max_retries: int = 5,
+        delivery_timeout: float = 10.0,
+        delivery_batch_interval: float | None = None,
+        delivery_max_batch_size: int = 100,
+        delivery_mode: str | None = None,
+        delivery_on_full: str = "backpressure",
+    ) -> "Tracker":
+        """Asynchronously create a fully initialized :class:`Tracker`.
+
+        Configuration loading uses blocking I/O. This factory runs the
+        standard constructor in a thread so callers can ``await`` the
+        result without blocking the event loop.
+        """
+
+        return await asyncio.to_thread(
+            cls,
+            config_id,
+            service_id,
+            aicm_api_key=aicm_api_key,
+            aicm_api_base=aicm_api_base,
+            aicm_api_url=aicm_api_url,
+            aicm_ini_path=aicm_ini_path,
+            delivery=delivery,
+            delivery_queue_size=delivery_queue_size,
+            delivery_max_retries=delivery_max_retries,
+            delivery_timeout=delivery_timeout,
+            delivery_batch_interval=delivery_batch_interval,
+            delivery_max_batch_size=delivery_max_batch_size,
+            delivery_mode=delivery_mode,
+            delivery_on_full=delivery_on_full,
+        )
 
     def track(
         self,
