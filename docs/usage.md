@@ -79,6 +79,32 @@ async def async_example():
             await manager.client.list_customers()
 ```
 
+## FastAPI integration
+
+When recording custom usage with :class:`Tracker` in a FastAPI application,
+create the tracker during application startup so configuration loading doesn't
+block individual requests. The asynchronous factory ``Tracker.create_async``
+performs the initialization in a thread and returns a ready instance:
+
+```python
+from fastapi import FastAPI
+from aicostmanager import Tracker
+
+app = FastAPI()
+
+
+@app.on_event("startup")
+async def startup() -> None:
+    app.state.tracker = await Tracker.create_async("cfg", "svc")
+
+
+@app.post("/track")
+async def track_usage(payload: dict) -> dict:
+    app.state.tracker.track(payload)
+    return {"status": "ok"}
+```
+
+
 ## Vendor & Service Lookup
 
 You can retrieve available vendors and their services:

@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 
 from aicostmanager.config_manager import Config, CostManagerConfig
@@ -54,3 +55,29 @@ def test_tracker_invalid_usage(monkeypatch):
 
     with pytest.raises(UsageValidationError):
         tracker.track({"tokens": "wrong"})
+
+
+def test_tracker_async_factory(monkeypatch):
+    cfg = Config(
+        uuid="u",
+        config_id="cfg",
+        api_id="api",
+        last_updated="now",
+        handling_config={},
+        manual_usage_schema={"tokens": "int", "model": "str"},
+    )
+
+    def fake_get_config_by_id(self, config_id):
+        return cfg
+
+    monkeypatch.setattr(CostManagerConfig, "get_config_by_id", fake_get_config_by_id)
+    delivery = DummyDelivery()
+
+    async def run() -> None:
+        tracker = await Tracker.create_async(
+            "cfg", "svc", aicm_api_key="sk-test", delivery=delivery
+        )
+        tracker.track({"tokens": 10, "model": "gpt"})
+        assert len(delivery.payloads) == 1
+
+    asyncio.run(run())
