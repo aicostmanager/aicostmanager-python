@@ -341,6 +341,8 @@ class ResilientDelivery:
         self._total_failed = 0
         self._last_error: Optional[str] = None
         self._total_discarded = 0
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._loop_thread: Optional[threading.Thread] = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -360,16 +362,31 @@ class ResilientDelivery:
         self._queue.put({})  # sentinel
         self._thread.join()
         self._thread = None
-        if self.async_mode and hasattr(self.session, "aclose"):
-            try:
-                asyncio.run(self.session.aclose())
-            except Exception:
+        if self.async_mode:
+            if hasattr(self.session, "aclose"):
                 try:
-                    loop = asyncio.new_event_loop()
-                    loop.run_until_complete(self.session.aclose())
-                    loop.close()
+                    if self._loop is not None:
+                        asyncio.run_coroutine_threadsafe(
+                            self.session.aclose(), self._loop
+                        ).result()
+                    else:
+                        asyncio.run(self.session.aclose())
                 except Exception:
-                    pass
+                    try:
+                        loop = asyncio.new_event_loop()
+                        loop.run_until_complete(self.session.aclose())
+                        loop.close()
+                    except Exception:
+                        pass
+            if self._loop is not None:
+                try:
+                    self._loop.call_soon_threadsafe(self._loop.stop)
+                    if self._loop_thread is not None:
+                        self._loop_thread.join()
+                    self._loop.close()
+                finally:
+                    self._loop = None
+                    self._loop_thread = None
 
     def deliver(self, payload: dict[str, Any]) -> None:
         """Queue ``payload`` for delivery without blocking."""
@@ -409,6 +426,13 @@ class ResilientDelivery:
     # Worker implementation
     # ------------------------------------------------------------------
     def _run(self) -> None:
+        if self.async_mode and self._loop is None:
+            self._loop = asyncio.new_event_loop()
+            self._loop_thread = threading.Thread(
+                target=self._loop.run_forever, daemon=True
+            )
+            self._loop_thread.start()
+
         while not self._stop.is_set():
             item = self._queue.get()
             if self._stop.is_set():
@@ -429,8 +453,11 @@ class ResilientDelivery:
                 payload = {"usage_records": []}
                 for p in batch:
                     payload["usage_records"].extend(p.get("usage_records", []))
-                if self.async_mode:
-                    asyncio.run(self._send_with_retry_async(payload))
+                if self.async_mode and self._loop is not None:
+                    future = asyncio.run_coroutine_threadsafe(
+                        self._send_with_retry_async(payload), self._loop
+                    )
+                    future.result()
                 else:
                     self._send_with_retry(payload)
             finally:
