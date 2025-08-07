@@ -1,5 +1,7 @@
 # Tracking Usage with `CostManager`
 
+For manual tracking without wrapping an API client, see [Manual Usage Tracking](tracker.md).
+
 `CostManager` provides a small wrapper around any API client so that the
 client's activity can be analysed.  It relies on configuration returned
 from `CostManagerConfig` which describes how requests and responses

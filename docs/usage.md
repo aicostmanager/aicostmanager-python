@@ -81,6 +81,8 @@ async def async_example():
 
 ## FastAPI integration
 
+See [Manual Usage Tracking](tracker.md) for a detailed guide on using the Tracker class.
+
 When recording custom usage with :class:`Tracker` in a FastAPI application,
 create the tracker during application startup so configuration loading doesn't
 block individual requests. The asynchronous factory ``Tracker.create_async``

@@ -316,6 +316,8 @@ def get_recent_usage(aicm_api_key: str, customer_id: str = None):
 - **[🏢 Multi-Tenant Guide](docs/multi-tenant.md)** - Client tracking, cost allocation, and billing
 - **[📊 Usage Examples](docs/usage.md)** - API usage and basic examples
 - **[🔧 Tracking System](docs/tracking.md)** - How the tracking system works
+- **[📐 Manual Usage Tracking](docs/tracker.md)** - Record custom usage events
+- **[🌐 REST API Tracking](docs/rest.md)** - Wrap requests or httpx sessions
 - **[🧪 Testing Guide](docs/testing.md)** - Running tests and validation
 
 ### Quick Reference
@@ -325,6 +327,8 @@ def get_recent_usage(aicm_api_key: str, customer_id: str = None):
 | **Multi-Tenant** | Track costs per client, project, or department | [Guide](docs/multi-tenant.md) |
 | **Basic Usage** | SDK installation and simple examples | [Usage](docs/usage.md) |
 | **Tracking** | How usage tracking works under the hood | [Tracking](docs/tracking.md) |
+| **Manual Tracking** | Send custom usage records without wrappers | [Tracker](docs/tracker.md) |
+| **REST API** | Track raw HTTP requests | [REST Tracking](docs/rest.md) |
 | **Testing** | Running tests and validation | [Testing](docs/testing.md) |
 
 ### API Reference
