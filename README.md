@@ -236,13 +236,17 @@ tracked_client = CostManager(
     delivery_batch_interval=0.05,  # Wait up to 50ms for more items
     delivery_max_batch_size=100,   # Flush when batch reaches this size
     # delivery_mode="async",       # Use async delivery (or set AICM_DELIVERY_MODE)
-    # delivery_on_full="backpressure",  # Block, raise, or backpressure when full
+    # delivery_on_full="backpressure",  # Block, raise, or backpressure when full (or set AICM_DELIVERY_ON_FULL)
 )
 ```
 
 Set the environment variable ``AICM_DELIVERY_MODE=async`` (or pass
 ``delivery_mode="async"`` as shown above) to use an ``httpx.AsyncClient`` with
 non-blocking retries—ideal for eventlet/gevent worker pools.
+
+To change the default behaviour when the queue is full, set
+``AICM_DELIVERY_ON_FULL`` to ``block`` or ``raise``.  The default is
+``backpressure`` which discards the oldest payload.
 
 When using process-based workers such as Celery or the ``multiprocessing``
 module, create the ``CostManager`` inside the worker's initialisation hook.
