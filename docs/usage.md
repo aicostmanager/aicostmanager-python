@@ -84,7 +84,9 @@ async def async_example():
 When recording custom usage with :class:`Tracker` in a FastAPI application,
 create the tracker during application startup so configuration loading doesn't
 block individual requests. The asynchronous factory ``Tracker.create_async``
-performs the initialization in a thread and returns a ready instance:
+performs the initialization in a thread and returns a ready instance. During
+shutdown, stop the background delivery using ``Tracker.close`` (or
+``get_global_delivery(...).stop()`` if calling the delivery queue directly):
 
 ```python
 from fastapi import FastAPI
@@ -96,6 +98,11 @@ app = FastAPI()
 @app.on_event("startup")
 async def startup() -> None:
     app.state.tracker = await Tracker.create_async("cfg", "svc")
+
+
+@app.on_event("shutdown")
+def shutdown() -> None:
+    app.state.tracker.close()
 
 
 @app.post("/track")

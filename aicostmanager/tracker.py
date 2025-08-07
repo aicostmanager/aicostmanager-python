@@ -166,3 +166,7 @@ class Tracker:
             record["context"] = context
 
         self.delivery.deliver({"usage_records": [record]})
+
+    def close(self) -> None:
+        """Stop the underlying delivery worker."""
+        self.delivery.stop()
