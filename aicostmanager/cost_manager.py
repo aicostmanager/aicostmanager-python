@@ -131,6 +131,12 @@ class CostManager:
                     name, args, kwargs, response, client=self.client, is_streaming=False
                 )
                 if payloads:
+                    # Ensure service_id is present for OpenAI calls to allow service-scoped limits
+                    if self.api_id == "openai":
+                        service_model = kwargs.get("model")
+                        for payload in payloads:
+                            if service_model and "service_id" not in payload:
+                                payload["service_id"] = service_model
                     self.tracked_payloads.extend(payloads)
                     for payload in payloads:
                         self._augment_payload(payload)
@@ -421,6 +427,11 @@ class NestedAttributeWrapper:
                     is_streaming=False,
                 )
                 if payloads:
+                    if self._parent_manager.api_id == "openai":
+                        service_model = kwargs.get("model")
+                        for payload in payloads:
+                            if service_model and "service_id" not in payload:
+                                payload["service_id"] = service_model
                     self._parent_manager.tracked_payloads.extend(payloads)
                     for payload in payloads:
                         self._parent_manager._augment_payload(payload)

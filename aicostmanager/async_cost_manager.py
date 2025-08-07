@@ -6,8 +6,6 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
-from .delivery import _ini_get_or_set
-
 from .client import (
     AsyncCostManagerClient,
     CostManagerClient,
@@ -15,6 +13,7 @@ from .client import (
 )
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
 from .cost_manager import _AsyncStreamIterator
+from .delivery import _ini_get_or_set
 from .universal_extractor import UniversalExtractor
 
 
@@ -258,6 +257,11 @@ class AsyncCostManager:
                 name, args, kwargs, response, client=self.client
             )
             if payloads:
+                if self.api_id == "openai":
+                    service_model = kwargs.get("model")
+                    for payload in payloads:
+                        if service_model and "service_id" not in payload:
+                            payload["service_id"] = service_model
                 self.tracked_payloads.extend(payloads)
                 for payload in payloads:
                     self._augment_payload(payload)
@@ -394,6 +398,11 @@ class AsyncNestedAttributeWrapper:
                     is_streaming=False,
                 )
                 if payloads:
+                    if self._parent_manager.api_id == "openai":
+                        service_model = kwargs.get("model")
+                        for payload in payloads:
+                            if service_model and "service_id" not in payload:
+                                payload["service_id"] = service_model
                     self._parent_manager.tracked_payloads.extend(payloads)
                     for payload in payloads:
                         self._parent_manager._augment_payload(payload)

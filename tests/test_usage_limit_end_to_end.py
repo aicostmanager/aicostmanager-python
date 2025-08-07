@@ -67,16 +67,6 @@ def test_usage_limit_end_to_end(
 
     service = gpt35_service
 
-    limit = client.create_usage_limit(
-        UsageLimitIn(
-            threshold_type=ThresholdType.LIMIT,
-            amount=0.00004,  # $0.01 - should allow first call but trigger on subsequent calls
-            period=Period.DAY,
-            vendor=openai_vendor.name,
-            service=service.service_id,
-        )
-    )
-
     try:
         tracked_client = CostManager(
             openai.OpenAI(api_key=openai_api_key),
@@ -95,6 +85,67 @@ def test_usage_limit_end_to_end(
         print("Initial call completed successfully")
         time.sleep(2)
 
+        # Get the actual service_id used by the tracked call (e.g., gpt-3.5-turbo-0125)
+        payloads = tracked_client.get_tracked_payloads()
+        assert payloads, "No payloads tracked for initial call"
+        actual_service_id = payloads[-1].get("service_id")
+        assert actual_service_id, "No service_id in tracked payload"
+        print(f"Actual service_id used: {actual_service_id}")
+
+        # Find the service object for the actual service_id
+        actual_service = None
+        for svc in services:
+            if svc.service_id == actual_service_id:
+                actual_service = svc
+                break
+
+        if not actual_service:
+            # Fallback to original service if not found
+            actual_service = service
+            actual_service_id = service.service_id
+
+        # Compute cost using tracked payload usage and current service costs from the API
+        usage = payloads[-1].get("usage", {})
+        prompt_tokens = usage.get("prompt_tokens") or usage.get("input_tokens") or 0
+        completion_tokens = (
+            usage.get("completion_tokens") or usage.get("output_tokens") or 0
+        )
+        costs = {
+            c.name: c
+            for c in client.list_service_costs(openai_vendor.name, actual_service_id)
+        }
+
+        def _unit_cost(name: str) -> float:
+            c = costs.get(name)
+            if not c:
+                return 0.0
+            # cost is per 'per_quantity' units
+            return float(c.cost) / max(int(c.per_quantity), 1)
+
+        first_call_cost = prompt_tokens * _unit_cost(
+            "prompt_tokens"
+        ) + completion_tokens * _unit_cost("completion_tokens")
+        # Fallback if names differ
+        if first_call_cost == 0:
+            first_call_cost = prompt_tokens * _unit_cost(
+                "input_tokens"
+            ) + completion_tokens * _unit_cost("output_tokens")
+        # Add a 20% headroom so the first call stays under the limit
+        dynamic_limit_amount = max(first_call_cost * 1.2, first_call_cost + 1e-8)
+
+        print(
+            f"Setting limit: ${dynamic_limit_amount:.8f} for service {actual_service_id}"
+        )
+        limit = client.create_usage_limit(
+            UsageLimitIn(
+                threshold_type=ThresholdType.LIMIT,
+                amount=dynamic_limit_amount,
+                period=Period.DAY,
+                vendor=openai_vendor.name,
+                service=actual_service_id,  # Use the actual service_id
+            )
+        )
+
         # subsequent calls expected to exceed limit (may take multiple calls)
         print("Starting loop to trigger usage limit (max 10 attempts)...")
         exception_raised = False
@@ -110,7 +161,7 @@ def test_usage_limit_end_to_end(
 
                 # Check for triggered limits after each call
                 triggered_limits = tracked_client.config_manager.get_triggered_limits(
-                    service_id=service.service_id
+                    service_id=actual_service_id  # Use the actual service_id
                 )
                 if triggered_limits:
                     print(
@@ -134,7 +185,7 @@ def test_usage_limit_end_to_end(
                 "Loop completed without exception - checking final triggered limits..."
             )
             final_triggered = tracked_client.config_manager.get_triggered_limits(
-                service_id=service.service_id
+                service_id=actual_service_id  # Use the actual service_id
             )
             print(f"Final triggered limits count: {len(final_triggered)}")
 
@@ -142,7 +193,7 @@ def test_usage_limit_end_to_end(
 
         # refresh triggered limits and check limit uuid
         triggered = tracked_client.config_manager.get_triggered_limits(
-            service_id=service.service_id
+            service_id=actual_service_id  # Use the actual service_id
         )
         assert any(t.limit_id == limit.uuid for t in triggered)
     finally:
