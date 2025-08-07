@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.14] - 2025-01-07
+### Added
+- **New `Tracker` class** for manual usage tracking with configurable validation schema
+- `UsageValidationError` exception for robust type validation of tracked usage data
+- `TypeValidator` utility for validating values against string-specified Python type hints
+- Async factory method `Tracker.create_async()` for non-blocking tracker initialization in async applications
+- `Tracker.close()` method for graceful shutdown of background delivery workers
+- Enhanced delivery queue with overflow metrics and configurable discard callbacks
+- Support for `AICM_DELIVERY_ON_FULL` environment variable to control queue overflow behavior globally
+
+### Enhanced
+- **Manual usage tracking capabilities** with schema-based validation for custom usage scenarios
+- Delivery system performance improvements with persistent event loop reuse in async mode
+- FastAPI integration examples with proper lifecycle management for tracker instances
+- Comprehensive test coverage for new tracker functionality and validation scenarios
+- Queue overflow handling with three modes: `block`, `raise`, or `backpressure` (with discard metrics)
+
+### Fixed
+- **Triggered limits retrieval** now properly fetches from API when local cache is missing or corrupted
+- Improved reliability of end-to-end usage limit enforcement tests
+- Better event loop management in delivery worker threads for async operations
+- Enhanced config manager robustness when INI files lack required encrypted payloads
+
+### Technical Improvements
+- Added `on_discard` callback support for monitoring dropped payloads in delivery queues
+- Persistent event loop management in delivery worker for better async performance
+- Enhanced triggered limits initialization with automatic API fallback when cache is empty
+- Comprehensive validation framework supporting complex Python type hints including `Optional`, `Union`, `List[T]`, and `Dict[K,V]`
+
 ## [0.1.13] - 2025-01-06
 ### Enhanced
 - Updated build and deployment documentation with comprehensive step-by-step release process
