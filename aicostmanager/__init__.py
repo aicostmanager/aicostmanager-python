@@ -18,6 +18,7 @@ from .delivery import (
     get_global_delivery,
     get_global_delivery_health,
 )
+from .tracker import Tracker, UsageValidationError
 from .models import (
     ApiUsageRecord,
     ApiUsageRequest,
@@ -62,6 +63,8 @@ __all__ = [
     "ResilientDelivery",
     "get_global_delivery",
     "get_global_delivery_health",
+    "Tracker",
+    "UsageValidationError",
     "ApiUsageRecord",
     "ApiUsageRequest",
     "ApiUsageResponse",
