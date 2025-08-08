@@ -70,6 +70,25 @@ with ClientCostManager(client) as manager:
     manager.client.list_customers()
     # payloads delivered in background
 
+# wrapping LLM SDK clients
+import openai
+from aicostmanager import ClientCostManager
+
+tracked = ClientCostManager(openai.OpenAI(api_key="..."))
+resp = tracked.chat.completions.create(
+    model="gpt-3.5-turbo",
+    messages=[{"role": "user", "content": "Hello"}],
+)
+
+# streaming usage is delivered at end-of-stream
+stream = tracked.chat.completions.create(
+    model="gpt-3.5-turbo",
+    messages=[{"role": "user", "content": "Tell me a joke"}],
+    stream=True,
+)
+for chunk in stream:
+    pass  # iterate to completion to trigger delivery
+
 # asynchronous tracking
 from aicostmanager import AsyncClientCostManager, AsyncCostManagerClient
 

@@ -50,6 +50,46 @@ When creating your own ``handling_config`` make sure the
 ``UniversalExtractor``.  The mapping should resolve to a dictionary that
 matches the ``ApiUsageRecord`` schema as documented in the API.
 
+## Nested attribute proxying
+
+`ClientCostManager` and `AsyncClientCostManager` transparently proxy nested
+client namespaces so you can call methods such as `client.chat.completions.create`,
+`client.messages.create` or `client.models.generate_content` on the wrapped
+client and still get automatic tracking. The wrapper resolves dotted attribute
+paths and forwards the call while extracting usage and delivering payloads.
+
+No code changes are required in your application; simply wrap the vendor SDK
+client and continue using it normally:
+
+```python
+from aicostmanager import ClientCostManager
+import openai
+
+tracked = ClientCostManager(openai.OpenAI(api_key="..."))
+resp = tracked.chat.completions.create(model="gpt-3.5-turbo", messages=[...])
+```
+
+## Streaming APIs
+
+For streaming APIs (e.g., OpenAI chat completions with `stream=True`, Google
+Gemini `generate_content_stream`, etc.), the wrapper returns a stream-like
+iterator. Usage events are extracted and queued for delivery when the stream
+finishes iterating (end-of-stream). For OpenAI chat streaming, the wrapper also
+automatically enables `stream_options={"include_usage": True}` if you pass
+`stream=True` and did not supply `stream_options`, ensuring final usage details
+are included.
+
+Notes:
+
+- **Delivery timing**: Usage is delivered at the end of the stream. If you need
+  to force earlier delivery, exhaust the iterator or explicitly close it.
+- **Response and service identifiers**: When possible, the wrapper propagates
+  `response_id` observed in chunks and sets `service_id` from request `model` to
+  help correlate events on the server.
+- **Missing usage**: Some providers omit usage in streaming deltas. The wrapper
+  attaches an empty `usage` object in those cases so the payload always conforms
+  to the expected schema.
+
 ## Limitations
 
 The implementation focuses on reliability rather than throughput.

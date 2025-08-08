@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, Optional
 
-from .base import BaseCostManager
 from ..client import AsyncCostManagerClient, CostManagerClient
-from ..delivery import ResilientDelivery, get_global_delivery, _ini_get_or_set
+from ..delivery import ResilientDelivery, _ini_get_or_set, get_global_delivery
+from .base import BaseCostManager
 
 
 class NestedAttributeWrapper:
@@ -23,8 +23,10 @@ class NestedAttributeWrapper:
         attr = getattr(self._attr, name)
         full_path = f"{self._path}.{name}" if self._path else name
         if callable(attr):
+
             def wrapper(*args, **kwargs):
                 return getattr(self._manager, full_path)(*args, **kwargs)
+
             return wrapper
         return NestedAttributeWrapper(attr, self._manager, full_path)
 
@@ -32,27 +34,65 @@ class NestedAttributeWrapper:
 class _StreamIterator:
     """Iterator proxy that records streaming results when iteration ends."""
 
-    def __init__(self, iterator: Iterator[Any], manager: "ClientCostManager", name: str, args: tuple, kwargs: dict) -> None:
+    def __init__(
+        self,
+        iterator: Iterator[Any],
+        manager: "ClientCostManager",
+        name: str,
+        args: tuple,
+        kwargs: dict,
+    ) -> None:
         self.iterator = iterator
         self.manager = manager
         self.name = name
         self.args = args
         self.kwargs = kwargs
+        self._last_item: Any = None
+        self._response_id: Any = None
+        self._usage_snapshot: Any = None
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        return next(self.iterator)
+        try:
+            item = next(self.iterator)
+            self._last_item = item
+            try:
+                if hasattr(item, "id") and getattr(item, "id"):
+                    self._response_id = getattr(item, "id")
+                if hasattr(item, "response") and hasattr(item.response, "id"):
+                    self._response_id = getattr(item.response, "id")
+                if hasattr(item, "usage") and getattr(item, "usage") is not None:
+                    self._usage_snapshot = getattr(item, "usage")
+                if hasattr(item, "response") and hasattr(item.response, "usage"):
+                    self._usage_snapshot = getattr(item.response, "usage")
+            except Exception:
+                pass
+            return item
+        except StopIteration:
+            # When the underlying stream is exhausted, process and deliver usage
+            try:
+                self.close()
+            finally:
+                pass
+            raise
 
     def close(self):  # type: ignore[override]
         if hasattr(self.iterator, "close"):
             self.iterator.close()
+        # Build a synthetic final response that includes id/usage captured from chunks
+        final_response = {
+            "id": self._response_id,
+            "usage": self._usage_snapshot,
+            "response": {"id": self._response_id, "usage": self._usage_snapshot},
+            "last_chunk": self._last_item,
+        }
         payloads = self.manager.extractor.process_call(
             self.name,
             self.args,
             self.kwargs,
-            self.iterator,
+            final_response,
             client=self.manager.client,
             is_streaming=True,
         )
@@ -60,11 +100,22 @@ class _StreamIterator:
             if self.manager.api_id == "openai":
                 service_model = self.kwargs.get("model")
                 for payload in payloads:
-                    if service_model and "service_id" not in payload:
+                    # Ensure response_id is present for server-side correlation
+                    if self._response_id and not payload.get("response_id"):
+                        payload["response_id"] = self._response_id
+                    if service_model and not payload.get("service_id"):
                         payload["service_id"] = service_model
+            # Ensure usage is a dict, never None (some providers omit it in streams)
+            for payload in payloads:
+                if payload.get("usage") is None:
+                    payload["usage"] = {}
             self.manager.tracked_payloads.extend(payloads)
             for payload in payloads:
                 self.manager._augment_payload(payload)
+                try:
+                    print(f"[AICM DEBUG] streaming payload: {payload}")
+                except Exception:
+                    pass
                 self.manager.delivery.deliver({"usage_records": [payload]})
 
 
@@ -80,8 +131,10 @@ class AsyncNestedAttributeWrapper:
         attr = getattr(self._attr, name)
         full_path = f"{self._path}.{name}" if self._path else name
         if callable(attr):
+
             async def wrapper(*args, **kwargs):
                 return await getattr(self._manager, full_path)(*args, **kwargs)
+
             return wrapper
         return AsyncNestedAttributeWrapper(attr, self._manager, full_path)
 
@@ -89,27 +142,64 @@ class AsyncNestedAttributeWrapper:
 class _AsyncStreamIterator:
     """Async iterator proxy that records streaming results when iteration ends."""
 
-    def __init__(self, iterator: Any, manager: "AsyncClientCostManager", name: str, args: tuple, kwargs: dict) -> None:
+    def __init__(
+        self,
+        iterator: Any,
+        manager: "AsyncClientCostManager",
+        name: str,
+        args: tuple,
+        kwargs: dict,
+    ) -> None:
         self.iterator = iterator
         self.manager = manager
         self.name = name
         self.args = args
         self.kwargs = kwargs
+        self._last_item: Any = None
+        self._response_id: Any = None
+        self._usage_snapshot: Any = None
 
     def __aiter__(self):
         return self
 
     async def __anext__(self):
-        return await self.iterator.__anext__()
+        try:
+            item = await self.iterator.__anext__()
+            self._last_item = item
+            try:
+                if hasattr(item, "id") and getattr(item, "id"):
+                    self._response_id = getattr(item, "id")
+                if hasattr(item, "response") and hasattr(item.response, "id"):
+                    self._response_id = getattr(item.response, "id")
+                if hasattr(item, "usage") and getattr(item, "usage") is not None:
+                    self._usage_snapshot = getattr(item, "usage")
+                if hasattr(item, "response") and hasattr(item.response, "usage"):
+                    self._usage_snapshot = getattr(item.response, "usage")
+            except Exception:
+                pass
+            return item
+        except StopAsyncIteration:
+            # When the underlying async stream is exhausted, process and deliver usage
+            try:
+                await self.aclose()
+            finally:
+                pass
+            raise
 
     async def aclose(self):  # type: ignore[override]
         if hasattr(self.iterator, "aclose"):
             await self.iterator.aclose()
+        final_response = {
+            "id": self._response_id,
+            "usage": self._usage_snapshot,
+            "response": {"id": self._response_id, "usage": self._usage_snapshot},
+            "last_chunk": self._last_item,
+        }
         payloads = self.manager.extractor.process_call(
             self.name,
             self.args,
             self.kwargs,
-            self.iterator,
+            final_response,
             client=self.manager.client,
             is_streaming=True,
         )
@@ -117,11 +207,20 @@ class _AsyncStreamIterator:
             if self.manager.api_id == "openai":
                 service_model = self.kwargs.get("model")
                 for payload in payloads:
-                    if service_model and "service_id" not in payload:
+                    if self._response_id and not payload.get("response_id"):
+                        payload["response_id"] = self._response_id
+                    if service_model and not payload.get("service_id"):
                         payload["service_id"] = service_model
+            for payload in payloads:
+                if payload.get("usage") is None:
+                    payload["usage"] = {}
             self.manager.tracked_payloads.extend(payloads)
             for payload in payloads:
                 self.manager._augment_payload(payload)
+                try:
+                    print(f"[AICM DEBUG] streaming payload (async): {payload}")
+                except Exception:
+                    pass
                 self.manager.delivery.deliver({"usage_records": [payload]})
 
 
@@ -175,38 +274,97 @@ class ClientCostManager(BaseCostManager):
 
     # attribute proxying -------------------------------------------------
     def __getattr__(self, name: str) -> Any:
-        attr = getattr(self.client, name)
-        if callable(attr):
-            def wrapper(*args, **kwargs):
-                self._refresh_limits()
-                if (
-                    kwargs.get("stream")
-                    and self.api_id == "openai"
-                    and name in ["completions.create", "chat.completions.create"]
-                ):
-                    if "stream_options" not in kwargs:
-                        kwargs["stream_options"] = {"include_usage": True}
-                response = attr(*args, **kwargs)
-                if self._is_streaming(response):
-                    return _StreamIterator(response, self, name, args, kwargs)
-                payloads = self.extractor.process_call(
-                    name, args, kwargs, response, client=self.client, is_streaming=False
-                )
-                if payloads:
-                    if self.api_id == "openai":
-                        service_model = kwargs.get("model")
+        # Resolve top-level attribute for normal attribute access (e.g., track_client.chat)
+        if "." not in name:
+            attr = getattr(self.client, name)
+            if callable(attr):
+
+                def wrapper(*args, **kwargs):
+                    self._refresh_limits()
+                    call_name = name
+                    if (
+                        kwargs.get("stream")
+                        and self.api_id == "openai"
+                        and call_name
+                        in ["completions.create", "chat.completions.create"]
+                    ):
+                        if "stream_options" not in kwargs:
+                            kwargs["stream_options"] = {"include_usage": True}
+                    response = attr(*args, **kwargs)
+                    if self._is_streaming(response):
+                        return _StreamIterator(response, self, call_name, args, kwargs)
+                    payloads = self.extractor.process_call(
+                        call_name,
+                        args,
+                        kwargs,
+                        response,
+                        client=self.client,
+                        is_streaming=False,
+                    )
+                    if payloads:
+                        if self.api_id == "openai":
+                            service_model = kwargs.get("model")
+                            for payload in payloads:
+                                if service_model and "service_id" not in payload:
+                                    payload["service_id"] = service_model
+                        self.tracked_payloads.extend(payloads)
                         for payload in payloads:
-                            if service_model and "service_id" not in payload:
-                                payload["service_id"] = service_model
-                    self.tracked_payloads.extend(payloads)
-                    for payload in payloads:
-                        self._augment_payload(payload)
-                        self.delivery.deliver({"usage_records": [payload]})
-                return response
-            return wrapper
-        else:
+                            self._augment_payload(payload)
+                            self.delivery.deliver({"usage_records": [payload]})
+                    return response
+
+                return wrapper
+            else:
+                self._refresh_limits()
+                return NestedAttributeWrapper(attr, self, name)
+
+        # Support dotted attribute paths coming from NestedAttributeWrapper
+        def _resolve_attr(path: str) -> Any:
+            target = self.client
+            for part in path.split("."):
+                target = getattr(target, part)
+            return target
+
+        attr = _resolve_attr(name)
+        if not callable(attr):
+            # Should not generally happen because dotted resolution is only used for callables
             self._refresh_limits()
             return NestedAttributeWrapper(attr, self, name)
+
+        def wrapper(*args, **kwargs):
+            self._refresh_limits()
+            call_name = name
+            if (
+                kwargs.get("stream")
+                and self.api_id == "openai"
+                and call_name in ["completions.create", "chat.completions.create"]
+            ):
+                if "stream_options" not in kwargs:
+                    kwargs["stream_options"] = {"include_usage": True}
+            response = attr(*args, **kwargs)
+            if self._is_streaming(response):
+                return _StreamIterator(response, self, call_name, args, kwargs)
+            payloads = self.extractor.process_call(
+                call_name,
+                args,
+                kwargs,
+                response,
+                client=self.client,
+                is_streaming=False,
+            )
+            if payloads:
+                if self.api_id == "openai":
+                    service_model = kwargs.get("model")
+                    for payload in payloads:
+                        if service_model and "service_id" not in payload:
+                            payload["service_id"] = service_model
+                self.tracked_payloads.extend(payloads)
+                for payload in payloads:
+                    self._augment_payload(payload)
+                    self.delivery.deliver({"usage_records": [payload]})
+            return response
+
+        return wrapper
 
     # delivery helpers ---------------------------------------------------
     def start_delivery(self) -> None:
@@ -398,18 +556,72 @@ class AsyncClientCostManager(BaseCostManager):
 
     # attribute proxying -------------------------------------------------
     def __getattr__(self, name: str) -> Any:
-        attr = getattr(self.client, name)
+        # Resolve top-level attribute for normal attribute access (e.g., track_client.chat)
+        if "." not in name:
+            attr = getattr(self.client, name)
+            if not callable(attr):
+                self._refresh_limits()
+                return AsyncNestedAttributeWrapper(attr, self, name)
+
+            async def wrapper(*args, **kwargs):
+                self._refresh_limits()
+                call_name = name
+                # Inject include_usage for OpenAI streaming chat completions
+                if (
+                    kwargs.get("stream")
+                    and self.api_id == "openai"
+                    and call_name in ["completions.create", "chat.completions.create"]
+                ):
+                    if "stream_options" not in kwargs:
+                        kwargs["stream_options"] = {"include_usage": True}
+                response = await attr(*args, **kwargs)
+                if kwargs.get("stream") and hasattr(response, "__aiter__"):
+                    return _AsyncStreamIterator(response, self, call_name, args, kwargs)
+                payloads = self.extractor.process_call(
+                    call_name, args, kwargs, response, client=self.client
+                )
+                if payloads:
+                    if self.api_id == "openai":
+                        service_model = kwargs.get("model")
+                        for payload in payloads:
+                            if service_model and "service_id" not in payload:
+                                payload["service_id"] = service_model
+                    self.tracked_payloads.extend(payloads)
+                    for payload in payloads:
+                        self._augment_payload(payload)
+                        self.delivery.deliver({"usage_records": [payload]})
+                return response
+
+            return wrapper
+
+        # Support dotted attribute paths coming from AsyncNestedAttributeWrapper
+        def _resolve_attr(path: str) -> Any:
+            target = self.client
+            for part in path.split("."):
+                target = getattr(target, part)
+            return target
+
+        attr = _resolve_attr(name)
         if not callable(attr):
+            # Should not generally happen because dotted resolution is only used for callables
             self._refresh_limits()
             return AsyncNestedAttributeWrapper(attr, self, name)
 
         async def wrapper(*args, **kwargs):
             self._refresh_limits()
+            call_name = name
+            if (
+                kwargs.get("stream")
+                and self.api_id == "openai"
+                and call_name in ["completions.create", "chat.completions.create"]
+            ):
+                if "stream_options" not in kwargs:
+                    kwargs["stream_options"] = {"include_usage": True}
             response = await attr(*args, **kwargs)
             if kwargs.get("stream") and hasattr(response, "__aiter__"):
-                return _AsyncStreamIterator(response, self, name, args, kwargs)
+                return _AsyncStreamIterator(response, self, call_name, args, kwargs)
             payloads = self.extractor.process_call(
-                name, args, kwargs, response, client=self.client
+                call_name, args, kwargs, response, client=self.client
             )
             if payloads:
                 if self.api_id == "openai":
@@ -422,6 +634,7 @@ class AsyncClientCostManager(BaseCostManager):
                     self._augment_payload(payload)
                     self.delivery.deliver({"usage_records": [payload]})
             return response
+
         return wrapper
 
     # delivery helpers ---------------------------------------------------
