@@ -2,12 +2,20 @@
 
 ## User Guides
 
-- **[Multi-Tenant & Client Tracking](multi-tenant.md)** - Track costs across multiple clients, projects, and departments
+### Automatic Tracking
+
 - [Usage](usage.md) - Basic SDK usage and API examples
-- [Tracking](tracking.md) - How the tracking system works
-- [Manual Usage Tracking](tracker.md) - Record custom usage events
 - [REST API Tracking](rest.md) - Wrap requests or httpx sessions
- - [Configuration & Env Vars](configuration.md) - Environment variables and INI behavior
+
+### Manual Tracking
+
+- [Manual Usage Tracking](tracker.md) - Record custom usage events
+
+### Additional Topics
+
+- **[Multi-Tenant & Client Tracking](multi-tenant.md)** - Track costs across multiple clients, projects, and departments
+- [Tracking](tracking.md) - How the tracking system works
+- [Configuration & Env Vars](configuration.md) - Environment variables and INI behavior
 
 ## Development
 

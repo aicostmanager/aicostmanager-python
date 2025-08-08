@@ -2,7 +2,7 @@ import pytest
 
 from aicostmanager.client import CostManagerClient
 from aicostmanager.config_manager import Config, CostManagerConfig
-from aicostmanager.cost_manager import CostManager
+from aicostmanager import ClientCostManager
 
 
 class DummyClient:
@@ -71,7 +71,7 @@ def test_cost_manager_queues_payload(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(CostManagerConfig, "get_config", lambda self, api_id: [cfg])
 
-    manager = CostManager(DummyClient(), delivery_queue_size=10)
+    manager = ClientCostManager(DummyClient(), delivery_queue_size=10)
     manager.add(a=2, b=3)
 
     manager.delivery._queue.join()

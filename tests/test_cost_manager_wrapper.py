@@ -1,7 +1,7 @@
 import pytest
 
 from aicostmanager.config_manager import Config, CostManagerConfig
-from aicostmanager.cost_manager import CostManager
+from aicostmanager import ClientCostManager
 
 
 class DummyClient:
@@ -37,7 +37,7 @@ def test_tracker_loads_configs(monkeypatch):
 
     monkeypatch.setattr(CostManagerConfig, "get_config", fake_get_config)
 
-    tracker = CostManager(dummy)
+    tracker = ClientCostManager(dummy)
 
     assert tracker.api_id == "test_cost_manager_wrapper"
     assert tracker.configs == [cfg]
@@ -49,7 +49,7 @@ def test_passthrough_method(monkeypatch):
     monkeypatch.setattr(
         CostManagerConfig, "get_triggered_limits", lambda self, **kwargs: []
     )
-    tracker = CostManager(DummyClient())
+    tracker = ClientCostManager(DummyClient())
     assert tracker.add(2, 3) == 5
 
 
@@ -58,7 +58,7 @@ def test_passthrough_streaming(monkeypatch):
     monkeypatch.setattr(
         CostManagerConfig, "get_triggered_limits", lambda self, **kwargs: []
     )
-    tracker = CostManager(DummyClient())
+    tracker = ClientCostManager(DummyClient())
     assert list(tracker.stream()) == [0, 1, 2]
 
 
@@ -79,7 +79,7 @@ def test_limits_checked_on_access(monkeypatch):
 
     monkeypatch.setattr(CostManagerConfig, "get_triggered_limits", fake_get_limits)
 
-    tracker = CostManager(Dummy())
+    tracker = ClientCostManager(Dummy())
     tracker.add(1, 2)
     _ = tracker.value
     tracker.add(3, 4)

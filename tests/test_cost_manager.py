@@ -1,7 +1,7 @@
 import pytest
 
 from aicostmanager.config_manager import Config, CostManagerConfig
-from aicostmanager.cost_manager import CostManager
+from aicostmanager import ClientCostManager
 
 
 class DummyClient:
@@ -34,7 +34,7 @@ def test_manager_tracks(monkeypatch):
         },
     )
     monkeypatch.setattr(CostManagerConfig, "get_config", lambda self, api_id: [cfg])
-    manager = CostManager(DummyClient())
+    manager = ClientCostManager(DummyClient())
     result = manager.add(a=2, b=3)
     assert result == 5
     payloads = manager.get_tracked_payloads()
@@ -58,7 +58,7 @@ def test_context_manager(monkeypatch):
         def deliver(self, payload):
             pass
 
-    manager = CostManager(dummy, delivery=DummyDelivery())
+    manager = ClientCostManager(dummy, delivery=DummyDelivery())
     with manager as m:
         assert m is manager
     assert calls["start"] == 1
@@ -84,7 +84,7 @@ def test_client_customer_key_and_context(monkeypatch):
     )
     monkeypatch.setattr(CostManagerConfig, "get_config", lambda self, api_id: [cfg])
 
-    manager = CostManager(
+    manager = ClientCostManager(
         DummyClient(), client_customer_key="c1", context={"foo": "bar"}
     )
     manager.add(a=1, b=2)

@@ -19,6 +19,8 @@ from .delivery import (
     get_global_delivery_health,
 )
 from .tracker import Tracker, UsageValidationError
+from .wrappers.client import ClientCostManager, AsyncClientCostManager
+from .wrappers.rest import RestUsageWrapper, AsyncRestUsageWrapper
 from .models import (
     ApiUsageRecord,
     ApiUsageRequest,
@@ -52,9 +54,13 @@ __all__ = [
     "APIRequestError",
     "AsyncCostManager",
     "AsyncCostManagerClient",
+    "AsyncClientCostManager",
     "CostManager",
+    "ClientCostManager",
     "RestCostManager",
     "AsyncRestCostManager",
+    "RestUsageWrapper",
+    "AsyncRestUsageWrapper",
     "CostManagerClient",
     "MissingConfiguration",
     "UsageLimitExceeded",

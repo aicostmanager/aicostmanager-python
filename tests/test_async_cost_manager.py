@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from aicostmanager.async_cost_manager import AsyncCostManager
+from aicostmanager import AsyncClientCostManager
 from aicostmanager.client import AsyncCostManagerClient, CostManagerClient
 from aicostmanager.config_manager import Config, CostManagerConfig
 
@@ -76,7 +76,7 @@ def test_async_manager_tracks(monkeypatch):
     monkeypatch.setattr(CostManagerClient, "__init__", fake_sync_init)
 
     async def run():
-        manager = AsyncCostManager(DummyClient())
+        manager = AsyncClientCostManager(DummyClient())
         result = await manager.add(a=2, b=3)
         assert result == 5
         payloads = manager.get_tracked_payloads()
@@ -167,7 +167,7 @@ def test_async_delivery(monkeypatch):
     monkeypatch.setattr(CostManagerConfig, "get_config", lambda self, api_id: [cfg])
 
     async def run():
-        manager = AsyncCostManager(DummyClient(), delivery_queue_size=10)
+        manager = AsyncClientCostManager(DummyClient(), delivery_queue_size=10)
         await asyncio.sleep(0)
         await manager.add(a=2, b=3)
         await manager.delivery._queue.join()
@@ -215,7 +215,7 @@ def test_async_client_customer_key_and_context(monkeypatch):
     monkeypatch.setattr(CostManagerClient, "__init__", fake_sync_init)
 
     async def run():
-        manager = AsyncCostManager(
+        manager = AsyncClientCostManager(
             DummyClient(), client_customer_key="c1", context={"foo": "bar"}
         )
         await manager.add(a=1, b=2)

@@ -16,16 +16,16 @@ Multi-tenant cost tracking allows you to:
 
 ### Method 1: Constructor Parameters
 
-The most straightforward way to track client usage is by setting client information when creating the `CostManager`:
+The most straightforward way to track client usage is by setting client information when creating the `ClientCostManager`:
 
 ```python
-from aicostmanager import CostManager
+from aicostmanager import ClientCostManager
 import openai
 
 client = openai.OpenAI(api_key="your-openai-key")
 
 # Track all usage for a specific client
-tracked_client = CostManager(
+tracked_client = ClientCostManager(
     client,
     client_customer_key="acme_corp",
     context={
@@ -48,11 +48,11 @@ response = tracked_client.chat.completions.create(
 Currently, all usage is automatically tracked and can be organized via the [AICostManager dashboard](https://aicostmanager.com):
 
 ```python
-from aicostmanager import CostManager
+from aicostmanager import ClientCostManager
 import openai
 
 client = openai.OpenAI(api_key="your-openai-key")
-tracked_client = CostManager(client)
+tracked_client = ClientCostManager(client)
 
 # Usage is tracked automatically
 response = tracked_client.chat.completions.create(
@@ -71,10 +71,10 @@ response = tracked_client.chat.completions.create(
 
 ### Per-Client Instances
 
-For applications serving multiple clients, create separate `CostManager` instances:
+For applications serving multiple clients, create separate `ClientCostManager` instances:
 
 ```python
-from aicostmanager import CostManager
+from aicostmanager import ClientCostManager
 import openai
 
 class AIServiceProvider:
@@ -87,7 +87,7 @@ class AIServiceProvider:
         key = f"{customer_id}_{project or 'default'}"
         
         if key not in self.client_trackers:
-            self.client_trackers[key] = CostManager(
+            self.client_trackers[key] = ClientCostManager(
                 self.base_client,
                 client_customer_key=customer_id,
                 context={
@@ -122,7 +122,7 @@ response2 = service.process_request("tech_startup", "assistant", "Help me code")
 For applications that handle multiple clients in the same session:
 
 ```python
-from aicostmanager import CostManager
+from aicostmanager import ClientCostManager
 import openai
 
 class MultiTenantLLMService:
@@ -132,7 +132,7 @@ class MultiTenantLLMService:
     def create_completion(self, customer_id, model, messages, **kwargs):
         """Create completion with client tracking."""
         # Create tracker with client context
-        tracker = CostManager(
+        tracker = ClientCostManager(
             self.base_client,
             client_customer_key=customer_id,
             context={

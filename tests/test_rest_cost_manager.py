@@ -4,7 +4,7 @@ import pytest
 
 from aicostmanager.client import AsyncCostManagerClient, CostManagerClient
 from aicostmanager.config_manager import Config, CostManagerConfig
-from aicostmanager.rest_cost_manager import AsyncRestCostManager, RestCostManager
+from aicostmanager import AsyncRestUsageWrapper, RestUsageWrapper
 
 
 class DummyResponse:
@@ -168,7 +168,7 @@ class DummyAsyncClientInit:
 def test_rest_manager_tracks(monkeypatch, config):
     monkeypatch.setattr(CostManagerClient, "__init__", DummyClientInit.__init__)
     session = DummySession()
-    manager = RestCostManager(session, base_url="https://api.example.com")
+    manager = RestUsageWrapper(session, base_url="https://api.example.com")
     resp = manager.get("/foo")
     assert resp.json() == {"value": 5}
     payloads = manager.get_tracked_payloads()
@@ -184,7 +184,7 @@ def test_async_rest_manager_tracks(monkeypatch, config):
 
     async def run():
         session = DummyAsyncSession()
-        manager = AsyncRestCostManager(session, base_url="https://api.example.com")
+        manager = AsyncRestUsageWrapper(session, base_url="https://api.example.com")
         resp = await manager.get("/foo")
         assert resp.json() == {"value": 5}
         payloads = manager.get_tracked_payloads()
@@ -198,7 +198,7 @@ def test_async_rest_manager_tracks(monkeypatch, config):
 def test_rest_client_customer_key_and_context(monkeypatch, config):
     monkeypatch.setattr(CostManagerClient, "__init__", DummyClientInit.__init__)
     session = DummySession()
-    manager = RestCostManager(
+    manager = RestUsageWrapper(
         session,
         base_url="https://api.example.com",
         client_customer_key="c1",
@@ -223,7 +223,7 @@ def test_async_rest_client_customer_key_and_context(monkeypatch, config):
 
     async def run():
         session = DummyAsyncSession()
-        manager = AsyncRestCostManager(
+        manager = AsyncRestUsageWrapper(
             session,
             base_url="https://api.example.com",
             client_customer_key="c1",

@@ -69,6 +69,14 @@ export AICM_API_KEY="your-aicostmanager-api-key-here"
 
 **🔒 Important**: Your existing LLM provider API keys (OpenAI, Anthropic, etc.) remain yours and are never shared with AICostManager. You continue to use them exactly as before—AICostManager only extracts usage metadata from responses.
 
+### Choosing a Tracking Approach
+
+1. **Does the API response include usage metrics?**
+   - **Yes** – Use an automatic wrapper:
+     - Existing SDK client → `ClientCostManager` or `AsyncClientCostManager`
+     - Plain HTTP calls → `RestUsageWrapper` or `AsyncRestUsageWrapper`
+   - **No** – Calculate usage yourself and send it with `Tracker`.
+
 ## 🚀 Quick Start
 
 ### Basic Usage
@@ -76,13 +84,13 @@ export AICM_API_KEY="your-aicostmanager-api-key-here"
 ```python
 import os
 import openai
-from aicostmanager import CostManager
+from aicostmanager import ClientCostManager
 
 # Create OpenAI client as usual
 openai_client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Wrap with AICostManager tracking
-tracked_client = CostManager(openai_client)  # reads AICM_API_KEY from env
+tracked_client = ClientCostManager(openai_client)  # reads AICM_API_KEY from env
 
 # Use exactly as before - zero changes to your API calls
 response = tracked_client.chat.completions.create(
@@ -115,10 +123,10 @@ for chunk in stream:
 
 ```python
 import anthropic
-from aicostmanager import CostManager
+from aicostmanager import ClientCostManager
 
 claude_client = anthropic.Anthropic(api_key="your-anthropic-key")
-tracked_claude = CostManager(claude_client)
+tracked_claude = ClientCostManager(claude_client)
 
 response = tracked_claude.messages.create(
     model="claude-3-haiku-20240307",
@@ -131,10 +139,10 @@ response = tracked_claude.messages.create(
 
 ```python
 import google.genai
-from aicostmanager import CostManager
+from aicostmanager import ClientCostManager
 
 gemini_client = google.genai.Client(api_key="your-google-key")
-tracked_gemini = CostManager(gemini_client)
+tracked_gemini = ClientCostManager(gemini_client)
 
 response = tracked_gemini.models.generate_content(
     model="gemini-1.5-flash",
@@ -146,10 +154,10 @@ response = tracked_gemini.models.generate_content(
 
 ```python
 import boto3
-from aicostmanager import CostManager
+from aicostmanager import ClientCostManager
 
 bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
-tracked_bedrock = CostManager(bedrock_client)
+tracked_bedrock = ClientCostManager(bedrock_client)
 
 # Use as normal - AICostManager automatically tracks usage
 ```
@@ -163,13 +171,13 @@ Perfect for agencies, SaaS platforms, and enterprise applications that need to t
 Track usage with client identifiers for accurate billing and cost allocation:
 
 ```python
-from aicostmanager import CostManager
+from aicostmanager import ClientCostManager
 import openai
 
 client = openai.OpenAI(api_key="your-key")
 
 # Option 1: Set client info via constructor
-tracked_client = CostManager(
+tracked_client = ClientCostManager(
     client,
     client_customer_key="customer_acme_corp",
     context={
@@ -228,10 +236,10 @@ Visit [aicostmanager.com](https://aicostmanager.com) to access:
 
 ## 🔄 How Delivery Works
 
-`CostManager` places extracted usage payloads on a global queue. A background worker batches and retries delivery so that instrumentation never blocks your application. The queue size, retry attempts and request timeout can be tuned when constructing the wrapper.
+`ClientCostManager` places extracted usage payloads on a global queue. A background worker batches and retries delivery so that instrumentation never blocks your application. The queue size, retry attempts and request timeout can be tuned when constructing the wrapper.
 
 ```python
-tracked_client = CostManager(
+tracked_client = ClientCostManager(
     client,
     delivery_queue_size=1000,      # Queue size for batching
     delivery_max_retries=5,        # Retry failed deliveries
@@ -261,11 +269,11 @@ process and avoids race conditions after forking.
 ### Async Support
 
 ```python
-from aicostmanager import AsyncCostManager
+from aicostmanager import AsyncClientCostManager
 import openai
 
 async_client = openai.AsyncOpenAI(api_key="your-key")
-tracked_async = AsyncCostManager(async_client)
+tracked_async = AsyncClientCostManager(async_client)
 
 response = await tracked_async.chat.completions.create(
     model="gpt-4o-mini",

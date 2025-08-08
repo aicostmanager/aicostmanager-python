@@ -63,19 +63,19 @@ If configuration payload is unchanged, triggered limits can still be refreshed
 via `/triggered-limits`. The SDK also falls back to fetching triggered limits
 from the API if the local INI cache is empty or missing fields.
 
-# using CostManager with automatic delivery
-from aicostmanager import CostManager
+# using ClientCostManager with automatic delivery
+from aicostmanager import ClientCostManager
 
-with CostManager(client) as manager:
+with ClientCostManager(client) as manager:
     manager.client.list_customers()
     # payloads delivered in background
 
 # asynchronous tracking
-from aicostmanager import AsyncCostManager, AsyncCostManagerClient
+from aicostmanager import AsyncClientCostManager, AsyncCostManagerClient
 
 async def async_example():
     async with AsyncCostManagerClient() as aclient:
-        async with AsyncCostManager(aclient) as manager:
+        async with AsyncClientCostManager(aclient) as manager:
             await manager.client.list_customers()
 ```
 
@@ -129,18 +129,33 @@ for vendor in vendors:
 
 ## Tracking Plain REST APIs
 
-Use ``RestCostManager`` (or ``AsyncRestCostManager`` for async) to track any
+Use ``RestUsageWrapper`` (or ``AsyncRestUsageWrapper`` for async) to track any
 service accessed via ``requests`` or ``httpx``:
 
 ```python
 import requests
-from aicostmanager import RestCostManager
+from aicostmanager import RestUsageWrapper
 
 session = requests.Session()
-tracker = RestCostManager(session, base_url="https://api.heygen.com")
+tracker = RestUsageWrapper(session, base_url="https://api.heygen.com")
 data = tracker.get("/v2/streaming.list").json()
 ```
 
 The wrapper automatically extracts payloads from each call and sends them to
-AICostManager just like when using ``CostManager``.
+AICostManager just like when using ``ClientCostManager``.
+
+### Non-LLM API example
+
+Any API that returns a usage section can be wrapped. For example:
+
+```python
+from aicostmanager import ClientCostManager
+
+class WeatherClient:
+    def forecast(self, city: str):
+        return {"temp": 70, "usage": {"calls": 1}}
+
+tracker = ClientCostManager(WeatherClient())
+tracker.forecast("Paris")
+```
 

@@ -1,8 +1,8 @@
-# Tracking Usage with `CostManager`
+# Tracking Usage with `ClientCostManager`
 
 For manual tracking without wrapping an API client, see [Manual Usage Tracking](tracker.md).
 
-`CostManager` provides a small wrapper around any API client so that the
+`ClientCostManager` provides a small wrapper around any API client so that the
 client's activity can be analysed.  It relies on configuration returned
 from `CostManagerConfig` which describes how requests and responses
 should be inspected.  The heavy lifting of turning that configuration
@@ -10,7 +10,7 @@ into data is handled by `UniversalExtractor`.
 
 ## Basic Workflow
 
-1. Instantiate `CostManager` with the API client you wish to monitor.
+1. Instantiate `ClientCostManager` with the API client you wish to monitor.
 2. On construction the wrapper fetches configuration for the client's
    `api_id` (the name of the client's class in lower case).
 3. The wrapper creates a single `UniversalExtractor` with those
@@ -56,7 +56,7 @@ The implementation focuses on reliability rather than throughput.
 Payloads are sent via a background thread with a bounded queue so that
 usage tracking will not exhaust memory when used inside a web
 application.  The queue size and retry policy can be tuned via
-``CostManager`` parameters. When the queue is full the default behaviour
+``ClientCostManager`` parameters. When the queue is full the default behaviour
 is to drop the oldest payload and log a warning. Set
 ``delivery_on_full`` to ``"block"`` to wait for space or ``"raise"`` to
 propagate ``queue.Full`` back to the caller. You can also set the
@@ -84,20 +84,20 @@ section so it can be tuned once and reused across runs.
   ``tenacity.AsyncRetrying`` for non-blocking retries.
 
 Set ``AICM_DELIVERY_MODE=async`` (or pass ``delivery_mode="async"`` when
-constructing ``CostManager``/``RestCostManager``) to enable the async mode.
+constructing ``ClientCostManager``/``RestUsageWrapper``) to enable the async mode.
 This is useful for eventlet or gevent worker pools where blocking network
 operations should be avoided.
 
-An asynchronous variant ``AsyncCostManager`` is available for wrapping
-async API clients.  It behaves the same as ``CostManager`` but uses an
+An asynchronous variant ``AsyncClientCostManager`` is available for wrapping
+async API clients. It behaves the same as ``ClientCostManager`` but uses an
 ``asyncio`` delivery queue and ``AsyncCostManagerClient`` for network
 requests:
 
 ```python
-from aicostmanager import AsyncCostManager, AsyncCostManagerClient
+from aicostmanager import AsyncClientCostManager, AsyncCostManagerClient
 
 async with AsyncCostManagerClient() as client:
-    async with AsyncCostManager(client) as tracker:
+    async with AsyncClientCostManager(client) as tracker:
         await tracker.client.some_call()
 ```
 ## Health & Metrics
@@ -114,6 +114,6 @@ print(get_global_delivery_health())
 ## Multiprocessing Environments
 
 In applications that fork worker processes (such as those using the
-``multiprocessing`` module or Celery), create the ``CostManager`` instance
+``multiprocessing`` module or Celery), create the ``ClientCostManager`` instance
 inside a worker-initialisation hook. This ensures each worker has its own
 delivery thread and avoids race conditions when processes start.

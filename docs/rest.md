@@ -1,20 +1,20 @@
 # Tracking REST APIs
 
-`RestCostManager` and `AsyncRestCostManager` make it easy to track any plain REST service accessed via `requests` or `httpx`.
+`RestUsageWrapper` and `AsyncRestUsageWrapper` make it easy to track any plain REST service accessed via `requests` or `httpx`.
 
 ```python
 import requests
-from aicostmanager import RestCostManager
+from aicostmanager import RestUsageWrapper
 
 session = requests.Session()
-tracker = RestCostManager(session, base_url="https://api.heygen.com")
+tracker = RestUsageWrapper(session, base_url="https://api.heygen.com")
 response = tracker.get("/v2/streaming.list", params={"page": 1})
 ```
 
 The hostname of the API (``api.heygen.com`` in this example) becomes both the
 ``api_id`` and ``config_id``. The full URL without the scheme is used as the
 ``service_id``. Any payloads extracted from the call are queued for delivery to
-AICostManager just like with ``CostManager``.
+AICostManager just like with ``ClientCostManager``.
 
 The response for ``/v2/streaming.list`` contains a list of streaming sessions.
 A handling configuration can iterate over those sessions and produce a usage
@@ -68,11 +68,11 @@ Handling configuration for this endpoint:
 
 ```python
 import httpx
-from aicostmanager import AsyncRestCostManager
+from aicostmanager import AsyncRestUsageWrapper
 
 async def main():
     async with httpx.AsyncClient() as aclient:
-        tracker = AsyncRestCostManager(aclient, base_url="https://api.heygen.com")
+        tracker = AsyncRestUsageWrapper(aclient, base_url="https://api.heygen.com")
         response = await tracker.get("/v2/streaming.list", params={"page": 1})
         # payloads delivered asynchronously
 ```
