@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.16] - 2025-01-08
+### Fixed
+- Resolved failures caused by nested method paths not being proxied (e.g., `chat.completions.create`,
+  `messages.create`, `models.generate_content`). The wrapper now supports dotted attribute resolution for
+  both sync and async clients.
+- Fixed streaming usage delivery across OpenAI, Gemini, and OpenAI-compatible providers by processing and
+  delivering usage at end-of-stream. Ensures `response_id` propagation and sets `service_id` from the
+  request `model` when missing.
+- Prevented 422 validation errors for providers that omit usage in streaming deltas by defaulting `usage`
+  to an empty object when absent.
+
+### Enhanced
+- Improved streaming detection and payload extraction reliability for iterators/async iterators.
+- Automatically enable `stream_options={"include_usage": true}` for OpenAI chat streaming when `stream=True`
+  and options were not provided, ensuring usage is returned in the final chunk.
+
+### Docs
+- Updated `docs/tracking.md` with:
+  - Nested attribute proxying details for calling `client.chat.completions.create`, `client.messages.create`,
+    and `client.models.generate_content` on wrapped clients.
+  - Streaming behavior notes: delivery at end-of-stream, `response_id`/`service_id` propagation, and `usage`
+    fallback.
+- Updated `docs/usage.md` with:
+  - LLM SDK wrapping examples for synchronous calls and streaming calls.
+  - Note that streaming usage is delivered when the stream is exhausted.
+
+### Tests
+- All tests updated/verified; entire suite now passes: 133 passed, 1 skipped.
+
 ## [0.1.15] - 2025-01-07
 ### Enhanced
 - Documentation updated to be uv-first across the project (installation and dev workflows)
