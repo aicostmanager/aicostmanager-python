@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """Sync HeyGen streaming sessions to AICostManager.
 
 This example relies on :func:`aicostmanager.delivery.get_global_delivery` for
