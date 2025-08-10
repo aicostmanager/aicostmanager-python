@@ -134,10 +134,24 @@ class Tracker:
         self,
         usage: Dict[str, Any],
         *,
+        response_id: Optional[str] = None,
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Validate and deliver a usage record."""
+        """Validate and deliver a usage record.
+
+        Parameters
+        ----------
+        usage:
+            The usage payload to validate and send.
+        response_id:
+            Optional identifier to associate with the usage record. If not
+            provided a random UUID4 hex string is generated.
+        client_customer_key:
+            Optional identifier for grouping usage by customer.
+        context:
+            Optional additional metadata to include with the record.
+        """
         if self.manual_usage_schema:
             errors: Dict[str, str] = {}
             missing: list[str] = []
@@ -157,7 +171,7 @@ class Tracker:
             "config_id": self.config_id,
             "service_id": self.service_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "response_id": uuid4().hex,
+            "response_id": response_id or uuid4().hex,
             "usage": usage,
         }
         if client_customer_key is not None:
