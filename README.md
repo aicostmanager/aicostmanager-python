@@ -305,6 +305,9 @@ tracker.track({
     "model": "gpt-4o-mini",
 })
 
+# Reuse a session or request identifier from the upstream service
+# tracker.track({"tokens": 123, "model": "gpt-4o-mini"}, response_id="session123")
+
 # Async initialization for web apps
 # tracker = await Tracker.create_async("cfg", "svc")
 # tracker.close()  # during shutdown

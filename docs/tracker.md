@@ -55,6 +55,16 @@ tracker.track(
 )
 ```
 
+## Custom Response IDs
+
+If the API you are tracking provides its own session or request identifier,
+you can use it for the usage record's ``response_id``:
+
+```python
+session_id = remote_response["session_id"]
+tracker.track({"duration": 12.3}, response_id=session_id)
+```
+
 ## Async Initialization (Web Apps)
 
 ```python
