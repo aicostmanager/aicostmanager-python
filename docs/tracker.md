@@ -161,11 +161,18 @@ If the usage dictionary does not match the schema a
 
 ## Stopping the delivery worker
 
-The tracker shares the global delivery worker by default.  To shut it down
-cleanly, call ``close`` during application shutdown:
+The tracker shares the global delivery worker by default. To shut it down
+cleanly, call ``close`` during application shutdown. ``close()`` flushes the
+delivery queue and blocks until all pending records have been sent. There is no
+public API to inspect the queue, so wrap tracking in a ``try``/``finally`` block
+to guarantee cleanup:
 
 ```python
-tracker.close()
+tracker = Tracker("cfg", "svc")
+try:
+    tracker.track({"tokens": 5})
+finally:
+    tracker.close()
 ```
 
 ## FastAPI example

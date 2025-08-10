@@ -9,10 +9,10 @@ task the worker is started automatically, so the task only needs to enqueue
 usage via :meth:`Tracker.track`.
 
 To **guarantee** that all usage records are delivered before the task finishes,
-call :func:`sync_streaming_sessions` with ``wait=True`` (the default). This
-stops the background worker after the queue is drained. The next task that
-needs to send usage data will spawn a new worker automatically when a new
-tracker instance is created.
+call :func:`sync_streaming_sessions` with ``wait=True`` (the default). The
+function closes the tracker in a ``finally`` block which stops the background
+worker after the queue is drained. The next task that needs to send usage data
+will spawn a new worker automatically when a new tracker instance is created.
 
 If you prefer to let delivery continue in the background, pass ``wait=False``;
 the worker thread will keep running after the task returns and will flush the
@@ -75,14 +75,15 @@ def sync_streaming_sessions(page_size: int = 100, *, wait: bool = True) -> None:
 
     tracker = Tracker(AICM_CONFIG_ID, AICM_SERVICE_ID, delivery_on_full="block")
 
-    for session in iter_sessions(page_size=page_size):
-        tracker.track(
-            {"duration": session.get("duration")},
-            response_id=session.get("session_id"),
-        )
-
-    if wait:
-        tracker.close()
+    try:
+        for session in iter_sessions(page_size=page_size):
+            tracker.track(
+                {"duration": session.get("duration")},
+                response_id=session.get("session_id"),
+            )
+    finally:
+        if wait:
+            tracker.close()
 
 
 def main() -> None:
