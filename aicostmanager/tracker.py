@@ -135,6 +135,7 @@ class Tracker:
         usage: Dict[str, Any],
         *,
         response_id: Optional[str] = None,
+        timestamp: str | datetime | None = None,
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -147,6 +148,9 @@ class Tracker:
         response_id:
             Optional identifier to associate with the usage record. If not
             provided a random UUID4 hex string is generated.
+        timestamp:
+            Optional ISO formatted timestamp for the usage record. When not
+            supplied the current UTC time is used.
         client_customer_key:
             Optional identifier for grouping usage by customer.
         context:
@@ -170,7 +174,11 @@ class Tracker:
         record: Dict[str, Any] = {
             "config_id": self.config_id,
             "service_id": self.service_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": (
+                timestamp.isoformat()
+                if isinstance(timestamp, datetime)
+                else timestamp or datetime.now(timezone.utc).isoformat()
+            ),
             "response_id": response_id or uuid4().hex,
             "usage": usage,
         }
