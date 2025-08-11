@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.17] - 2025-08-11
 ### Added
+
 - REST API tracking guide (`docs/rest.md`) and example script `examples/heygen_sync.py` showing batch/manual tracking with `Tracker`
 - Per-call context support in REST wrappers via `set_client_customer_key()` and `set_context()`
 
