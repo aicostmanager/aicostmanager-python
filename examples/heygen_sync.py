@@ -9,10 +9,10 @@ started automatically for each worker process so the task only needs to enqueue
 payloads.
 
 To **guarantee** that all usage records are delivered before the task finishes,
-call :func:`sync_streaming_sessions` with ``wait=True`` (the default). This
-stops the background worker after the queue is drained. The next task that
-needs to send usage data will spawn a new worker automatically via
-``get_global_delivery``.
+call :func:`sync_streaming_sessions` with ``wait=True`` (the default). The
+function closes the tracker in a ``finally`` block which stops the background
+worker after the queue is drained. The next task that needs to send usage data
+will spawn a new worker automatically when a new tracker instance is created.
 
 If you prefer to let delivery continue in the background, pass ``wait=False``;
 the worker thread will keep running after the task returns and will flush the
@@ -28,11 +28,10 @@ Example Celery task::
 """
 
 import os
-from datetime import datetime, timezone
+
 import requests
 
-from aicostmanager.client import CostManagerClient
-from aicostmanager.delivery import get_global_delivery
+from aicostmanager.tracker import Tracker
 
 HEYGEN_API_KEY = os.environ.get("HEYGEN_API_KEY")
 AICM_CONFIG_ID = os.environ.get("AICM_CONFIG_ID")
@@ -74,23 +73,17 @@ def sync_streaming_sessions(page_size: int = 100, *, wait: bool = True) -> None:
         raise RuntimeError(
             "HEYGEN_API_KEY, AICM_CONFIG_ID, and AICM_SERVICE_ID must be set in the environment",
         )
+    tracker = Tracker(AICM_CONFIG_ID, AICM_SERVICE_ID, delivery_on_full="block")
 
-    cm_client = CostManagerClient()
-    delivery = get_global_delivery(cm_client, on_full="block")
-
-    for session in iter_sessions(page_size=page_size):
-        payload = {
-            "config_id": AICM_CONFIG_ID,
-            "service_id": AICM_SERVICE_ID,
-            "timestamp": session.get("start_time")
-            or datetime.now(timezone.utc).isoformat(),
-            "response_id": session.get("session_id"),
-            "usage": {"duration": session.get("duration")},
-        }
-        delivery.deliver({"usage_records": [payload]})
-
-    if wait:
-        delivery.stop()
+    try:
+        for session in iter_sessions(page_size=page_size):
+            tracker.track(
+                {"duration": session.get("duration")},
+                response_id=session.get("session_id"),
+            )
+    finally:
+        if wait:
+            tracker.close()
 
 
 def main() -> None:
