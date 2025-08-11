@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, Iterator, List, Optional
+import weakref
 
 from .client import CostManagerClient, UsageLimitExceeded
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
@@ -266,6 +267,7 @@ class _StreamIterator:
         self._kwargs = kwargs
         self._last = None
         self._finalized = False
+        weakref.finalize(self, self._finalise_if_needed)
 
     def __iter__(self) -> Iterator:
         for item in self._iterator:
@@ -293,6 +295,11 @@ class _StreamIterator:
     def __getattr__(self, name):
         """Proxy attribute access to the underlying iterator."""
         return getattr(self._iterator, name)
+
+    def _finalise_if_needed(self) -> None:
+        if not self._finalized:
+            self._finalise()
+            self._finalized = True
 
     def _finalise(self) -> None:
         # For Bedrock streaming, merge the original response metadata with the final chunk
@@ -357,6 +364,8 @@ class _AsyncStreamIterator:
         self._args = args
         self._kwargs = kwargs
         self._last = None
+        self._finalized = False
+        weakref.finalize(self, self._finalise_if_needed)
 
     def __aiter__(self):
         return self
@@ -365,7 +374,9 @@ class _AsyncStreamIterator:
         try:
             item = await self._iterator.__anext__()
         except StopAsyncIteration:
-            self._finalise()
+            if not self._finalized:
+                self._finalise()
+                self._finalized = True
             raise
         else:
             self._last = item
@@ -385,6 +396,11 @@ class _AsyncStreamIterator:
             for payload in payloads:
                 self._manager._augment_payload(payload)
                 self._manager.delivery.deliver({"usage_records": [payload]})
+
+    def _finalise_if_needed(self) -> None:
+        if not self._finalized:
+            self._finalise()
+            self._finalized = True
 
 
 class NestedAttributeWrapper:
