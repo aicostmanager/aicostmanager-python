@@ -18,6 +18,7 @@ import threading
 import time
 import logging
 import io
+import atexit
 from contextlib import contextmanager
 from typing import Any, Optional, Callable
 
@@ -239,6 +240,9 @@ def get_global_delivery(
             max_batch_size=max_batch_size,
         )
         _global_delivery.start()
+        if not getattr(_global_delivery, "_atexit_registered", False):
+            atexit.register(_global_delivery.stop)
+            _global_delivery._atexit_registered = True
 
         # Ensure the delivery thread is restarted in forked worker processes
         try:  # pragma: no cover - optional multiprocessing hook
