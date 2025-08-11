@@ -268,6 +268,10 @@ class _StreamIterator:
         self._last = None
         # Prefer an event that actually carries final data (e.g., usage)
         self._best_final = None
+        # Capture best-known usage/id/model observed during the stream
+        self._final_usage = None
+        self._final_id = None
+        self._final_model = None
         self._finalized = False
         weakref.finalize(self, self._finalise_if_needed)
 
@@ -311,9 +315,53 @@ class _StreamIterator:
             usage = getattr(item, "usage", None)
             if usage is not None:
                 self._best_final = item
+                self._final_usage = usage
+            # Some SDKs place usage on a nested message
+            message = getattr(item, "message", None)
+            if message is not None:
+                nested_usage = getattr(message, "usage", None)
+                if nested_usage is not None:
+                    self._best_final = item
+                    self._final_usage = nested_usage
+                # Capture id/model if present on nested message
+                if self._final_id is None:
+                    self._final_id = getattr(message, "id", None)
+                if self._final_model is None:
+                    self._final_model = getattr(message, "model", None)
+            # Capture id/model if present on the item itself
+            if self._final_id is None:
+                self._final_id = getattr(item, "id", self._final_id)
+            if self._final_model is None:
+                self._final_model = getattr(item, "model", self._final_model)
         except Exception:
             # Be conservative; if anything goes wrong, ignore and proceed
             pass
+
+    def _ensure_usage_container(self, final_response: Any) -> Any:
+        """Ensure the response we pass to the extractor exposes usage/id/model.
+
+        If the chosen final_response lacks a direct usage attribute but we
+        captured one during streaming, return a minimal dict with those fields.
+        """
+        try:
+            has_usage = getattr(final_response, "usage", None) is not None
+            if not has_usage and isinstance(final_response, dict):
+                has_usage = final_response.get("usage") is not None
+        except Exception:
+            has_usage = False
+
+        if has_usage or self._final_usage is None:
+            return final_response
+
+        # Build a minimal container that the extractor can read from
+        return {
+            "usage": self._final_usage,
+            # Prefer actual id/model from final event or fall back to observed
+            "id": getattr(final_response, "id", None) or self._final_id,
+            "model": getattr(final_response, "model", None)
+            or self._final_model
+            or self._kwargs.get("model"),
+        }
 
     def _finalise_if_needed(self) -> None:
         if not self._finalized:
@@ -334,6 +382,7 @@ class _StreamIterator:
                 "ResponseMetadata": self._iterator["ResponseMetadata"],
             }
 
+        final_response = self._ensure_usage_container(final_response)
         payloads = self._manager.extractor.process_call(
             self._method,
             self._args,
@@ -385,6 +434,9 @@ class _AsyncStreamIterator:
         self._kwargs = kwargs
         self._last = None
         self._best_final = None
+        self._final_usage = None
+        self._final_id = None
+        self._final_model = None
         self._finalized = False
         weakref.finalize(self, self._finalise_if_needed)
 
@@ -406,16 +458,33 @@ class _AsyncStreamIterator:
                 usage = getattr(item, "usage", None)
                 if usage is not None:
                     self._best_final = item
+                    self._final_usage = usage
+                message = getattr(item, "message", None)
+                if message is not None:
+                    nested_usage = getattr(message, "usage", None)
+                    if nested_usage is not None:
+                        self._best_final = item
+                        self._final_usage = nested_usage
+                    if self._final_id is None:
+                        self._final_id = getattr(message, "id", None)
+                    if self._final_model is None:
+                        self._final_model = getattr(message, "model", None)
+                if self._final_id is None:
+                    self._final_id = getattr(item, "id", self._final_id)
+                if self._final_model is None:
+                    self._final_model = getattr(item, "model", self._final_model)
             except Exception:
                 pass
             return item
 
     def _finalise(self) -> None:
+        final_response = self._best_final or self._last
+        final_response = self._ensure_usage_container(final_response)
         payloads = self._manager.extractor.process_call(
             self._method,
             self._args,
             self._kwargs,
-            self._best_final or self._last,
+            final_response,
             client=self._manager.client,
             is_streaming=True,
         )
