@@ -34,6 +34,9 @@ filterwarnings = [
 ]
 
 [dependency-groups]
+dev = [
+    "bump-my-version>=1.2.1",
+]
 test = [
     "openai",
     "pytest",
@@ -56,6 +59,7 @@ dev = [
 current_version = "0.1.18"
 commit = true
 tag = true
+allow_dirty = true
 
 [[tool.bumpversion.files]]
 filename = "pyproject.toml"
