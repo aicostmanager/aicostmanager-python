@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.17] - 2025-08-11
+### Added
+- REST API tracking guide (`docs/rest.md`) and example script `examples/heygen_sync.py` showing batch/manual tracking with `Tracker`
+- Per-call context support in REST wrappers via `set_client_customer_key()` and `set_context()`
+
+### Enhanced
+- `UniversalExtractor`: base_url autodetection, streaming `final_fields` support, UUID generation for missing `response_id`, and broader JSON serialization (httpx.URL/urllib `ParseResult`, Pydantic `model_dump`, objects with `dict`/`__dict__`)
+- `RestCostManager` and `AsyncRestCostManager`: pre-request triggered limit checks, delivery batching controls (`delivery_mode`, `on_full`, batch size/interval), and context manager helpers
+- Documentation refreshed with REST wrapper usage and FastAPI tracker lifecycle guidance
+
+### Fixed
+- More defensive extraction error handling so failures never block delivery
+- Minor documentation link/formatting consistency
+
 ## [0.1.15] - 2025-01-07
 ### Enhanced
 - Documentation updated to be uv-first across the project (installation and dev workflows)
