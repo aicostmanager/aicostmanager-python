@@ -41,14 +41,17 @@ The project uses [bump-my-version](https://github.com/callowayproject/bump-my-ve
 - `major` - for breaking changes (0.1.12 → 1.0.0)
 
 ```bash
-# For a patch release (most common):
+# RECOMMENDED: Use the convenience script to avoid uv.lock conflicts
+./scripts/bump_version.sh patch    # for patch releases (most common)
+./scripts/bump_version.sh minor    # for minor releases  
+./scripts/bump_version.sh major    # for major releases
+
+# OR: Use direct command (requires activated virtual environment)
+source .venv/bin/activate
 bump-my-version bump patch
 
-# For a minor release:
-bump-my-version bump minor
-
-# For a major release:
-bump-my-version bump major
+# AVOID: Don't use 'uv run' as it can modify uv.lock before checking clean status
+# uv run bump-my-version bump patch  # ❌ This causes the uv.lock issue
 ```
 
 **What this does:**
@@ -169,7 +172,7 @@ twine upload dist/*
 ```bash
 # Complete release process:
 git status && git push origin main
-bump-my-version bump patch
+./scripts/bump_version.sh patch
 # Edit CHANGELOG.md
 git add CHANGELOG.md && git commit -m "Update changelog for vX.X.X"
 git push origin main && git push origin --tags
