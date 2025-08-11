@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Iterator, List, Optional
 import weakref
+from typing import Any, Dict, Iterable, Iterator, List, Optional
 
 from .client import CostManagerClient, UsageLimitExceeded
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
@@ -266,12 +266,16 @@ class _StreamIterator:
         self._args = args
         self._kwargs = kwargs
         self._last = None
+        # Prefer an event that actually carries final data (e.g., usage)
+        self._best_final = None
         self._finalized = False
         weakref.finalize(self, self._finalise_if_needed)
 
     def __iter__(self) -> Iterator:
         for item in self._iterator:
             self._last = item
+            # Track the most informative event to use for final extraction
+            self._consider_best_final(item)
             yield item
         # Only finalize if not already done (e.g., by nested iterator)
         if not self._finalized:
@@ -296,6 +300,21 @@ class _StreamIterator:
         """Proxy attribute access to the underlying iterator."""
         return getattr(self._iterator, name)
 
+    def _consider_best_final(self, item: Any) -> None:
+        """Select the most useful event for final extraction.
+
+        Preference order:
+        1) Any event that has a non-null `usage` attribute
+        2) Otherwise, keep existing selection; fall back to last item
+        """
+        try:
+            usage = getattr(item, "usage", None)
+            if usage is not None:
+                self._best_final = item
+        except Exception:
+            # Be conservative; if anything goes wrong, ignore and proceed
+            pass
+
     def _finalise_if_needed(self) -> None:
         if not self._finalized:
             self._finalise()
@@ -303,7 +322,7 @@ class _StreamIterator:
 
     def _finalise(self) -> None:
         # For Bedrock streaming, merge the original response metadata with the final chunk
-        final_response = self._last
+        final_response = self._best_final or self._last
         if (
             hasattr(self._iterator, "get")
             and "ResponseMetadata" in self._iterator
@@ -340,6 +359,7 @@ class _NestedStreamIterator:
     def __iter__(self) -> Iterator:
         for item in self._nested_iterator:
             self._parent._last = item  # Track the last item in the parent
+            self._parent._consider_best_final(item)
             yield item
         # Finalize when nested iteration completes
         if not self._parent._finalized:
@@ -364,6 +384,7 @@ class _AsyncStreamIterator:
         self._args = args
         self._kwargs = kwargs
         self._last = None
+        self._best_final = None
         self._finalized = False
         weakref.finalize(self, self._finalise_if_needed)
 
@@ -380,6 +401,13 @@ class _AsyncStreamIterator:
             raise
         else:
             self._last = item
+            # Track the most informative event to use for final extraction
+            try:
+                usage = getattr(item, "usage", None)
+                if usage is not None:
+                    self._best_final = item
+            except Exception:
+                pass
             return item
 
     def _finalise(self) -> None:
@@ -387,7 +415,7 @@ class _AsyncStreamIterator:
             self._method,
             self._args,
             self._kwargs,
-            self._last,
+            self._best_final or self._last,
             client=self._manager.client,
             is_streaming=True,
         )
