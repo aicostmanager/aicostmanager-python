@@ -1,6 +1,6 @@
 """Python SDK for the AICostManager API."""
 
-__version__ = "0.1.19"
+__version__ = "0.1.20"
 
 from .async_cost_manager import AsyncCostManager
 from .client import (
