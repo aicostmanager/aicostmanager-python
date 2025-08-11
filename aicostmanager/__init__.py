@@ -1,6 +1,6 @@
 """Python SDK for the AICostManager API."""
 
-__version__ = "0.1.16"
+__version__ = "0.1.17"
 
 from .async_cost_manager import AsyncCostManager
 from .client import (
@@ -18,7 +18,6 @@ from .delivery import (
     get_global_delivery,
     get_global_delivery_health,
 )
-from .tracker import Tracker, UsageValidationError
 from .models import (
     ApiUsageRecord,
     ApiUsageRequest,
@@ -45,6 +44,7 @@ from .models import (
     VendorOut,
 )
 from .rest_cost_manager import AsyncRestCostManager, RestCostManager
+from .tracker import Tracker, UsageValidationError
 from .universal_extractor import UniversalExtractor
 
 __all__ = [
