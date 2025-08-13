@@ -149,7 +149,9 @@ class PersistentDelivery:
                 (data, now, now, now),
             )
             self.conn.commit()
-            return cur.lastrowid
+            msg_id = cur.lastrowid
+        logger.debug("Enqueued message id=%s", msg_id)
+        return msg_id
 
     def _get_batch(self, limit: int = 100) -> List[sqlite3.Row]:
         """Fetch up to ``limit`` queued rows and mark them processing."""
@@ -166,7 +168,10 @@ class PersistentDelivery:
                     [(now, row["id"]) for row in rows],
                 )
                 self.conn.commit()
-            return rows
+        if rows and logger.isEnabledFor(logging.DEBUG):
+            ids = ", ".join(str(row["id"]) for row in rows)
+            logger.debug("Fetched %d messages for processing: %s", len(rows), ids)
+        return rows
 
     def _reschedule(self, row_id: int, retry_count: int) -> None:
         if retry_count >= self.max_retries:
@@ -181,11 +186,19 @@ class PersistentDelivery:
                 (status, retry_count, scheduled, time.time(), row_id),
             )
             self.conn.commit()
+        logger.debug(
+            "Rescheduled message id=%s retry=%s status=%s next_at=%.2f",
+            row_id,
+            retry_count,
+            status,
+            scheduled,
+        )
 
     def _delete(self, row_id: int) -> None:
         with self._lock:
             self.conn.execute("DELETE FROM queue WHERE id=?", (row_id,))
             self.conn.commit()
+        logger.debug("Deleted message id=%s", row_id)
 
     def _flush_buffer(self, buffer: List[sqlite3.Row]) -> None:
         """Send and remove all messages currently in ``buffer``.
@@ -195,11 +208,16 @@ class PersistentDelivery:
         """
         if not buffer:
             return
+        if logger.isEnabledFor(logging.DEBUG):
+            ids = ", ".join(str(row["id"]) for row in buffer)
+            logger.debug("Flushing %d messages: %s", len(buffer), ids)
         payloads = [json.loads(row["payload"]) for row in buffer]
         try:
             self.deliver_batch(payloads)
             for row in buffer:
                 self._delete(row["id"])
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Delivered %d messages", len(buffer))
         except Exception:
             logger.exception("Batch delivery failed")
             for row in buffer:
@@ -210,6 +228,7 @@ class PersistentDelivery:
     # ------------------------------------------------------------------
     # Worker
     def _run_worker(self) -> None:
+        logger.debug("Worker thread started")
         buffer: List[sqlite3.Row] = []
         first_ts: float | None = None
         while not self._stop_event.is_set():
@@ -243,6 +262,7 @@ class PersistentDelivery:
         # Final flush when stopping to ensure no messages are dropped
         if buffer:
             self._flush_buffer(buffer)
+        logger.debug("Worker thread stopping")
 
     # ------------------------------------------------------------------
     # Delivery methods
