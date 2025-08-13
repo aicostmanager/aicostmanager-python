@@ -1,159 +1,47 @@
 import asyncio
-import pytest
 
-from aicostmanager.config_manager import Config, CostManagerConfig
-from aicostmanager.tracker import Tracker, UsageValidationError
+from aicostmanager.tracker import Tracker
 
 
 class DummyDelivery:
     def __init__(self):
-        self.payloads = []
+        self.enqueued = []
+        self.sent = []
 
-    def deliver(self, payload):
-        self.payloads.append(payload)
+    def enqueue(self, payload):
+        self.enqueued.append(payload)
 
+    def deliver_now(self, payload):
+        self.sent.append(payload)
 
-class StopDelivery(DummyDelivery):
-    def __init__(self):
-        super().__init__()
-        self.stopped = False
-
-    def stop(self):
-        self.stopped = True
+    async def deliver_now_async(self, payload):
+        self.sent.append(payload)
 
 
-def test_tracker_valid_usage(monkeypatch):
-    cfg = Config(
-        uuid="u",
-        config_id="cfg",
-        api_id="api",
-        last_updated="now",
-        handling_config={},
-        manual_usage_schema={"tokens": "int", "model": "str"},
-    )
-
-    def fake_get_config_by_id(self, config_id):
-        return cfg
-
-    monkeypatch.setattr(CostManagerConfig, "get_config_by_id", fake_get_config_by_id)
+def test_tracker_enqueue():
     delivery = DummyDelivery()
-    tracker = Tracker("cfg", "svc", aicm_api_key="sk-test", delivery=delivery)
+    tracker = Tracker(delivery=delivery)
+    tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
+    assert delivery.enqueued
+    record = delivery.enqueued[0]
+    assert record["api_id"] == "openai"
+    assert record["service_key"] == "gpt-5-mini"
+    assert "payload" in record
 
-    tracker.track({"tokens": 10, "model": "gpt"})
-    assert len(delivery.payloads) == 1
-    record = delivery.payloads[0]["usage_records"][0]
-    assert record["usage"]["tokens"] == 10
-    assert record["service_id"] == "svc"
 
-
-def test_tracker_custom_response_id(monkeypatch):
-    cfg = Config(
-        uuid="u",
-        config_id="cfg",
-        api_id="api",
-        last_updated="now",
-        handling_config={},
-        manual_usage_schema={"tokens": "int", "model": "str"},
-    )
-
-    def fake_get_config_by_id(self, config_id):
-        return cfg
-
-    monkeypatch.setattr(CostManagerConfig, "get_config_by_id", fake_get_config_by_id)
+def test_tracker_sync_delivery():
     delivery = DummyDelivery()
-    tracker = Tracker("cfg", "svc", aicm_api_key="sk-test", delivery=delivery)
-
-    tracker.track({"tokens": 10, "model": "gpt"}, response_id="session123")
-    record = delivery.payloads[0]["usage_records"][0]
-    assert record["response_id"] == "session123"
+    tracker = Tracker(delivery=delivery)
+    tracker.track_sync("openai", "gpt-5-mini", {"input_tokens": 1})
+    assert delivery.sent
 
 
-def test_tracker_custom_timestamp(monkeypatch):
-    cfg = Config(
-        uuid="u",
-        config_id="cfg",
-        api_id="api",
-        last_updated="now",
-        handling_config={},
-        manual_usage_schema={"tokens": "int", "model": "str"},
-    )
-
-    def fake_get_config_by_id(self, config_id):
-        return cfg
-
-    monkeypatch.setattr(CostManagerConfig, "get_config_by_id", fake_get_config_by_id)
+def test_tracker_async_delivery():
     delivery = DummyDelivery()
-    tracker = Tracker("cfg", "svc", aicm_api_key="sk-test", delivery=delivery)
+    tracker = Tracker(delivery=delivery)
 
-    tracker.track(
-        {"tokens": 10, "model": "gpt"}, timestamp="2024-01-01T00:00:00Z"
-    )
-    record = delivery.payloads[0]["usage_records"][0]
-    assert record["timestamp"] == "2024-01-01T00:00:00Z"
-
-
-def test_tracker_invalid_usage(monkeypatch):
-    cfg = Config(
-        uuid="u",
-        config_id="cfg",
-        api_id="api",
-        last_updated="now",
-        handling_config={},
-        manual_usage_schema={"tokens": "int"},
-    )
-
-    def fake_get_config_by_id(self, config_id):
-        return cfg
-
-    monkeypatch.setattr(CostManagerConfig, "get_config_by_id", fake_get_config_by_id)
-    tracker = Tracker("cfg", "svc", aicm_api_key="sk-test", delivery=DummyDelivery())
-
-    with pytest.raises(UsageValidationError):
-        tracker.track({"tokens": "wrong"})
-
-
-def test_tracker_async_factory(monkeypatch):
-    cfg = Config(
-        uuid="u",
-        config_id="cfg",
-        api_id="api",
-        last_updated="now",
-        handling_config={},
-        manual_usage_schema={"tokens": "int", "model": "str"},
-    )
-
-    def fake_get_config_by_id(self, config_id):
-        return cfg
-
-    monkeypatch.setattr(CostManagerConfig, "get_config_by_id", fake_get_config_by_id)
-    delivery = DummyDelivery()
-
-    async def run() -> None:
-        tracker = await Tracker.create_async(
-            "cfg", "svc", aicm_api_key="sk-test", delivery=delivery
-        )
-        tracker.track({"tokens": 10, "model": "gpt"})
-        assert len(delivery.payloads) == 1
+    async def run():
+        await tracker.track_sync_async("openai", "gpt-5-mini", {"input_tokens": 1})
 
     asyncio.run(run())
-
-
-def test_tracker_close(monkeypatch):
-    cfg = Config(
-        uuid="u",
-        config_id="cfg",
-        api_id="api",
-        last_updated="now",
-        handling_config={},
-        manual_usage_schema={}
-    )
-
-    def fake_get_config_by_id(self, config_id):
-        return cfg
-
-    monkeypatch.setattr(CostManagerConfig, "get_config_by_id", fake_get_config_by_id)
-    delivery = StopDelivery()
-    tracker = Tracker("cfg", "svc", aicm_api_key="sk-test", delivery=delivery)
-
-    tracker.close()
-    assert delivery.stopped
+    assert delivery.sent

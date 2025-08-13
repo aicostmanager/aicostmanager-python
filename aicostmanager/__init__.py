@@ -18,6 +18,7 @@ from .delivery import (
     get_global_delivery,
     get_global_delivery_health,
 )
+from .persistent_delivery import PersistentDelivery
 from .models import (
     ApiUsageRecord,
     ApiUsageRequest,
@@ -44,7 +45,7 @@ from .models import (
     VendorOut,
 )
 from .rest_cost_manager import AsyncRestCostManager, RestCostManager
-from .tracker import Tracker, UsageValidationError
+from .tracker import Tracker
 from .universal_extractor import UniversalExtractor
 
 __all__ = [
@@ -61,10 +62,10 @@ __all__ = [
     "CostManagerConfig",
     "UniversalExtractor",
     "ResilientDelivery",
+    "PersistentDelivery",
     "get_global_delivery",
     "get_global_delivery_health",
     "Tracker",
-    "UsageValidationError",
     "ApiUsageRecord",
     "ApiUsageRequest",
     "ApiUsageResponse",
