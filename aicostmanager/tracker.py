@@ -1,137 +1,83 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-import asyncio
 from uuid import uuid4
 
-from .client import CostManagerClient
-from .config_manager import Config, CostManagerConfig
-from .delivery import ResilientDelivery, get_global_delivery
-from .type_validator import TypeValidator
-
-
-class UsageValidationError(ValueError):
-    """Raised when supplied usage data fails schema validation."""
-
-    def __init__(
-        self,
-        errors: Dict[str, str] | None = None,
-        missing_fields: list[str] | None = None,
-        extra_fields: list[str] | None = None,
-    ) -> None:
-        errors = errors or {}
-        missing_fields = missing_fields or []
-        extra_fields = extra_fields or []
-        messages = []
-        if missing_fields:
-            messages.append(f"Missing fields: {', '.join(missing_fields)}")
-        if errors:
-            messages.append(
-                "Type errors: "
-                + "; ".join(f"{field}: {msg}" for field, msg in errors.items())
-            )
-        if extra_fields:
-            messages.append(f"Unexpected fields: {', '.join(extra_fields)}")
-        super().__init__("; ".join(messages))
-        self.errors = errors
-        self.missing_fields = missing_fields
-        self.extra_fields = extra_fields
+from .persistent_delivery import PersistentDelivery
 
 
 class Tracker:
-    """Manually track usage for a given configuration and service."""
+    """Lightweight usage tracker for the new ``/track`` endpoint."""
 
     def __init__(
         self,
-        config_id: str,
-        service_id: str,
         *,
+        delivery: PersistentDelivery | None = None,
         aicm_api_key: Optional[str] = None,
         aicm_api_base: Optional[str] = None,
         aicm_api_url: Optional[str] = None,
         aicm_ini_path: Optional[str] = None,
-        delivery: ResilientDelivery | None = None,
-        delivery_queue_size: int = 1000,
-        delivery_max_retries: int = 5,
-        delivery_timeout: float = 10.0,
-        delivery_batch_interval: float | None = None,
-        delivery_max_batch_size: int = 100,
-        delivery_mode: str | None = None,
-        delivery_on_full: str | None = None,
+        db_path: Optional[str] = None,
+        log_file: Optional[str] = None,
+        log_level: Optional[str] = None,
+        timeout: float = 10.0,
+        poll_interval: float = 1.0,
+        max_attempts: int = 3,
+        max_retries: int = 5,
     ) -> None:
-        self.config_id = config_id
-        self.service_id = service_id
-        self.cm_client = CostManagerClient(
-            aicm_api_key=aicm_api_key,
-            aicm_api_base=aicm_api_base,
-            aicm_api_url=aicm_api_url,
-            aicm_ini_path=aicm_ini_path,
-        )
-        self.config_manager = CostManagerConfig(self.cm_client)
-        cfg: Config = self.config_manager.get_config_by_id(config_id)
-        self.manual_usage_schema: Dict[str, str] = cfg.manual_usage_schema or {}
-        self._validator = TypeValidator()
         if delivery is not None:
             self.delivery = delivery
         else:
-            self.delivery = get_global_delivery(
-                self.cm_client,
-                max_retries=delivery_max_retries,
-                queue_size=delivery_queue_size,
-                timeout=delivery_timeout,
-                batch_interval=delivery_batch_interval,
-                max_batch_size=delivery_max_batch_size,
-                delivery_mode=delivery_mode,
-                on_full=delivery_on_full,
+            self.delivery = PersistentDelivery(
+                aicm_api_key=aicm_api_key,
+                aicm_api_base=aicm_api_base,
+                aicm_api_url=aicm_api_url,
+                aicm_ini_path=aicm_ini_path,
+                db_path=db_path,
+                log_file=log_file,
+                log_level=log_level,
+                timeout=timeout,
+                poll_interval=poll_interval,
+                max_attempts=max_attempts,
+                max_retries=max_retries,
             )
 
-    @classmethod
-    async def create_async(
-        cls,
-        config_id: str,
-        service_id: str,
+    # ------------------------------------------------------------------
+    def _build_record(
+        self,
+        api_id: str,
+        system_key: str,
+        usage: Dict[str, Any],
         *,
-        aicm_api_key: Optional[str] = None,
-        aicm_api_base: Optional[str] = None,
-        aicm_api_url: Optional[str] = None,
-        aicm_ini_path: Optional[str] = None,
-        delivery: ResilientDelivery | None = None,
-        delivery_queue_size: int = 1000,
-        delivery_max_retries: int = 5,
-        delivery_timeout: float = 10.0,
-        delivery_batch_interval: float | None = None,
-        delivery_max_batch_size: int = 100,
-        delivery_mode: str | None = None,
-        delivery_on_full: str | None = None,
-    ) -> "Tracker":
-        """Asynchronously create a fully initialized :class:`Tracker`.
+        response_id: Optional[str],
+        timestamp: str | datetime | None,
+        client_customer_key: Optional[str],
+        context: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        record: Dict[str, Any] = {
+            "api_id": api_id,
+            "service_key": system_key,
+            "response_id": response_id or uuid4().hex,
+            "timestamp": (
+                timestamp.isoformat()
+                if isinstance(timestamp, datetime)
+                else timestamp or datetime.now(timezone.utc).isoformat()
+            ),
+            "payload": usage,
+        }
+        if client_customer_key is not None:
+            record["client_customer_key"] = client_customer_key
+        if context is not None:
+            record["context"] = context
+        return record
 
-        Configuration loading uses blocking I/O. This factory runs the
-        standard constructor in a thread so callers can ``await`` the
-        result without blocking the event loop.
-        """
-
-        return await asyncio.to_thread(
-            cls,
-            config_id,
-            service_id,
-            aicm_api_key=aicm_api_key,
-            aicm_api_base=aicm_api_base,
-            aicm_api_url=aicm_api_url,
-            aicm_ini_path=aicm_ini_path,
-            delivery=delivery,
-            delivery_queue_size=delivery_queue_size,
-            delivery_max_retries=delivery_max_retries,
-            delivery_timeout=delivery_timeout,
-            delivery_batch_interval=delivery_batch_interval,
-            delivery_max_batch_size=delivery_max_batch_size,
-            delivery_mode=delivery_mode,
-            delivery_on_full=delivery_on_full,
-        )
-
+    # ------------------------------------------------------------------
     def track(
         self,
+        api_id: str,
+        system_key: str,
         usage: Dict[str, Any],
         *,
         response_id: Optional[str] = None,
@@ -139,56 +85,86 @@ class Tracker:
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Validate and deliver a usage record.
+        """Enqueue a usage record for background delivery."""
+        record = self._build_record(
+            api_id,
+            system_key,
+            usage,
+            response_id=response_id,
+            timestamp=timestamp,
+            client_customer_key=client_customer_key,
+            context=context,
+        )
+        self.delivery.enqueue(record)
 
-        Parameters
-        ----------
-        usage:
-            The usage payload to validate and send.
-        response_id:
-            Optional identifier to associate with the usage record. If not
-            provided a random UUID4 hex string is generated.
-        timestamp:
-            Optional ISO formatted timestamp for the usage record. When not
-            supplied the current UTC time is used.
-        client_customer_key:
-            Optional identifier for grouping usage by customer.
-        context:
-            Optional additional metadata to include with the record.
-        """
-        if self.manual_usage_schema:
-            errors: Dict[str, str] = {}
-            missing: list[str] = []
-            for field, type_str in self.manual_usage_schema.items():
-                if field not in usage:
-                    if "Optional" not in type_str:
-                        missing.append(field)
-                    continue
-                is_valid, err = self._validator.validate_value(usage[field], type_str)
-                if not is_valid:
-                    errors[field] = err
-            extra = [f for f in usage if f not in self.manual_usage_schema]
-            if errors or missing or extra:
-                raise UsageValidationError(errors, missing, extra)
+    async def track_async(
+        self,
+        api_id: str,
+        system_key: str,
+        usage: Dict[str, Any],
+        *,
+        response_id: Optional[str] = None,
+        timestamp: str | datetime | None = None,
+        client_customer_key: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        await asyncio.to_thread(
+            self.track,
+            api_id,
+            system_key,
+            usage,
+            response_id=response_id,
+            timestamp=timestamp,
+            client_customer_key=client_customer_key,
+            context=context,
+        )
 
-        record: Dict[str, Any] = {
-            "config_id": self.config_id,
-            "service_id": self.service_id,
-            "timestamp": (
-                timestamp.isoformat()
-                if isinstance(timestamp, datetime)
-                else timestamp or datetime.now(timezone.utc).isoformat()
-            ),
-            "response_id": response_id or uuid4().hex,
-            "usage": usage,
-        }
-        if client_customer_key is not None:
-            record["client_customer_key"] = client_customer_key
-        if context is not None:
-            record["context"] = context
+    # ------------------------------------------------------------------
+    def track_sync(
+        self,
+        api_id: str,
+        system_key: str,
+        usage: Dict[str, Any],
+        *,
+        response_id: Optional[str] = None,
+        timestamp: str | datetime | None = None,
+        client_customer_key: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Immediately deliver a usage record, bypassing the queue."""
+        record = self._build_record(
+            api_id,
+            system_key,
+            usage,
+            response_id=response_id,
+            timestamp=timestamp,
+            client_customer_key=client_customer_key,
+            context=context,
+        )
+        self.delivery.deliver_now(record)
 
-        self.delivery.deliver({"usage_records": [record]})
+    async def track_sync_async(
+        self,
+        api_id: str,
+        system_key: str,
+        usage: Dict[str, Any],
+        *,
+        response_id: Optional[str] = None,
+        timestamp: str | datetime | None = None,
+        client_customer_key: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        record = self._build_record(
+            api_id,
+            system_key,
+            usage,
+            response_id=response_id,
+            timestamp=timestamp,
+            client_customer_key=client_customer_key,
+            context=context,
+        )
+        await self.delivery.deliver_now_async(record)
 
+    # ------------------------------------------------------------------
     def close(self) -> None:
-        """Stop the underlying delivery worker."""
         self.delivery.stop()
