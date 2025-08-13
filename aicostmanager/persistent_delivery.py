@@ -184,6 +184,26 @@ class PersistentDelivery:
             self.conn.execute("DELETE FROM queue WHERE id=?", (row_id,))
             self.conn.commit()
 
+    def _flush_buffer(self, buffer: List[sqlite3.Row]) -> None:
+        """Send and remove all messages currently in ``buffer``.
+
+        Any failures will reschedule the affected messages for a later
+        attempt. The ``buffer`` list is cleared in all cases.
+        """
+        if not buffer:
+            return
+        payloads = [json.loads(row["payload"]) for row in buffer]
+        try:
+            self.deliver_batch(payloads)
+            for row in buffer:
+                self._delete(row["id"])
+        except Exception:
+            logging.exception("Batch delivery failed")
+            for row in buffer:
+                retry = row["retry_count"] + 1
+                self._reschedule(row["id"], retry)
+        buffer.clear()
+
     # ------------------------------------------------------------------
     # Worker
     def _run_worker(self) -> None:
@@ -206,17 +226,7 @@ class PersistentDelivery:
                     should_flush = True
 
             if should_flush:
-                payloads = [json.loads(row["payload"]) for row in buffer]
-                try:
-                    self.deliver_batch(payloads)
-                    for row in buffer:
-                        self._delete(row["id"])
-                except Exception:
-                    logging.exception("Batch delivery failed")
-                    for row in buffer:
-                        retry = row["retry_count"] + 1
-                        self._reschedule(row["id"], retry)
-                buffer.clear()
+                self._flush_buffer(buffer)
                 first_ts = None
                 continue
 
@@ -226,6 +236,10 @@ class PersistentDelivery:
             else:
                 sleep_for = self.poll_interval
             time.sleep(sleep_for)
+
+        # Final flush when stopping to ensure no messages are dropped
+        if buffer:
+            self._flush_buffer(buffer)
 
     # ------------------------------------------------------------------
     # Delivery methods
