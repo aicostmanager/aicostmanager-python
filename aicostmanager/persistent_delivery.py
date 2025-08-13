@@ -208,7 +208,7 @@ class PersistentDelivery:
         """Send a payload immediately with retries."""
         for attempt in Retrying(
             stop=stop_after_attempt(self.max_attempts),
-            wait=wait_exponential_jitter(min=1, max=10),
+            wait=wait_exponential_jitter(initial=1, max=10),
         ):
             with attempt:
                 self._send_once(payload)
@@ -225,7 +225,7 @@ class PersistentDelivery:
 
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(self.max_attempts),
-            wait=wait_exponential_jitter(min=1, max=10),
+            wait=wait_exponential_jitter(initial=1, max=10),
         ):
             with attempt:
                 await _send()
