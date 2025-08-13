@@ -47,6 +47,7 @@ class PersistentDelivery:
         max_attempts: int = 3,
         max_retries: int = 5,
         transport: httpx.BaseTransport | None = None,
+        log_bodies: bool = False,
     ) -> None:
         self.api_key = aicm_api_key or os.getenv("AICM_API_KEY")
         self.api_base = aicm_api_base or os.getenv(
@@ -126,6 +127,12 @@ class PersistentDelivery:
         self.max_attempts = max_attempts
         self.timeout = timeout
         self._transport = transport
+        env_log_bodies = os.getenv("AICM_DELIVERY_LOG_BODIES", "false").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        self.log_bodies = log_bodies or env_log_bodies
         self._client = httpx.Client(timeout=timeout, transport=transport)
         self._endpoint = (
             self.api_base.rstrip("/") + self.api_url.rstrip("/") + "/track"
@@ -265,12 +272,53 @@ class PersistentDelivery:
         logger.debug("Worker thread stopping")
 
     # ------------------------------------------------------------------
+    # Helpers
+    def _redact(self, data: Any) -> Any:
+        if isinstance(data, dict):
+            return {
+                k: ("<redacted>" if k.lower() in {"authorization", "api_key", "apikey"} else self._redact(v))
+                for k, v in data.items()
+            }
+        if isinstance(data, list):
+            return [self._redact(v) for v in data]
+        return data
+
+    # ------------------------------------------------------------------
     # Delivery methods
     def _send_batch_once(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
-        resp = self._client.post(
-            self._endpoint, json={"tracked": payloads}, headers=self._headers
+        body = {"tracked": payloads}
+        payload_size = len(json.dumps(body).encode("utf-8"))
+        logger.debug(
+            "Sending %d payload(s) (%d bytes) to %s",
+            len(payloads),
+            payload_size,
+            self._endpoint,
         )
-        resp.raise_for_status()
+        if self.log_bodies:
+            logger.debug("Request body: %s", self._redact(body))
+        resp = self._client.post(
+            self._endpoint, json=body, headers=self._headers
+        )
+        if self.log_bodies:
+            try:
+                logger.debug("Response body: %s", self._redact(resp.json()))
+            except Exception:
+                logger.debug("Response body: %s", self._redact(resp.text))
+        try:
+            resp.raise_for_status()
+            logger.info(
+                "Batch delivered to %s with status %s",
+                self._endpoint,
+                resp.status_code,
+            )
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "Error delivering batch to %s: status %s body %s",
+                self._endpoint,
+                e.response.status_code,
+                self._redact(e.response.text),
+            )
+            raise
         return resp
 
     def deliver_batch(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
@@ -289,12 +337,41 @@ class PersistentDelivery:
         return self.deliver_batch([payload])
 
     async def _send_batch_async(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
+        body = {"tracked": payloads}
+        payload_size = len(json.dumps(body).encode("utf-8"))
+        logger.debug(
+            "Sending %d payload(s) (%d bytes) to %s",
+            len(payloads),
+            payload_size,
+            self._endpoint,
+        )
+        if self.log_bodies:
+            logger.debug("Request body: %s", self._redact(body))
         async with httpx.AsyncClient(timeout=self.timeout, transport=self._transport) as client:
             resp = await client.post(
-                self._endpoint, json={"tracked": payloads}, headers=self._headers
+                self._endpoint, json=body, headers=self._headers
             )
+        if self.log_bodies:
+            try:
+                logger.debug("Response body: %s", self._redact(resp.json()))
+            except Exception:
+                logger.debug("Response body: %s", self._redact(resp.text))
+        try:
             resp.raise_for_status()
-            return resp
+            logger.info(
+                "Batch delivered to %s with status %s",
+                self._endpoint,
+                resp.status_code,
+            )
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "Error delivering batch to %s: status %s body %s",
+                self._endpoint,
+                e.response.status_code,
+                self._redact(e.response.text),
+            )
+            raise
+        return resp
 
     async def deliver_batch_async(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
         async for attempt in AsyncRetrying(

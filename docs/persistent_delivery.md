@@ -20,6 +20,7 @@ Values can be supplied directly or through environment variables and the
 - `AICM_DELIVERY_DB_PATH`
 - `AICM_DELIVERY_LOG_FILE`
 - `AICM_DELIVERY_LOG_LEVEL`
+- `AICM_DELIVERY_LOG_BODIES`
 
 The same options may be placed in a `[delivery]` section inside the INI file.
 
@@ -46,3 +47,8 @@ Call `stop()` to flush and close resources when shutting down.
 ```
 delivery.stop()
 ```
+
+For troubleshooting, full request and response bodies can be logged (with
+common sensitive fields redacted) by passing `log_bodies=True` when creating
+`PersistentDelivery` or setting the environment variable
+`AICM_DELIVERY_LOG_BODIES`.
