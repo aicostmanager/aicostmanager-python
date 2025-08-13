@@ -3,8 +3,11 @@
 `PersistentDelivery` provides a durable, thread based queue for sending
 usage information to the AICostManager `/track` endpoint. Messages are stored
 in a local SQLite database using write ahead logging so that they survive
-restarts and power loss.  A background worker fetches queued messages and
-retries delivery with exponential backoff.
+restarts and power loss.  A background worker fetches queued messages,
+bundles up to 100 at a time into a single request, and retries delivery with
+exponential backoff. The worker flushes whatever has been collected every
+`batch_interval` seconds (default `0.5`) so it doesn't wait for a full batch
+before sending.
 
 ## Configuration
 
@@ -27,9 +30,9 @@ from aicostmanager import PersistentDelivery
 
 payload = {"api_id": "openai", "service_key": "gpt", "payload": {"tokens": 1}}
 
-delivery = PersistentDelivery(aicm_api_key="sk-test")
-delivery.enqueue(payload)            # queued for background delivery
-delivery.deliver_now(payload)        # immediate delivery
+delivery = PersistentDelivery(aicm_api_key="sk-test", batch_interval=0.5)
+delivery.enqueue(payload)             # queued for background delivery
+delivery.deliver_now(payload)         # immediate delivery of a single record
 ```
 
 The queue can be inspected for health information:

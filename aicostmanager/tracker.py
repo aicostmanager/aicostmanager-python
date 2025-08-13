@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+
+import httpx
 from uuid import uuid4
 
 from .persistent_delivery import PersistentDelivery
@@ -24,6 +26,7 @@ class Tracker:
         log_level: Optional[str] = None,
         timeout: float = 10.0,
         poll_interval: float = 1.0,
+        batch_interval: float = 0.5,
         max_attempts: int = 3,
         max_retries: int = 5,
     ) -> None:
@@ -40,6 +43,7 @@ class Tracker:
                 log_level=log_level,
                 timeout=timeout,
                 poll_interval=poll_interval,
+                batch_interval=batch_interval,
                 max_attempts=max_attempts,
                 max_retries=max_retries,
             )
@@ -120,7 +124,7 @@ class Tracker:
         )
 
     # ------------------------------------------------------------------
-    def track_sync(
+    def sync_track(
         self,
         api_id: str,
         system_key: str,
@@ -130,7 +134,7 @@ class Tracker:
         timestamp: str | datetime | None = None,
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    ) -> httpx.Response:
         """Immediately deliver a usage record, bypassing the queue."""
         record = self._build_record(
             api_id,
@@ -141,9 +145,9 @@ class Tracker:
             client_customer_key=client_customer_key,
             context=context,
         )
-        self.delivery.deliver_now(record)
+        return self.delivery.deliver_now(record)
 
-    async def track_sync_async(
+    async def sync_track_async(
         self,
         api_id: str,
         system_key: str,
@@ -153,7 +157,7 @@ class Tracker:
         timestamp: str | datetime | None = None,
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    ) -> httpx.Response:
         record = self._build_record(
             api_id,
             system_key,
@@ -163,7 +167,11 @@ class Tracker:
             client_customer_key=client_customer_key,
             context=context,
         )
-        await self.delivery.deliver_now_async(record)
+        return await self.delivery.deliver_now_async(record)
+
+    # Backwards compatible aliases
+    track_sync = sync_track
+    track_sync_async = sync_track_async
 
     # ------------------------------------------------------------------
     def close(self) -> None:
