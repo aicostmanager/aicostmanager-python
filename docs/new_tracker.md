@@ -15,13 +15,13 @@ usage = {"input_tokens": 1, "output_tokens": 2}
 tracker.track("openai", "gpt-5-mini", usage)
 ```
 
-Use `track_sync` to send immediately without waiting for the background queue:
+Use `deliver_now` to send immediately without waiting for the background queue:
 
 ```python
-tracker.track_sync("openai", "gpt-5-mini", usage)
+tracker.deliver_now("openai", "gpt-5-mini", usage)
 ```
 
-Both methods also have async counterparts `track_async` and `track_sync_async`
+Both methods also have async counterparts `track_async` and `deliver_now_async`
 for use in frameworks such as FastAPI or when running inside Celery tasks.
 Remember to call `close()` on application shutdown so any background worker can
 terminate cleanly.

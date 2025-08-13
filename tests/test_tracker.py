@@ -33,20 +33,22 @@ def test_tracker_enqueue():
     assert "payload" in record
 
 
-def test_tracker_sync_delivery():
+def test_tracker_deliver_now():
     delivery = DummyDelivery()
     tracker = Tracker(delivery=delivery)
-    resp = tracker.sync_track("openai", "gpt-5-mini", {"input_tokens": 1})
+    resp = tracker.deliver_now("openai", "gpt-5-mini", {"input_tokens": 1})
     assert delivery.sent
     assert resp["ok"]
 
 
-def test_tracker_async_delivery():
+def test_tracker_deliver_now_async():
     delivery = DummyDelivery()
     tracker = Tracker(delivery=delivery)
 
     async def run():
-        resp = await tracker.sync_track_async("openai", "gpt-5-mini", {"input_tokens": 1})
+        resp = await tracker.deliver_now_async(
+            "openai", "gpt-5-mini", {"input_tokens": 1}
+        )
         return resp
 
     resp = asyncio.run(run())
