@@ -26,11 +26,11 @@ tracker.track({
 })
 ```
 
-To bypass the queue and send immediately, use `sync_track` which returns the
+To bypass the queue and send immediately, use `deliver_now` which returns the
 server response:
 
 ```python
-resp = tracker.sync_track("openai", "gpt-5-mini", {"tokens": 1})
+resp = tracker.deliver_now("openai", "gpt-5-mini", {"tokens": 1})
 assert resp.status_code == 200
 ```
 

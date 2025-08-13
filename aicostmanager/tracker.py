@@ -124,7 +124,7 @@ class Tracker:
         )
 
     # ------------------------------------------------------------------
-    def sync_track(
+    def deliver_now(
         self,
         api_id: str,
         system_key: str,
@@ -147,7 +147,7 @@ class Tracker:
         )
         return self.delivery.deliver_now(record)
 
-    async def sync_track_async(
+    async def deliver_now_async(
         self,
         api_id: str,
         system_key: str,
@@ -170,8 +170,10 @@ class Tracker:
         return await self.delivery.deliver_now_async(record)
 
     # Backwards compatible aliases
-    track_sync = sync_track
-    track_sync_async = sync_track_async
+    sync_track = deliver_now
+    sync_track_async = deliver_now_async
+    track_sync = deliver_now
+    track_sync_async = deliver_now_async
 
     # ------------------------------------------------------------------
     def close(self) -> None:
