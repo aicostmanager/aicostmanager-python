@@ -40,6 +40,7 @@ class PersistentDelivery:
         log_level: Optional[str] = None,
         timeout: float = 10.0,
         poll_interval: float = 1.0,
+        batch_interval: float = 0.5,
         max_attempts: int = 3,
         max_retries: int = 5,
         transport: httpx.BaseTransport | None = None,
@@ -117,6 +118,7 @@ class PersistentDelivery:
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self.poll_interval = poll_interval
+        self.batch_interval = batch_interval
         self.max_retries = max_retries
         self.max_attempts = max_attempts
         self.timeout = timeout
@@ -185,21 +187,45 @@ class PersistentDelivery:
     # ------------------------------------------------------------------
     # Worker
     def _run_worker(self) -> None:
+        buffer: List[sqlite3.Row] = []
+        first_ts: float | None = None
         while not self._stop_event.is_set():
-            rows = self._get_batch()
-            if not rows:
-                time.sleep(self.poll_interval)
+            needed = 100 - len(buffer)
+            if needed > 0:
+                rows = self._get_batch(needed)
+                if rows:
+                    buffer.extend(rows)
+                    if first_ts is None:
+                        first_ts = time.time()
+
+            should_flush = False
+            if buffer:
+                if len(buffer) >= 100:
+                    should_flush = True
+                elif first_ts is not None and (time.time() - first_ts) >= self.batch_interval:
+                    should_flush = True
+
+            if should_flush:
+                payloads = [json.loads(row["payload"]) for row in buffer]
+                try:
+                    self.deliver_batch(payloads)
+                    for row in buffer:
+                        self._delete(row["id"])
+                except Exception:
+                    logging.exception("Batch delivery failed")
+                    for row in buffer:
+                        retry = row["retry_count"] + 1
+                        self._reschedule(row["id"], retry)
+                buffer.clear()
+                first_ts = None
                 continue
-            payloads = [json.loads(row["payload"]) for row in rows]
-            try:
-                self.deliver_batch(payloads)
-                for row in rows:
-                    self._delete(row["id"])
-            except Exception:
-                logging.exception("Batch delivery failed")
-                for row in rows:
-                    retry = row["retry_count"] + 1
-                    self._reschedule(row["id"], retry)
+
+            if buffer and first_ts is not None:
+                remaining = self.batch_interval - (time.time() - first_ts)
+                sleep_for = max(0, min(self.poll_interval, remaining))
+            else:
+                sleep_for = self.poll_interval
+            time.sleep(sleep_for)
 
     # ------------------------------------------------------------------
     # Delivery methods

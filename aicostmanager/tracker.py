@@ -26,6 +26,7 @@ class Tracker:
         log_level: Optional[str] = None,
         timeout: float = 10.0,
         poll_interval: float = 1.0,
+        batch_interval: float = 0.5,
         max_attempts: int = 3,
         max_retries: int = 5,
     ) -> None:
@@ -42,6 +43,7 @@ class Tracker:
                 log_level=log_level,
                 timeout=timeout,
                 poll_interval=poll_interval,
+                batch_interval=batch_interval,
                 max_attempts=max_attempts,
                 max_retries=max_retries,
             )

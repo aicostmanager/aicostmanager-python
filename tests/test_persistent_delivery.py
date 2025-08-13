@@ -83,3 +83,37 @@ def test_batch_delivery_groups_messages():
         assert len(batches) == 2
         assert len(batches[0]) == 100
         assert len(batches[1]) == 20
+
+
+def test_timer_flushes_partial_batch():
+    batches = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        batches.append(json.loads(request.content.decode())["tracked"])
+        return httpx.Response(200, json={"ok": True})
+
+    transport = httpx.MockTransport(handler)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "queue.db")
+        delivery = PersistentDelivery(
+            aicm_api_key="test",
+            db_path=db_path,
+            transport=transport,
+            poll_interval=0.1,
+            batch_interval=0.5,
+        )
+
+        payload = {"api_id": "openai", "service_key": "svc", "payload": {}}
+        for _ in range(5):
+            delivery.enqueue(payload)
+
+        for _ in range(20):
+            if delivery.get_stats().get("queued", 0) == 0:
+                break
+            time.sleep(0.1)
+
+        delivery.stop()
+
+        assert len(batches) == 1
+        assert len(batches[0]) == 5
