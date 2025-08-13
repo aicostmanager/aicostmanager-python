@@ -1,5 +1,7 @@
 import asyncio
 
+import asyncio
+
 from aicostmanager.tracker import Tracker
 
 
@@ -13,9 +15,11 @@ class DummyDelivery:
 
     def deliver_now(self, payload):
         self.sent.append(payload)
+        return {"ok": True}
 
     async def deliver_now_async(self, payload):
         self.sent.append(payload)
+        return {"ok": True}
 
 
 def test_tracker_enqueue():
@@ -32,8 +36,9 @@ def test_tracker_enqueue():
 def test_tracker_sync_delivery():
     delivery = DummyDelivery()
     tracker = Tracker(delivery=delivery)
-    tracker.track_sync("openai", "gpt-5-mini", {"input_tokens": 1})
+    resp = tracker.sync_track("openai", "gpt-5-mini", {"input_tokens": 1})
     assert delivery.sent
+    assert resp["ok"]
 
 
 def test_tracker_async_delivery():
@@ -41,7 +46,9 @@ def test_tracker_async_delivery():
     tracker = Tracker(delivery=delivery)
 
     async def run():
-        await tracker.track_sync_async("openai", "gpt-5-mini", {"input_tokens": 1})
+        resp = await tracker.sync_track_async("openai", "gpt-5-mini", {"input_tokens": 1})
+        return resp
 
-    asyncio.run(run())
+    resp = asyncio.run(run())
     assert delivery.sent
+    assert resp["ok"]
