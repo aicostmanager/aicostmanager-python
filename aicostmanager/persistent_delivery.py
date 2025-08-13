@@ -18,6 +18,8 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class PersistentDelivery:
     """Durable queue based delivery using SQLite.
@@ -38,6 +40,7 @@ class PersistentDelivery:
         db_path: Optional[str] = None,
         log_file: Optional[str] = None,
         log_level: Optional[str] = None,
+        logger: Optional[logging.Logger] = None,
         timeout: float = 10.0,
         poll_interval: float = 1.0,
         batch_interval: float = 0.5,
@@ -79,20 +82,20 @@ class PersistentDelivery:
             "AICM_DELIVERY_LOG_LEVEL", "delivery", "log_level", "INFO"
         )).upper()
 
-        if self.log_file:
-            log_dir = os.path.dirname(self.log_file)
-            if log_dir:
-                os.makedirs(log_dir, exist_ok=True)
-            logging.basicConfig(
-                filename=self.log_file,
-                level=getattr(logging, self.log_level, logging.INFO),
-                format="%(asctime)s %(levelname)s %(message)s",
-            )
-        else:
-            logging.basicConfig(
-                level=getattr(logging, self.log_level, logging.INFO),
-                format="%(asctime)s %(levelname)s %(message)s",
-            )
+        self.logger = logger or logging.getLogger(__name__)
+        globals()["logger"] = self.logger
+        self.logger.setLevel(getattr(logging, self.log_level, logging.INFO))
+        if not self.logger.handlers:
+            formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+            if self.log_file:
+                log_dir = os.path.dirname(self.log_file)
+                if log_dir:
+                    os.makedirs(log_dir, exist_ok=True)
+                handler = logging.FileHandler(self.log_file)
+            else:
+                handler = logging.StreamHandler()
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
         db_dir = os.path.dirname(self.db_path)
         if db_dir:
@@ -198,7 +201,7 @@ class PersistentDelivery:
             for row in buffer:
                 self._delete(row["id"])
         except Exception:
-            logging.exception("Batch delivery failed")
+            logger.exception("Batch delivery failed")
             for row in buffer:
                 retry = row["retry_count"] + 1
                 self._reschedule(row["id"], retry)
