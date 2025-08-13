@@ -52,3 +52,5 @@ For troubleshooting, full request and response bodies can be logged (with
 common sensitive fields redacted) by passing `log_bodies=True` when creating
 `PersistentDelivery` or setting the environment variable
 `AICM_DELIVERY_LOG_BODIES`.
+
+See [PersistentDelivery Logging](persistent_delivery_logging.md) for a detailed guide to log configuration and troubleshooting.
