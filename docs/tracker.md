@@ -26,6 +26,14 @@ tracker.track({
 })
 ```
 
+To bypass the queue and send immediately, use `sync_track` which returns the
+server response:
+
+```python
+resp = tracker.sync_track("openai", "gpt-5-mini", {"tokens": 1})
+assert resp.status_code == 200
+```
+
 ## Validation and Errors
 
 If your configuration includes a `manual_usage_schema`, values are validated with the built-in `TypeValidator`. When validation fails a `UsageValidationError` is raised summarizing issues:

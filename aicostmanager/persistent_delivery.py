@@ -146,19 +146,22 @@ class PersistentDelivery:
             self.conn.commit()
             return cur.lastrowid
 
-    def _get_next(self) -> Optional[sqlite3.Row]:
+    def _get_batch(self, limit: int = 100) -> List[sqlite3.Row]:
+        """Fetch up to ``limit`` queued rows and mark them processing."""
         with self._lock:
-            row = self.conn.execute(
-                "SELECT * FROM queue WHERE status='queued' AND scheduled_at <= ? ORDER BY id LIMIT 1",
-                (time.time(),),
-            ).fetchone()
-            if row:
-                self.conn.execute(
+            cur = self.conn.execute(
+                "SELECT * FROM queue WHERE status='queued' AND scheduled_at <= ? ORDER BY id LIMIT ?",
+                (time.time(), limit),
+            )
+            rows = cur.fetchall()
+            if rows:
+                now = time.time()
+                self.conn.executemany(
                     "UPDATE queue SET status='processing', updated_at=? WHERE id=?",
-                    (time.time(), row["id"]),
+                    [(now, row["id"]) for row in rows],
                 )
                 self.conn.commit()
-            return row
+            return rows
 
     def _reschedule(self, row_id: int, retry_count: int) -> None:
         if retry_count >= self.max_retries:
@@ -183,52 +186,64 @@ class PersistentDelivery:
     # Worker
     def _run_worker(self) -> None:
         while not self._stop_event.is_set():
-            row = self._get_next()
-            if not row:
+            rows = self._get_batch()
+            if not rows:
                 time.sleep(self.poll_interval)
                 continue
-            payload = json.loads(row["payload"])
+            payloads = [json.loads(row["payload"]) for row in rows]
             try:
-                self.deliver_now(payload)
-                self._delete(row["id"])
+                self.deliver_batch(payloads)
+                for row in rows:
+                    self._delete(row["id"])
             except Exception:
-                retry = row["retry_count"] + 1
-                logging.exception("Delivery failed for queued item %s", row["id"])
-                self._reschedule(row["id"], retry)
+                logging.exception("Batch delivery failed")
+                for row in rows:
+                    retry = row["retry_count"] + 1
+                    self._reschedule(row["id"], retry)
 
     # ------------------------------------------------------------------
     # Delivery methods
-    def _send_once(self, payload: Dict[str, Any]) -> None:
+    def _send_batch_once(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
         resp = self._client.post(
-            self._endpoint, json=payload, headers=self._headers
+            self._endpoint, json={"tracked": payloads}, headers=self._headers
         )
         resp.raise_for_status()
+        return resp
 
-    def deliver_now(self, payload: Dict[str, Any]) -> None:
-        """Send a payload immediately with retries."""
+    def deliver_batch(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
+        """Send a batch of payloads immediately with retries."""
         for attempt in Retrying(
             stop=stop_after_attempt(self.max_attempts),
             wait=wait_exponential_jitter(initial=1, max=10),
         ):
             with attempt:
-                self._send_once(payload)
+                return self._send_batch_once(payloads)
+        # Retrying guarantees a return or raise, but mypy
+        raise RuntimeError("unreachable")
 
-    async def deliver_now_async(self, payload: Dict[str, Any]) -> None:
-        async def _send() -> None:
-            async with httpx.AsyncClient(
-                timeout=self.timeout, transport=self._transport
-            ) as client:
-                resp = await client.post(
-                    self._endpoint, json=payload, headers=self._headers
-                )
-                resp.raise_for_status()
+    def deliver_now(self, payload: Dict[str, Any]) -> httpx.Response:
+        """Send a single payload immediately."""
+        return self.deliver_batch([payload])
 
+    async def _send_batch_async(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
+        async with httpx.AsyncClient(timeout=self.timeout, transport=self._transport) as client:
+            resp = await client.post(
+                self._endpoint, json={"tracked": payloads}, headers=self._headers
+            )
+            resp.raise_for_status()
+            return resp
+
+    async def deliver_batch_async(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(self.max_attempts),
             wait=wait_exponential_jitter(initial=1, max=10),
         ):
             with attempt:
-                await _send()
+                return await self._send_batch_async(payloads)
+        raise RuntimeError("unreachable")
+
+    async def deliver_now_async(self, payload: Dict[str, Any]) -> httpx.Response:
+        return await self.deliver_batch_async([payload])
 
     # ------------------------------------------------------------------
     # Monitoring
