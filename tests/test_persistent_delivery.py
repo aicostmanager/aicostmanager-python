@@ -3,6 +3,7 @@ import tempfile
 import time
 
 import httpx
+import json
 
 from aicostmanager.persistent_delivery import PersistentDelivery
 
@@ -11,7 +12,9 @@ def test_deliver_now_and_enqueue():
     received = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        received.append(request.json())
+        # httpx.Request no longer exposes a ``json`` method in recent versions,
+        # so parse the body manually for compatibility.
+        received.append(json.loads(request.content.decode()))
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
