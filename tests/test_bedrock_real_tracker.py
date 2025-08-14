@@ -35,14 +35,14 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
 
 
 @pytest.mark.parametrize(
-    "service_key, model_id",
+    "service_key, model",
     [
         ("amazon-bedrock::amazon.nova-pro-v1:0", "amazon.nova-pro-v1:0"),
         ("amazon-bedrock::us.meta.llama3-3-70b-instruct-v1:0", "us.meta.llama3-3-70b-instruct-v1:0"),
         ("amazon-bedrock::us.amazon.nova-pro-v1:0", "us.amazon.nova-pro-v1:0"),
     ],
 )
-def test_bedrock_tracker(service_key, model_id, aws_region, aicm_api_key):
+def test_bedrock_tracker(service_key, model, aws_region, aicm_api_key):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
     tracker = Tracker(
@@ -57,22 +57,24 @@ def test_bedrock_tracker(service_key, model_id, aws_region, aicm_api_key):
         "messages": [{"role": "user", "content": [{"text": "Say hi"}]}],
         "inferenceConfig": {"maxTokens": 50},
     }
-    response = client.converse(modelId=model_id, **body)
+    # Background tracking via queue
+    resp = client.converse(modelId=model, **body)
     response_id = (
-        response.get("output", {}).get("message", {}).get("id")
-        or response.get("ResponseMetadata", {}).get("RequestId")
+        resp.get("output", {}).get("message", {}).get("id")
+        or resp.get("ResponseMetadata", {}).get("RequestId")
     )
     tracker.track("amazon-bedrock", service_key, {"input_tokens": 1}, response_id=response_id)
     _wait_for_cost_event(aicm_api_key, response_id)
 
+    # Immediate delivery
     body2 = {
         "messages": [{"role": "user", "content": [{"text": "Say hi again"}]}],
         "inferenceConfig": {"maxTokens": 50},
     }
-    response2 = client.converse(modelId=model_id, **body2)
+    resp2 = client.converse(modelId=model, **body2)
     response_id2 = (
-        response2.get("output", {}).get("message", {}).get("id")
-        or response2.get("ResponseMetadata", {}).get("RequestId")
+        resp2.get("output", {}).get("message", {}).get("id")
+        or resp2.get("ResponseMetadata", {}).get("RequestId")
     )
     delivery_resp = tracker.deliver_now(
         "amazon-bedrock", service_key, {"input_tokens": 1}, response_id=response_id2
