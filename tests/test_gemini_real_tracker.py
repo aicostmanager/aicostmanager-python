@@ -49,17 +49,17 @@ def test_gemini_tracker(service_key, model, google_api_key, aicm_api_key):
     )
     client = genai.Client(api_key=google_api_key)
 
-    response = client.models.generate_content(model=model, contents="Say hi")
-    response_id = getattr(response, "id", None) or getattr(response, "response_id", None)
-    if not response_id:
-        pytest.skip("No response_id returned by Gemini")
+    # Background tracking via queue
+    resp = client.models.generate_content(model=model, contents="Say hi")
+    response_id = getattr(resp, "id", None) or getattr(resp, "response_id", None)
+    assert response_id, "Gemini did not return response_id"
     tracker.track("gemini", service_key, {"input_tokens": 1}, response_id=response_id)
     _wait_for_cost_event(aicm_api_key, response_id)
 
-    response2 = client.models.generate_content(model=model, contents="Say hi again")
-    response_id2 = getattr(response2, "id", None) or getattr(response2, "response_id", None)
-    if not response_id2:
-        pytest.skip("No response_id returned by Gemini")
+    # Immediate delivery
+    resp2 = client.models.generate_content(model=model, contents="Say hi again")
+    response_id2 = getattr(resp2, "id", None) or getattr(resp2, "response_id", None)
+    assert response_id2, "Gemini did not return response_id"
     delivery_resp = tracker.deliver_now(
         "gemini", service_key, {"input_tokens": 1}, response_id=response_id2
     )

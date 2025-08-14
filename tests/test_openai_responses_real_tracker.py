@@ -48,11 +48,13 @@ def test_openai_responses_tracker(service_key, model, openai_api_key, aicm_api_k
     )
     client = openai.OpenAI(api_key=openai_api_key)
 
+    # Background tracking via queue
     resp = client.responses.create(model=model, input="Say hi")
     response_id = getattr(resp, "id", None)
     tracker.track("openai_responses", service_key, {"input_tokens": 1}, response_id=response_id)
     _wait_for_cost_event(aicm_api_key, response_id)
 
+    # Immediate delivery
     resp2 = client.responses.create(model=model, input="Say hi again")
     response_id2 = getattr(resp2, "id", None)
     delivery_resp = tracker.deliver_now(
