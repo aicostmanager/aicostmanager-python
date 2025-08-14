@@ -64,7 +64,9 @@ class PersistentDelivery:
         if os.path.exists(self.ini_path):
             cp.read(self.ini_path)
 
-        def _cfg(env: str, section: str, option: str, default: Optional[str]) -> Optional[str]:
+        def _cfg(
+            env: str, section: str, option: str, default: Optional[str]
+        ) -> Optional[str]:
             if env and (val := os.getenv(env)):
                 return val
             if cp.has_section(section) and option in cp[section]:
@@ -72,16 +74,18 @@ class PersistentDelivery:
             return default
 
         self.db_path = db_path or _cfg(
-            "AICM_DELIVERY_DB_PATH", "delivery", "db_path", str(
-                Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"
-            )
+            "AICM_DELIVERY_DB_PATH",
+            "delivery",
+            "db_path",
+            str(Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"),
         )
         self.log_file = log_file or _cfg(
             "AICM_DELIVERY_LOG_FILE", "delivery", "log_file", None
         )
-        self.log_level = (log_level or _cfg(
-            "AICM_DELIVERY_LOG_LEVEL", "delivery", "log_level", "INFO"
-        )).upper()
+        self.log_level = (
+            log_level
+            or _cfg("AICM_DELIVERY_LOG_LEVEL", "delivery", "log_level", "INFO")
+        ).upper()
 
         self.logger = logger or logging.getLogger(__name__)
         globals()["logger"] = self.logger
@@ -134,9 +138,7 @@ class PersistentDelivery:
         )
         self.log_bodies = log_bodies or env_log_bodies
         self._client = httpx.Client(timeout=timeout, transport=transport)
-        self._endpoint = (
-            self.api_base.rstrip("/") + self.api_url.rstrip("/") + "/track"
-        )
+        self._endpoint = self.api_base.rstrip("/") + self.api_url.rstrip("/") + "/track"
         self._headers = {
             "Authorization": f"Bearer {self.api_key}",
             "User-Agent": "aicostmanager-python",
@@ -186,7 +188,7 @@ class PersistentDelivery:
             scheduled = time.time()
         else:
             status = "queued"
-            scheduled = time.time() + min(2 ** retry_count, 300)
+            scheduled = time.time() + min(2**retry_count, 300)
         with self._lock:
             self.conn.execute(
                 "UPDATE queue SET status=?, retry_count=?, scheduled_at=?, updated_at=? WHERE id=?",
@@ -251,7 +253,10 @@ class PersistentDelivery:
             if buffer:
                 if len(buffer) >= 100:
                     should_flush = True
-                elif first_ts is not None and (time.time() - first_ts) >= self.batch_interval:
+                elif (
+                    first_ts is not None
+                    and (time.time() - first_ts) >= self.batch_interval
+                ):
                     should_flush = True
 
             if should_flush:
@@ -276,7 +281,11 @@ class PersistentDelivery:
     def _redact(self, data: Any) -> Any:
         if isinstance(data, dict):
             return {
-                k: ("<redacted>" if k.lower() in {"authorization", "api_key", "apikey"} else self._redact(v))
+                k: (
+                    "<redacted>"
+                    if k.lower() in {"authorization", "api_key", "apikey"}
+                    else self._redact(v)
+                )
                 for k, v in data.items()
             }
         if isinstance(data, list):
@@ -287,7 +296,10 @@ class PersistentDelivery:
     # Delivery methods
     def _send_batch_once(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
         body = {"tracked": payloads}
-        payload_size = len(json.dumps(body).encode("utf-8"))
+        # Serialize here to ensure Python None -> JSON null and to have an exact
+        # representation of what is sent over the wire.
+        body_json = json.dumps(body)
+        payload_size = len(body_json.encode("utf-8"))
         logger.debug(
             "Sending %d payload(s) (%d bytes) to %s",
             len(payloads),
@@ -296,9 +308,10 @@ class PersistentDelivery:
         )
         if self.log_bodies:
             logger.debug("Request body: %s", self._redact(body))
-        resp = self._client.post(
-            self._endpoint, json=body, headers=self._headers
-        )
+            logger.debug("Request body (json): %s", body_json)
+        headers = dict(self._headers)
+        headers["Content-Type"] = "application/json"
+        resp = self._client.post(self._endpoint, content=body_json, headers=headers)
         if self.log_bodies:
             try:
                 logger.debug("Response body: %s", self._redact(resp.json()))
@@ -312,13 +325,19 @@ class PersistentDelivery:
                 resp.status_code,
             )
         except httpx.HTTPStatusError as e:
+            # Re-raise with server body included for better diagnostics
+            body_text = e.response.text
             logger.error(
                 "Error delivering batch to %s: status %s body %s",
                 self._endpoint,
                 e.response.status_code,
-                self._redact(e.response.text),
+                self._redact(body_text),
             )
-            raise
+            message = (
+                f"Client error '{e.response.status_code} {e.response.reason_phrase}' for url '{e.request.url}'\n"
+                f"Server response body: {body_text}"
+            )
+            raise httpx.HTTPStatusError(message, request=e.request, response=e.response)
         return resp
 
     def deliver_batch(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
@@ -338,7 +357,8 @@ class PersistentDelivery:
 
     async def _send_batch_async(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
         body = {"tracked": payloads}
-        payload_size = len(json.dumps(body).encode("utf-8"))
+        body_json = json.dumps(body)
+        payload_size = len(body_json.encode("utf-8"))
         logger.debug(
             "Sending %d payload(s) (%d bytes) to %s",
             len(payloads),
@@ -347,10 +367,13 @@ class PersistentDelivery:
         )
         if self.log_bodies:
             logger.debug("Request body: %s", self._redact(body))
-        async with httpx.AsyncClient(timeout=self.timeout, transport=self._transport) as client:
-            resp = await client.post(
-                self._endpoint, json=body, headers=self._headers
-            )
+            logger.debug("Request body (json): %s", body_json)
+        async with httpx.AsyncClient(
+            timeout=self.timeout, transport=self._transport
+        ) as client:
+            headers = dict(self._headers)
+            headers["Content-Type"] = "application/json"
+            resp = await client.post(self._endpoint, content=body_json, headers=headers)
         if self.log_bodies:
             try:
                 logger.debug("Response body: %s", self._redact(resp.json()))
@@ -364,16 +387,24 @@ class PersistentDelivery:
                 resp.status_code,
             )
         except httpx.HTTPStatusError as e:
+            # Re-raise with server body included for better diagnostics
+            body_text = e.response.text
             logger.error(
                 "Error delivering batch to %s: status %s body %s",
                 self._endpoint,
                 e.response.status_code,
-                self._redact(e.response.text),
+                self._redact(body_text),
             )
-            raise
+            message = (
+                f"Client error '{e.response.status_code} {e.response.reason_phrase}' for url '{e.request.url}'\n"
+                f"Server response body: {body_text}"
+            )
+            raise httpx.HTTPStatusError(message, request=e.request, response=e.response)
         return resp
 
-    async def deliver_batch_async(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
+    async def deliver_batch_async(
+        self, payloads: List[Dict[str, Any]]
+    ) -> httpx.Response:
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(self.max_attempts),
             wait=wait_exponential_jitter(initial=1, max=10),
@@ -395,7 +426,9 @@ class PersistentDelivery:
             stats = {row["status"]: row["c"] for row in cur.fetchall()}
         return stats
 
-    def list_messages(self, status: str = "queued", limit: int = 10) -> List[Dict[str, Any]]:
+    def list_messages(
+        self, status: str = "queued", limit: int = 10
+    ) -> List[Dict[str, Any]]:
         with self._lock:
             cur = self.conn.execute(
                 "SELECT id, payload, retry_count, scheduled_at FROM queue WHERE status=? ORDER BY id LIMIT ?",

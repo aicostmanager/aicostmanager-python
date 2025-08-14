@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from uuid import uuid4
 
 import httpx
-from uuid import uuid4
 
 from .persistent_delivery import PersistentDelivery
 
@@ -62,7 +62,6 @@ class Tracker:
     ) -> Dict[str, Any]:
         record: Dict[str, Any] = {
             "api_id": api_id,
-            "service_key": system_key,
             "response_id": response_id or uuid4().hex,
             "timestamp": (
                 timestamp.isoformat()
@@ -71,6 +70,10 @@ class Tracker:
             ),
             "payload": usage,
         }
+        # Only include service_key when provided. Some server-side validators
+        # treat explicit null differently from an omitted field.
+        if system_key is not None:
+            record["service_key"] = system_key
         if client_customer_key is not None:
             record["client_customer_key"] = client_customer_key
         if context is not None:

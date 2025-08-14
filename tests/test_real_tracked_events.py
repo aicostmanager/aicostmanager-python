@@ -1,6 +1,8 @@
 import time
 import uuid
 
+import httpx
+
 from aicostmanager import Tracker
 
 VALID_PAYLOAD = {
@@ -211,7 +213,30 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
     ]
 
     results = []
-    for event in events:
+    for idx, event in enumerate(events):
+        if idx == 1:
+            # Missing service_key: the client raises on 422, so verify behavior via raw HTTP call
+            body = {
+                "tracked": [
+                    {
+                        "api_id": event["api_id"],
+                        # intentionally omit service_key
+                        "response_id": event["response_id"],
+                        "timestamp": event["timestamp"],
+                        "payload": event["payload"],
+                    }
+                ]
+            }
+            with httpx.Client() as client:
+                resp = client.post(
+                    f"{aicm_api_base.rstrip('/')}/api/v1/track",
+                    json=body,
+                    headers={"Authorization": f"Bearer {aicm_api_key}"},
+                )
+            assert resp.status_code == 422, resp.text
+            results.append(resp.json()["event_ids"][0])
+            continue
+
         resp = tracker.deliver_now(
             event["api_id"],
             event.get("service_key"),
@@ -228,9 +253,42 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
     assert results[1]["missing"] == ["Missing service_key"]
     assert results[2]["badformat"] == ["Invalid service_key format"]
     assert results[3]["noservice"] == ["Service not found"]
-    assert results[4]["noapi"] == ["API client not found"]
+    # Accept either legacy or updated message wording from the server
+    assert results[4]["noapi"] in (
+        ["API client not found"],
+        ["ApiClientService configuration not found"],
+    )
     err = results[5]["badpayload"]
     assert isinstance(err, list) and any(
         e.startswith("Payload validation error") for e in err
     )
 
+
+def test_track_missing_response_id_generates_unknown_and_422(
+    aicm_api_key, aicm_api_base
+):
+    # Send directly with httpx to omit response_id entirely.
+    with httpx.Client() as client:
+        body = {
+            "tracked": [
+                {
+                    "api_id": "openai_chat",
+                    "service_key": "openai::gpt-5-mini",
+                    "timestamp": "2025-01-01T00:00:00Z",
+                    "payload": VALID_PAYLOAD,
+                }
+            ]
+        }
+        resp = client.post(
+            f"{aicm_api_base.rstrip('/')}/api/v1/track",
+            json=body,
+            headers={"Authorization": f"Bearer {aicm_api_key}"},
+        )
+    assert resp.status_code == 422, resp.text
+    data = resp.json()
+    assert "event_ids" in data and len(data["event_ids"]) == 1
+    mapping = data["event_ids"][0]
+    assert isinstance(mapping, dict) and len(mapping) == 1
+    key = next(iter(mapping.keys()))
+    assert key.startswith("UNKNOWN-RESPONSE-")
+    assert mapping[key] == ["Missing response_id."]
