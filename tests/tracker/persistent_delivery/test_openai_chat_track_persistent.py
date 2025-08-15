@@ -111,6 +111,7 @@ def test_openai_chat_track_streaming(aicm_api_key):
         messages=[{"role": "user", "content": "Say hi"}],
         max_completion_tokens=20,
         stream=True,
+        stream_options={"include_usage": True},
     )
 
     # Process streaming events to accumulate usage data
