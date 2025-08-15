@@ -7,7 +7,6 @@ import pytest
 
 boto3 = pytest.importorskip("boto3")
 
-from aicostmanager.persistent_delivery import PersistentDelivery
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import extract_usage
 
@@ -73,27 +72,25 @@ def _make_client(region: str):
 def test_bedrock_track_non_streaming(service_key, model, aws_region, aicm_api_key):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    delivery = PersistentDelivery(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    tracker = Tracker(delivery=delivery)
-    client = _make_client(aws_region)
+    ) as tracker:
+        client = _make_client(aws_region)
 
-    body = {
-        "messages": [{"role": "user", "content": [{"text": "Say hi"}]}],
-        "inferenceConfig": {"maxTokens": 50},
-    }
-    resp = client.converse(modelId=model, **body)
-    response_id = resp.get("output", {}).get("message", {}).get("id") or resp.get(
-        "ResponseMetadata", {}
-    ).get("RequestId")
-    usage = extract_usage(resp)
-    tracker.track("amazon-bedrock", service_key, usage, response_id=response_id)
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+        body = {
+            "messages": [{"role": "user", "content": [{"text": "Say hi"}]}],
+            "inferenceConfig": {"maxTokens": 50},
+        }
+        resp = client.converse(modelId=model, **body)
+        response_id = resp.get("output", {}).get("message", {}).get("id") or resp.get(
+            "ResponseMetadata", {}
+        ).get("RequestId")
+        usage = extract_usage(resp)
+        tracker.track("amazon-bedrock", service_key, usage, response_id=response_id)
+        _wait_for_cost_event(aicm_api_key, response_id)
 
 
 @pytest.mark.parametrize(
@@ -109,55 +106,61 @@ def test_bedrock_track_non_streaming(service_key, model, aws_region, aicm_api_ke
 def test_bedrock_track_streaming(service_key, model, aws_region, aicm_api_key):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    delivery = PersistentDelivery(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    tracker = Tracker(delivery=delivery)
-    client = _make_client(aws_region)
+    ) as tracker:
+        client = _make_client(aws_region)
 
-    body = {
-        "messages": [{"role": "user", "content": [{"text": "Say hi"}]}],
-        "inferenceConfig": {"maxTokens": 50},
-    }
-    try:
-        resp = client.converse_stream(modelId=model, **body)
-    except Exception as e:
-        msg = str(e)
-        if (
-            "on-demand throughput isn't supported" in msg
-            or "on-demand throughput isn't supported" in msg
-        ):
-            pytest.skip(
-                "Bedrock model requires provisioned throughput; skipping this case"
-            )
-        raise
-
-    response_id = uuid.uuid4().hex
-    usage_payload = {}
-
-    final_usage = None
-    for chunk in resp["stream"]:
+        body = {
+            "messages": [{"role": "user", "content": [{"text": "Say hi"}]}],
+            "inferenceConfig": {"maxTokens": 50},
+        }
         try:
-            if "metadata" in chunk:
-                print("bedrock metadata usage:", chunk.get("metadata", {}).get("usage"))
-            if "contentBlockDelta" in chunk:
-                print("bedrock content delta:", chunk["contentBlockDelta"].get("delta"))
-        except Exception:
-            pass
-        from aicostmanager.usage_utils import get_streaming_usage_from_response
+            resp = client.converse_stream(modelId=model, **body)
+        except Exception as e:
+            msg = str(e)
+            if (
+                "on-demand throughput isn't supported" in msg
+                or "on-demand throughput isn't supported" in msg
+            ):
+                pytest.skip(
+                    "Bedrock model requires provisioned throughput; skipping this case"
+                )
+            raise
 
-        up = get_streaming_usage_from_response(chunk, "bedrock")
-        if isinstance(up, dict) and up:
-            print("bedrock usage chunk:", json.dumps(up, default=str))
-            final_usage = up
-    if not final_usage:
-        # Bedrock usage is in a metadata chunk towards the end
-        pytest.skip("No usage found in Bedrock streaming response; skipping")
-    usage_payload = final_usage
+        response_id = uuid.uuid4().hex
+        usage_payload = {}
 
-    tracker.track("amazon-bedrock", service_key, usage_payload, response_id=response_id)
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+        final_usage = None
+        for chunk in resp["stream"]:
+            try:
+                if "metadata" in chunk:
+                    print(
+                        "bedrock metadata usage:",
+                        chunk.get("metadata", {}).get("usage"),
+                    )
+                if "contentBlockDelta" in chunk:
+                    print(
+                        "bedrock content delta:",
+                        chunk["contentBlockDelta"].get("delta"),
+                    )
+            except Exception:
+                pass
+            from aicostmanager.usage_utils import get_streaming_usage_from_response
+
+            up = get_streaming_usage_from_response(chunk, "bedrock")
+            if isinstance(up, dict) and up:
+                print("bedrock usage chunk:", json.dumps(up, default=str))
+                final_usage = up
+        if not final_usage:
+            # Bedrock usage is in a metadata chunk towards the end
+            pytest.skip("No usage found in Bedrock streaming response; skipping")
+        usage_payload = final_usage
+
+        tracker.track(
+            "amazon-bedrock", service_key, usage_payload, response_id=response_id
+        )
+        _wait_for_cost_event(aicm_api_key, response_id)

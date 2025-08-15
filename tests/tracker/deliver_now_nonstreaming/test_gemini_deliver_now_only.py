@@ -144,53 +144,56 @@ def test_gemini_deliver_now_only(service_key, model, google_api_key, aicm_api_ke
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
-    tracker = Tracker(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    client = genai.Client(api_key=google_api_key)
+    ) as tracker:
+        client = genai.Client(api_key=google_api_key)
 
-    resp = client.models.generate_content(
-        model=model, contents="Say hi (deliver_now_only)"
-    )
-    response_id = getattr(resp, "id", None) or getattr(resp, "response_id", None)
-    if not response_id:
-        # Debug-print available attributes to help diagnose schema differences
-        try:
-            print("gemini response type:", type(resp))
-            print(
-                "gemini response dir sample:",
-                [a for a in dir(resp) if not a.startswith("__")][:30],
-            )
-        except Exception:
-            pass
-        # Fallback: generate our own correlation id for tracking
-        import uuid as _uuid
-
-        response_id = _uuid.uuid4().hex
-        print("No response_id from Gemini; using generated id:", response_id)
-
-    # Build usage payload from Gemini response
-    raw_usage_payload = _extract_usage_payload(resp)
-    usage_payload = _normalize_gemini_usage(raw_usage_payload)
-    print("raw usage payload:", json.dumps(raw_usage_payload, indent=2, default=str))
-    print("normalized usage payload:", json.dumps(usage_payload, indent=2, default=str))
-
-    try:
-        delivery_resp = tracker.deliver_now(
-            "gemini", service_key, usage_payload, response_id=response_id
+        resp = client.models.generate_content(
+            model=model, contents="Say hi (deliver_now_only)"
         )
-        print("deliver_now status:", delivery_resp.status_code)
+        response_id = getattr(resp, "id", None) or getattr(resp, "response_id", None)
+        if not response_id:
+            # Debug-print available attributes to help diagnose schema differences
+            try:
+                print("gemini response type:", type(resp))
+                print(
+                    "gemini response dir sample:",
+                    [a for a in dir(resp) if not a.startswith("__")][:30],
+                )
+            except Exception:
+                pass
+            # Fallback: generate our own correlation id for tracking
+            import uuid as _uuid
+
+            response_id = _uuid.uuid4().hex
+            print("No response_id from Gemini; using generated id:", response_id)
+
+        # Build usage payload from Gemini response
+        raw_usage_payload = _extract_usage_payload(resp)
+        usage_payload = _normalize_gemini_usage(raw_usage_payload)
+        print(
+            "raw usage payload:", json.dumps(raw_usage_payload, indent=2, default=str)
+        )
+        print(
+            "normalized usage payload:",
+            json.dumps(usage_payload, indent=2, default=str),
+        )
+
         try:
-            print("deliver_now json:", delivery_resp.json())
-        except Exception:
-            print("deliver_now text:", delivery_resp.text)
-    except Exception as e:
-        print("deliver_now raised:", repr(e))
-        raise
+            delivery_resp = tracker.deliver_now(
+                "gemini", service_key, usage_payload, response_id=response_id
+            )
+            print("deliver_now status:", delivery_resp.status_code)
+            try:
+                print("deliver_now json:", delivery_resp.json())
+            except Exception:
+                print("deliver_now text:", delivery_resp.text)
+        except Exception as e:
+            print("deliver_now raised:", repr(e))
+            raise
 
-    _wait_for_cost_event(aicm_api_key, response_id)
-
-    tracker.close()
+        _wait_for_cost_event(aicm_api_key, response_id)

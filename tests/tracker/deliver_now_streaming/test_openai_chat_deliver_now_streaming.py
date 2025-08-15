@@ -59,42 +59,41 @@ def test_openai_chat_deliver_now_streaming(
     if not openai_api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
-    tracker = Tracker(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    client = openai.OpenAI(api_key=openai_api_key)
+    ) as tracker:
+        client = openai.OpenAI(api_key=openai_api_key)
 
-    response_id = uuid.uuid4().hex
-    usage_payload = {}
+        response_id = uuid.uuid4().hex
+        usage_payload = {}
 
-    print("openai chat response_id:", response_id)
-    stream = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": "Say hi (deliver_now_streaming)"}],
-        max_completion_tokens=20,
-        stream=True,
-        stream_options={"include_usage": True},
-    )
-    for chunk in stream:
-        try:
-            print("openai chat chunk has usage:", hasattr(chunk, "usage"))
-        except Exception:
-            pass
-        up = get_streaming_usage_from_response(chunk, "openai_chat")
-        if isinstance(up, dict) and up:
-            print("openai chat usage chunk:", json.dumps(up, default=str))
-            usage_payload = up
+        print("openai chat response_id:", response_id)
+        stream = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "Say hi (deliver_now_streaming)"}],
+            max_completion_tokens=20,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        for chunk in stream:
+            try:
+                print("openai chat chunk has usage:", hasattr(chunk, "usage"))
+            except Exception:
+                pass
+            up = get_streaming_usage_from_response(chunk, "openai_chat")
+            if isinstance(up, dict) and up:
+                print("openai chat usage chunk:", json.dumps(up, default=str))
+                usage_payload = up
 
-    if not usage_payload:
-        pytest.skip("No usage returned in streaming chunks; skipping")
+        if not usage_payload:
+            pytest.skip("No usage returned in streaming chunks; skipping")
 
-    delivery_resp = tracker.deliver_now(
-        "openai_chat", service_key, usage_payload, response_id=response_id
-    )
-    assert delivery_resp.status_code in (200, 201)
+        delivery_resp = tracker.deliver_now(
+            "openai_chat", service_key, usage_payload, response_id=response_id
+        )
+        assert delivery_resp.status_code in (200, 201)
 
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+        _wait_for_cost_event(aicm_api_key, response_id)

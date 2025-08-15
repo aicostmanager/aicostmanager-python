@@ -62,45 +62,44 @@ def test_openai_responses_deliver_now_streaming(
     if not openai_api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
-    tracker = Tracker(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    client = openai.OpenAI(api_key=openai_api_key)
+    ) as tracker:
+        client = openai.OpenAI(api_key=openai_api_key)
 
-    response_id = uuid.uuid4().hex
-    usage_payload = {}
+        response_id = uuid.uuid4().hex
+        usage_payload = {}
 
-    print("openai responses response_id:", response_id)
-    stream = client.responses.stream(
-        model=model,
-        input="Say hi (deliver_now_streaming)",
-    )
-    with stream as s:
-        for event in s:
-            try:
-                print("openai responses event has usage:", hasattr(event, "usage"))
-            except Exception:
-                pass
-            up = get_streaming_usage_from_response(event, "openai_responses")
-            if isinstance(up, dict) and up:
-                print("openai responses usage chunk:", json.dumps(up, default=str))
-                usage_payload = up
+        print("openai responses response_id:", response_id)
+        stream = client.responses.stream(
+            model=model,
+            input="Say hi (deliver_now_streaming)",
+        )
+        with stream as s:
+            for event in s:
+                try:
+                    print("openai responses event has usage:", hasattr(event, "usage"))
+                except Exception:
+                    pass
+                up = get_streaming_usage_from_response(event, "openai_responses")
+                if isinstance(up, dict) and up:
+                    print("openai responses usage chunk:", json.dumps(up, default=str))
+                    usage_payload = up
 
-        # Fallback to final response usage if we didn't catch a chunk
-        final_resp = s.get_final_response()
+            # Fallback to final response usage if we didn't catch a chunk
+            final_resp = s.get_final_response()
+            if not usage_payload:
+                usage_payload = get_usage_from_response(final_resp, "openai_responses")
+
         if not usage_payload:
-            usage_payload = get_usage_from_response(final_resp, "openai_responses")
+            pytest.skip("No usage returned in streaming events; skipping")
 
-    if not usage_payload:
-        pytest.skip("No usage returned in streaming events; skipping")
+        delivery_resp = tracker.deliver_now(
+            "openai_responses", service_key, usage_payload, response_id=response_id
+        )
+        assert delivery_resp.status_code in (200, 201)
 
-    delivery_resp = tracker.deliver_now(
-        "openai_responses", service_key, usage_payload, response_id=response_id
-    )
-    assert delivery_resp.status_code in (200, 201)
-
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+        _wait_for_cost_event(aicm_api_key, response_id)

@@ -11,7 +11,7 @@ from aicostmanager.usage_utils import get_streaming_usage_from_response
 
 boto3 = pytest.importorskip("boto3")
 
-BASE_URL = os.environ.get("AICM_API_BASE", "http://127.0.0.1:8001")
+BASE_URL = "http://127.0.0.1:8001"
 
 
 def _wait_for_cost_event(aicm_api_key: str, response_id: str):
@@ -49,6 +49,10 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str):
     )
 
 
+def _make_client(region: str):
+    return boto3.client("bedrock-runtime", region_name=region)
+
+
 @pytest.mark.parametrize(
     "service_key, model",
     [
@@ -63,62 +67,70 @@ def test_bedrock_deliver_now_streaming(service_key, model, aws_region, aicm_api_
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
-    tracker = Tracker(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    client = boto3.client("bedrock-runtime", region_name=aws_region)
+    ) as tracker:
+        client = _make_client(aws_region)
 
-    response_id = uuid.uuid4().hex
-    usage_payload = {}
+        response_id = uuid.uuid4().hex
+        usage_payload = {}
 
-    body = {
-        "system": [{"text": "You are a helpful assistant."}],
-        "messages": [
-            {"role": "user", "content": [{"text": "Say hi (deliver_now_streaming)"}]}
-        ],
-        "inferenceConfig": {"maxTokens": 50},
-    }
+        body = {
+            "system": [{"text": "You are a helpful assistant."}],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [{"text": "Say hi (deliver_now_streaming)"}],
+                }
+            ],
+            "inferenceConfig": {"maxTokens": 50},
+        }
 
-    request = {"modelId": model, **body}
+        request = {"modelId": model, **body}
 
-    try:
-        resp = client.converse_stream(**request)
-    except Exception as e:
-        msg = str(e)
-        if (
-            "on-demand throughput isn’t supported" in msg
-            or "on-demand throughput isn't supported" in msg
-        ):
-            pytest.skip(
-                "Bedrock model requires provisioned throughput; skipping this case"
-            )
-        raise
-
-    final_usage = None
-    for chunk in resp["stream"]:
         try:
-            if "metadata" in chunk:
-                print("bedrock metadata usage:", chunk.get("metadata", {}).get("usage"))
-            if "contentBlockDelta" in chunk:
-                print("bedrock content delta:", chunk["contentBlockDelta"].get("delta"))
-        except Exception:
-            pass
-        up = get_streaming_usage_from_response(chunk, "bedrock")
-        if isinstance(up, dict) and up:
-            print("bedrock usage chunk:", json.dumps(up, default=str))
-            final_usage = up
-    if not final_usage:
-        # Bedrock usage is in a metadata chunk towards the end
-        pytest.skip("No usage found in Bedrock streaming response; skipping")
-    usage_payload = final_usage
+            resp = client.converse_stream(**request)
+        except Exception as e:
+            msg = str(e)
+            if (
+                "on-demand throughput isn't supported" in msg
+                or "on-demand throughput isn't supported" in msg
+            ):
+                pytest.skip(
+                    "Bedrock model requires provisioned throughput; skipping this case"
+                )
+            raise
 
-    delivery_resp = tracker.deliver_now(
-        "amazon-bedrock", service_key, usage_payload, response_id=response_id
-    )
-    assert delivery_resp.status_code in (200, 201)
+        final_usage = None
+        for chunk in resp["stream"]:
+            try:
+                if "metadata" in chunk:
+                    print(
+                        "bedrock metadata usage:",
+                        chunk.get("metadata", {}).get("usage"),
+                    )
+                if "contentBlockDelta" in chunk:
+                    print(
+                        "bedrock content delta:",
+                        chunk["contentBlockDelta"].get("delta"),
+                    )
+            except Exception:
+                pass
+            up = get_streaming_usage_from_response(chunk, "bedrock")
+            if isinstance(up, dict) and up:
+                print("bedrock usage chunk:", json.dumps(up, default=str))
+                final_usage = up
+        if not final_usage:
+            # Bedrock usage is in a metadata chunk towards the end
+            pytest.skip("No usage found in Bedrock streaming response; skipping")
+        usage_payload = final_usage
 
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+        delivery_resp = tracker.deliver_now(
+            "amazon-bedrock", service_key, usage_payload, response_id=response_id
+        )
+        assert delivery_resp.status_code in (200, 201)
+
+        _wait_for_cost_event(aicm_api_key, response_id)

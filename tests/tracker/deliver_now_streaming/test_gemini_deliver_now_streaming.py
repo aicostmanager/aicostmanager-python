@@ -58,77 +58,77 @@ def test_gemini_deliver_now_streaming(service_key, model, google_api_key, aicm_a
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
-    tracker = Tracker(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    client = genai.Client(api_key=google_api_key)
+    ) as tracker:
+        client = genai.Client(api_key=google_api_key)
 
-    response_id = uuid.uuid4().hex
-    usage_payload = {}
+        response_id = uuid.uuid4().hex
+        usage_payload = {}
 
-    print("gemini response_id:", response_id)
-    stream = client.models.generate_content_stream(
-        model=model, contents=["Say hi (deliver_now_streaming)"]
-    )
-    final_event = None
-    for evt in stream:
-        final_event = evt
-        try:
-            print("gemini event type:", getattr(evt, "type", type(evt)))
-            um = getattr(evt, "usage_metadata", None)
-            if um is not None:
-                try:
-                    print(
-                        "gemini event usage_metadata:",
-                        json.dumps(
-                            get_streaming_usage_from_response(evt, "gemini"),
-                            default=str,
-                        ),
-                    )
-                except Exception as ie:
-                    print("gemini usage extract error:", repr(ie))
-        except Exception:
-            pass
-        up = get_streaming_usage_from_response(evt, "gemini")
-        if isinstance(up, dict) and up:
-            print("gemini usage chunk:", json.dumps(up, default=str))
-            usage_payload = up
-
-    if not usage_payload and final_event is not None:
-        # Some clients only include usage in the last event; try one more time
-        up = get_streaming_usage_from_response(final_event, "gemini")
-        if isinstance(up, dict) and up:
-            usage_payload = up
-
-    if not usage_payload:
-        print(
-            "gemini final_event type:", getattr(final_event, "type", type(final_event))
+        print("gemini response_id:", response_id)
+        stream = client.models.generate_content_stream(
+            model=model, contents=["Say hi (deliver_now_streaming)"]
         )
-        print(
-            "gemini final_event usage_metadata:",
-            getattr(final_event, "usage_metadata", None),
-        )
-        pytest.skip("No usage returned in streaming events; skipping")
-
-    print("gemini final usage payload:", json.dumps(usage_payload, default=str))
-    try:
-        delivery_resp = tracker.deliver_now(
-            "gemini", service_key, usage_payload, response_id=response_id
-        )
-        assert delivery_resp.status_code in (200, 201)
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code == 422:
+        final_event = None
+        for evt in stream:
+            final_event = evt
             try:
-                print("gemini 422 response body:", e.response.text)
+                print("gemini event type:", getattr(evt, "type", type(evt)))
+                um = getattr(evt, "usage_metadata", None)
+                if um is not None:
+                    try:
+                        print(
+                            "gemini event usage_metadata:",
+                            json.dumps(
+                                get_streaming_usage_from_response(evt, "gemini"),
+                                default=str,
+                            ),
+                        )
+                    except Exception as ie:
+                        print("gemini usage extract error:", repr(ie))
             except Exception:
                 pass
-            pytest.skip(
-                "Server rejected Gemini streaming usage schema (422). Update server schema to accept raw usage."
-            )
-        raise
+            up = get_streaming_usage_from_response(evt, "gemini")
+            if isinstance(up, dict) and up:
+                print("gemini usage chunk:", json.dumps(up, default=str))
+                usage_payload = up
 
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+        if not usage_payload and final_event is not None:
+            # Some clients only include usage in the last event; try one more time
+            up = get_streaming_usage_from_response(final_event, "gemini")
+            if isinstance(up, dict) and up:
+                usage_payload = up
+
+        if not usage_payload:
+            print(
+                "gemini final_event type:",
+                getattr(final_event, "type", type(final_event)),
+            )
+            print(
+                "gemini final_event usage_metadata:",
+                getattr(final_event, "usage_metadata", None),
+            )
+            pytest.skip("No usage returned in streaming events; skipping")
+
+        print("gemini final usage payload:", json.dumps(usage_payload, default=str))
+        try:
+            delivery_resp = tracker.deliver_now(
+                "gemini", service_key, usage_payload, response_id=response_id
+            )
+            assert delivery_resp.status_code in (200, 201)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 422:
+                try:
+                    print("gemini 422 response body:", e.response.text)
+                except Exception:
+                    pass
+                pytest.skip(
+                    "Server rejected Gemini streaming usage schema (422). Update server schema to accept raw usage."
+                )
+            raise
+
+        _wait_for_cost_event(aicm_api_key, response_id)

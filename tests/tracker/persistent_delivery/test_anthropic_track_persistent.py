@@ -9,7 +9,6 @@ import pytest
 
 anthropic = pytest.importorskip("anthropic")
 
-from aicostmanager.persistent_delivery import PersistentDelivery
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import extract_usage
 
@@ -61,120 +60,118 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
 def test_anthropic_track_non_streaming(anthropic_api_key, aicm_api_key, tmp_path):
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
-    delivery = PersistentDelivery(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         db_path=str(tmp_path / "anthropic_queue.db"),
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    tracker = Tracker(delivery=delivery)
-    client = anthropic.Anthropic(api_key=anthropic_api_key)
+    ) as tracker:
+        client = anthropic.Anthropic(api_key=anthropic_api_key)
 
-    resp = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
-        messages=[{"role": "user", "content": "Say hi"}],
-        max_tokens=20,
-    )
-    response_id = getattr(resp, "id", None)
-    usage = extract_usage(resp)
-    tracker.track(
-        "anthropic",
-        "anthropic::claude-3-5-sonnet-20241022",
-        usage,
-        response_id=response_id,
-    )
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+        resp = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            messages=[{"role": "user", "content": "Say hi"}],
+            max_tokens=20,
+        )
+        response_id = getattr(resp, "id", None)
+        usage = extract_usage(resp)
+        tracker.track(
+            "anthropic",
+            "anthropic::claude-3-5-sonnet-20241022",
+            usage,
+            response_id=response_id,
+        )
+        _wait_for_cost_event(aicm_api_key, response_id)
 
 
 def test_anthropic_track_streaming(anthropic_api_key, aicm_api_key, tmp_path):
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
-    delivery = PersistentDelivery(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         db_path=str(tmp_path / "anthropic_queue.db"),
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    tracker = Tracker(delivery=delivery)
-    client = anthropic.Anthropic(api_key=anthropic_api_key)
+    ) as tracker:
+        client = anthropic.Anthropic(api_key=anthropic_api_key)
 
-    response_id = None
-    usage_payload = {}
+        response_id = None
+        usage_payload = {}
 
-    with client.messages.stream(
-        model="claude-3-5-sonnet-20241022",
-        messages=[{"role": "user", "content": "Say hi"}],
-        max_tokens=20,
-    ) as stream:
-        for evt in stream:
-            # Get response_id from the first event that has it
-            if response_id is None:
-                response_id = getattr(evt, "id", None)
+        with client.messages.stream(
+            model="claude-3-5-sonnet-20241022",
+            messages=[{"role": "user", "content": "Say hi"}],
+            max_tokens=20,
+        ) as stream:
+            for evt in stream:
+                # Get response_id from the first event that has it
+                if response_id is None:
+                    response_id = getattr(evt, "id", None)
 
-            # Extract usage from each event and accumulate
-            from aicostmanager.usage_utils import get_streaming_usage_from_response
+                # Extract usage from each event and accumulate
+                from aicostmanager.usage_utils import get_streaming_usage_from_response
 
-            up = get_streaming_usage_from_response(evt, "anthropic")
-            if isinstance(up, dict) and up:
-                # Merge usage data (later events may have more complete info)
-                usage_payload.update(up)
+                up = get_streaming_usage_from_response(evt, "anthropic")
+                if isinstance(up, dict) and up:
+                    # Merge usage data (later events may have more complete info)
+                    usage_payload.update(up)
 
-    if not usage_payload:
-        pytest.skip("No usage returned in streaming events; skipping")
+        if not usage_payload:
+            pytest.skip("No usage returned in streaming events; skipping")
 
-    # Track the usage and get the actual response_id that was used
-    tracker.track(
-        "anthropic",
-        "anthropic::claude-3-5-sonnet-20241022",
-        usage_payload,
-        response_id=response_id,
-    )
+        # Track the usage and get the actual response_id that was used
+        tracker.track(
+            "anthropic",
+            "anthropic::claude-3-5-sonnet-20241022",
+            usage_payload,
+            response_id=response_id,
+        )
 
-    # If no response_id was provided, we need to get it from the persistent delivery
-    # The persistent delivery generates its own ID when none is provided
-    if response_id is None:
-        # Temporarily stop the worker thread to prevent it from processing our message
-        delivery._stop_event.set()
-        delivery._worker.join(timeout=1.0)
-
-        # Query the database to get the response_id
-        import sqlite3
-
-        conn = sqlite3.connect(str(tmp_path / "anthropic_queue.db"))
-
-        # First, let's see what's in the queue
-        cursor = conn.execute("SELECT id, payload FROM queue")
-        rows = cursor.fetchall()
-        print(f"Queue contents: {len(rows)} rows")
-        for row in rows:
-            print(f"  Row {row[0]}: {row[1][:100]}...")
-
-        # Now try to get the most recent payload
-        cursor = conn.execute("SELECT payload FROM queue ORDER BY id DESC LIMIT 1")
-        row = cursor.fetchone()
-        if row:
-            payload_data = json.loads(row[0])
-            print(f"Payload data: {payload_data}")
-            # The local storage format has response_id directly in the payload
-            if "response_id" in payload_data:
-                response_id = payload_data["response_id"]
-                print(f"Found response_id: {response_id}")
-        else:
-            print("No rows found in queue")
-        conn.close()
-
-        # If we still don't have a response_id, we can't proceed
+        # If no response_id was provided, we need to get it from the persistent delivery
+        # The persistent delivery generates its own ID when none is provided
         if response_id is None:
-            pytest.fail("Failed to get response_id from persistent delivery")
+            # Temporarily stop the worker thread to prevent it from processing our message
+            tracker.delivery._stop_event.set()
+            tracker.delivery._worker.join(timeout=1.0)
 
-        # Restart the worker thread
-        delivery._stop_event.clear()
-        delivery._worker = threading.Thread(target=delivery._run_worker, daemon=True)
-        delivery._worker.start()
+            # Query the database to get the response_id
+            import sqlite3
 
-    print(f"Using response_id: {response_id}")
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+            conn = sqlite3.connect(str(tmp_path / "anthropic_queue.db"))
+
+            # First, let's see what's in the queue
+            cursor = conn.execute("SELECT id, payload FROM queue")
+            rows = cursor.fetchall()
+            print(f"Queue contents: {len(rows)} rows")
+            for row in rows:
+                print(f"  Row {row[0]}: {row[1][:100]}...")
+
+            # Now try to get the most recent payload
+            cursor = conn.execute("SELECT payload FROM queue ORDER BY id DESC LIMIT 1")
+            row = cursor.fetchone()
+            if row:
+                payload_data = json.loads(row[0])
+                print(f"Payload data: {payload_data}")
+                # The local storage format has response_id directly in the payload
+                if "response_id" in payload_data:
+                    response_id = payload_data["response_id"]
+                    print(f"Found response_id: {response_id}")
+            else:
+                print("No rows found in queue")
+            conn.close()
+
+            # If we still don't have a response_id, we can't proceed
+            if response_id is None:
+                pytest.fail("Failed to get response_id from persistent delivery")
+
+            # Restart the worker thread
+            tracker.delivery._stop_event.clear()
+            tracker.delivery._worker = threading.Thread(
+                target=tracker.delivery._run_worker, daemon=True
+            )
+            tracker.delivery._worker.start()
+
+        print(f"Using response_id: {response_id}")
+        _wait_for_cost_event(aicm_api_key, response_id)

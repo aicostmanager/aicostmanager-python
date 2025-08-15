@@ -62,47 +62,46 @@ def test_anthropic_deliver_now_streaming(
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
-    tracker = Tracker(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    client = anthropic.Anthropic(api_key=anthropic_api_key)
+    ) as tracker:
+        client = anthropic.Anthropic(api_key=anthropic_api_key)
 
-    response_id = uuid.uuid4().hex
-    usage_payload = {}
+        response_id = uuid.uuid4().hex
+        usage_payload = {}
 
-    print("anthropic response_id:", response_id)
-    stream = client.messages.stream(
-        model=model,
-        messages=[{"role": "user", "content": "Say hi (deliver_now_streaming)"}],
-        max_tokens=32,
-    )
-    with stream as s:
-        for evt in s:
-            try:
-                etype = getattr(evt, "type", type(evt))
-                print("anthropic event type:", etype)
-                if hasattr(evt, "message") and hasattr(evt.message, "usage"):
-                    print("anthropic event message.usage:", evt.message.usage)
-                if hasattr(evt, "usage"):
-                    print("anthropic event usage:", evt.usage)
-            except Exception:
-                pass
-            up = get_streaming_usage_from_response(evt, "anthropic")
-            if isinstance(up, dict) and up:
-                print("anthropic usage chunk:", json.dumps(up, default=str))
-                usage_payload = up
+        print("anthropic response_id:", response_id)
+        stream = client.messages.stream(
+            model=model,
+            messages=[{"role": "user", "content": "Say hi (deliver_now_streaming)"}],
+            max_tokens=32,
+        )
+        with stream as s:
+            for evt in s:
+                try:
+                    etype = getattr(evt, "type", type(evt))
+                    print("anthropic event type:", etype)
+                    if hasattr(evt, "message") and hasattr(evt.message, "usage"):
+                        print("anthropic event message.usage:", evt.message.usage)
+                    if hasattr(evt, "usage"):
+                        print("anthropic event usage:", evt.usage)
+                except Exception:
+                    pass
+                up = get_streaming_usage_from_response(evt, "anthropic")
+                if isinstance(up, dict) and up:
+                    print("anthropic usage chunk:", json.dumps(up, default=str))
+                    usage_payload = up
 
-    if not usage_payload:
-        pytest.skip("No usage returned in streaming events; skipping")
+        if not usage_payload:
+            pytest.skip("No usage returned in streaming events; skipping")
 
-    print("anthropic final usage payload:", json.dumps(usage_payload, default=str))
-    delivery_resp = tracker.deliver_now(
-        "anthropic", service_key, usage_payload, response_id=response_id
-    )
-    assert delivery_resp.status_code in (200, 201)
+        print("anthropic final usage payload:", json.dumps(usage_payload, default=str))
+        delivery_resp = tracker.deliver_now(
+            "anthropic", service_key, usage_payload, response_id=response_id
+        )
+        assert delivery_resp.status_code in (200, 201)
 
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+        _wait_for_cost_event(aicm_api_key, response_id)

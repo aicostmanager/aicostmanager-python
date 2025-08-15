@@ -9,7 +9,6 @@ import pytest
 
 openai = pytest.importorskip("openai")
 
-from aicostmanager.persistent_delivery import PersistentDelivery
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import extract_usage
 
@@ -66,107 +65,110 @@ def test_openai_responses_track_non_streaming(aicm_api_key):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
-    delivery = PersistentDelivery(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    tracker = Tracker(delivery=delivery)
-    client = _make_client(api_key)
+    ) as tracker:
+        client = _make_client(api_key)
 
-    resp = client.responses.create(model="gpt-5-mini", input="Say hi")
-    response_id = getattr(resp, "id", None)
-    usage = extract_usage(resp)
-    tracker.track(
-        "openai_responses", "openai::gpt-5-mini", usage, response_id=response_id
-    )
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+        resp = client.responses.create(model="gpt-5-mini", input="Say hi")
+        response_id = getattr(resp, "id", None)
+        usage = extract_usage(resp)
+        tracker.track(
+            "openai_responses", "openai::gpt-5-mini", usage, response_id=response_id
+        )
+        _wait_for_cost_event(aicm_api_key, response_id)
 
 
 def test_openai_responses_track_streaming(aicm_api_key):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
-    delivery = PersistentDelivery(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    tracker = Tracker(delivery=delivery)
-    client = _make_client(api_key)
+    ) as tracker:
+        client = _make_client(api_key)
 
-    response_id = None
-    usage_payload = {}
+        response_id = None
+        usage_payload = {}
 
-    stream = client.responses.create(model="gpt-5-mini", input="Say hi", stream=True)
+        stream = client.responses.create(
+            model="gpt-5-mini", input="Say hi", stream=True
+        )
 
-    # Process streaming events to accumulate usage data
-    for evt in stream:
-        # Get response_id from the first event that has it
+        # Process streaming events to accumulate usage data
+        for evt in stream:
+            # Get response_id from the first event that has it
+            if response_id is None:
+                response_id = getattr(evt, "id", None)
+
+            # Extract usage from each event and accumulate
+            from aicostmanager.usage_utils import get_streaming_usage_from_response
+
+            up = get_streaming_usage_from_response(evt, "openai_responses")
+            if isinstance(up, dict) and up:
+                # Merge usage data (later events may have more complete info)
+                usage_payload.update(up)
+
+        if not usage_payload:
+            pytest.skip("No usage returned in streaming events; skipping")
+
+        # Track the usage and get the actual response_id that was used
+        tracker.track(
+            "openai_responses",
+            "openai::gpt-5-mini",
+            usage_payload,
+            response_id=response_id,
+        )
+
+        # If no response_id was provided, we need to get it from the persistent delivery
+        # The persistent delivery generates its own ID when none is provided
         if response_id is None:
-            response_id = getattr(evt, "id", None)
+            # Temporarily stop the worker thread to prevent it from processing our message
+            tracker.delivery._stop_event.set()
+            tracker.delivery._worker.join(timeout=1.0)
 
-        # Extract usage from each event and accumulate
-        from aicostmanager.usage_utils import get_streaming_usage_from_response
+            # Query the database to get the response_id
+            import sqlite3
 
-        up = get_streaming_usage_from_response(evt, "openai_responses")
-        if isinstance(up, dict) and up:
-            # Merge usage data (later events may have more complete info)
-            usage_payload.update(up)
+            conn = sqlite3.connect(tracker.delivery.db_path)
 
-    if not usage_payload:
-        pytest.skip("No usage returned in streaming events; skipping")
+            # First, let's see what's in the queue
+            cursor = conn.execute("SELECT id, payload FROM queue")
+            rows = cursor.fetchall()
+            print(f"Queue contents: {len(rows)} rows")
+            for row in rows:
+                print(f"  Row {row[0]}: {row[1][:100]}...")
 
-    # Track the usage and get the actual response_id that was used
-    tracker.track(
-        "openai_responses", "openai::gpt-5-mini", usage_payload, response_id=response_id
-    )
+            # Now try to get the most recent payload
+            cursor = conn.execute("SELECT payload FROM queue ORDER BY id DESC LIMIT 1")
+            row = cursor.fetchone()
+            if row:
+                payload_data = json.loads(row[0])
+                print(f"Payload data: {payload_data}")
+                # The local storage format has response_id directly in the payload
+                if "response_id" in payload_data:
+                    response_id = payload_data["response_id"]
+                    print(f"Found response_id: {response_id}")
+            else:
+                print("No rows found in queue")
+            conn.close()
 
-    # If no response_id was provided, we need to get it from the persistent delivery
-    # The persistent delivery generates its own ID when none is provided
-    if response_id is None:
-        # Temporarily stop the worker thread to prevent it from processing our message
-        delivery._stop_event.set()
-        delivery._worker.join(timeout=1.0)
+            # If we still don't have a response_id, we can't proceed
+            if response_id is None:
+                pytest.fail("Failed to get response_id from persistent delivery")
 
-        # Query the database to get the response_id
-        import sqlite3
+            # Restart the worker thread
+            tracker.delivery._stop_event.clear()
+            tracker.delivery._worker = threading.Thread(
+                target=tracker.delivery._run_worker, daemon=True
+            )
+            tracker.delivery._worker.start()
 
-        conn = sqlite3.connect(delivery.db_path)
-
-        # First, let's see what's in the queue
-        cursor = conn.execute("SELECT id, payload FROM queue")
-        rows = cursor.fetchall()
-        print(f"Queue contents: {len(rows)} rows")
-        for row in rows:
-            print(f"  Row {row[0]}: {row[1][:100]}...")
-
-        # Now try to get the most recent payload
-        cursor = conn.execute("SELECT payload FROM queue ORDER BY id DESC LIMIT 1")
-        row = cursor.fetchone()
-        if row:
-            payload_data = json.loads(row[0])
-            print(f"Payload data: {payload_data}")
-            # The local storage format has response_id directly in the payload
-            if "response_id" in payload_data:
-                response_id = payload_data["response_id"]
-                print(f"Found response_id: {response_id}")
-        else:
-            print("No rows found in queue")
-        conn.close()
-
-        # If we still don't have a response_id, we can't proceed
-        if response_id is None:
-            pytest.fail("Failed to get response_id from persistent delivery")
-
-        # Restart the worker thread
-        delivery._stop_event.clear()
-        delivery._worker = threading.Thread(target=delivery._run_worker, daemon=True)
-        delivery._worker.start()
-
-    print(f"Using response_id: {response_id}")
-    _wait_for_cost_event(aicm_api_key, response_id)
-    tracker.close()
+        print(f"Using response_id: {response_id}")
+        _wait_for_cost_event(aicm_api_key, response_id)

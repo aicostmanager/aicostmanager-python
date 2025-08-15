@@ -179,5 +179,13 @@ class Tracker:
     track_sync_async = deliver_now_async
 
     # ------------------------------------------------------------------
+    def __enter__(self):
+        """Context manager entry point."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit point - automatically closes the tracker."""
+        self.close()
+
     def close(self) -> None:
         self.delivery.stop()

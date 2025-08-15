@@ -62,35 +62,33 @@ def test_openai_chat_deliver_now_only(service_key, model, key_env, maker, aicm_a
     if not api_key:
         pytest.skip(f"{key_env} not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
-    tracker = Tracker(
+    with Tracker(
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
-    )
-    client = maker(api_key)
+    ) as tracker:
+        client = maker(api_key)
 
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": "Say hi (deliver_now_only)"}],
-        max_completion_tokens=20,
-    )
-    response_id = getattr(resp, "id", None)
-    usage_payload = get_usage_from_response(resp, "openai_chat")
-
-    try:
-        delivery_resp = tracker.deliver_now(
-            "openai_chat", service_key, usage_payload, response_id=response_id
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "Say hi (deliver_now_only)"}],
+            max_completion_tokens=20,
         )
-        print("deliver_now status:", delivery_resp.status_code)
+        response_id = getattr(resp, "id", None)
+        usage_payload = get_usage_from_response(resp, "openai_chat")
+
         try:
-            print("deliver_now json:", delivery_resp.json())
-        except Exception:
-            print("deliver_now text:", delivery_resp.text)
-    except Exception as e:
-        print("deliver_now raised:", repr(e))
-        raise
+            delivery_resp = tracker.deliver_now(
+                "openai_chat", service_key, usage_payload, response_id=response_id
+            )
+            print("deliver_now status:", delivery_resp.status_code)
+            try:
+                print("deliver_now json:", delivery_resp.json())
+            except Exception:
+                print("deliver_now text:", delivery_resp.text)
+        except Exception as e:
+            print("deliver_now raised:", repr(e))
+            raise
 
-    _wait_for_cost_event(aicm_api_key, response_id)
-
-    tracker.close()
+        _wait_for_cost_event(aicm_api_key, response_id)
