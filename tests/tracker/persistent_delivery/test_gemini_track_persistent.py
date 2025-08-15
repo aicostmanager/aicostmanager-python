@@ -104,12 +104,14 @@ def test_gemini_track_streaming(google_api_key, aicm_api_key):
     response_id = None
     usage_payload = {}
 
-    stream = client.models.generate_content(
-        model="gemini-2.5-flash", contents="Say hi", stream=True
+    stream = client.models.generate_content_stream(
+        model="gemini-2.5-flash", contents=["Say hi"]
     )
 
     # Process streaming events to accumulate usage data
+    final_event = None
     for evt in stream:
+        final_event = evt
         # Get response_id from the first event that has it
         if response_id is None:
             response_id = getattr(evt, "id", None) or getattr(evt, "response_id", None)
@@ -120,6 +122,12 @@ def test_gemini_track_streaming(google_api_key, aicm_api_key):
         up = get_streaming_usage_from_response(evt, "gemini")
         if isinstance(up, dict) and up:
             # Merge usage data (later events may have more complete info)
+            usage_payload.update(up)
+
+    if not usage_payload and final_event is not None:
+        # Some clients only include usage in the last event; try one more time
+        up = get_streaming_usage_from_response(final_event, "gemini")
+        if isinstance(up, dict) and up:
             usage_payload.update(up)
 
     if not usage_payload:
