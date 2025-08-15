@@ -58,11 +58,12 @@ def _wait_for_empty(delivery, timeout: float = 5.0) -> bool:
 
 
 def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30):
-    """Poll the server until a cost event for ``response_id`` appears."""
+    """Wait 2s then try up to 3 fetches for a cost event."""
     headers = {"Authorization": f"Bearer {aicm_api_key}"}
-    deadline = time.time() + timeout
+    time.sleep(2)
+    attempts = 3
     last_data = None
-    while time.time() < deadline:
+    for _ in range(attempts):
         try:
             req = urllib.request.Request(
                 f"{BASE_URL}/api/v1/cost-events/{response_id}",

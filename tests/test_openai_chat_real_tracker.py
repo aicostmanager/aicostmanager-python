@@ -14,8 +14,10 @@ BASE_URL = "http://127.0.0.1:8001"
 
 def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30):
     headers = {"Authorization": f"Bearer {aicm_api_key}"}
-    deadline = time.time() + timeout
-    while time.time() < deadline:
+    # Wait an initial 2 seconds, then try up to 3 times
+    time.sleep(2)
+    attempts = 3
+    for _ in range(attempts):
         try:
             req = urllib.request.Request(
                 f"{BASE_URL}/api/v1/cost-events/{response_id}",

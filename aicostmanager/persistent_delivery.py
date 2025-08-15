@@ -14,6 +14,7 @@ import httpx
 from tenacity import (
     AsyncRetrying,
     Retrying,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential_jitter,
 )
@@ -203,6 +204,20 @@ class PersistentDelivery:
             scheduled,
         )
 
+    def _mark_failed(self, row_id: int, reason: str | None = None) -> None:
+        with self._lock:
+            self.conn.execute(
+                "UPDATE queue SET status='failed', updated_at=? WHERE id=?",
+                (time.time(), row_id),
+            )
+            self.conn.commit()
+        if reason:
+            logger.error(
+                "Marked message id=%s as failed (permanent): %s", row_id, reason
+            )
+        else:
+            logger.error("Marked message id=%s as failed (permanent)", row_id)
+
     def _delete(self, row_id: int) -> None:
         with self._lock:
             self.conn.execute("DELETE FROM queue WHERE id=?", (row_id,))
@@ -227,11 +242,15 @@ class PersistentDelivery:
                 self._delete(row["id"])
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug("Delivered %d messages", len(buffer))
-        except Exception:
+        except Exception as exc:
             logger.exception("Batch delivery failed")
+            permanent = self._is_permanent_error(exc)
             for row in buffer:
-                retry = row["retry_count"] + 1
-                self._reschedule(row["id"], retry)
+                if permanent:
+                    self._mark_failed(row["id"], reason=str(exc))
+                else:
+                    retry = row["retry_count"] + 1
+                    self._reschedule(row["id"], retry)
         buffer.clear()
 
     # ------------------------------------------------------------------
@@ -294,6 +313,18 @@ class PersistentDelivery:
 
     # ------------------------------------------------------------------
     # Delivery methods
+    def _is_permanent_error(self, exc: Exception) -> bool:
+        if isinstance(exc, httpx.HTTPStatusError):
+            code = exc.response.status_code
+            # Treat most 4xx as permanent. Allow retries for 408 (timeout) and 429 (rate limit).
+            if 400 <= code < 500 and code not in (408, 429):
+                return True
+        return False
+
+    def _should_retry_exception(self, exc: Exception) -> bool:
+        # tenacity wants True -> retry, False -> don't retry
+        return not self._is_permanent_error(exc)
+
     def _send_batch_once(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
         body = {"tracked": payloads}
         # Serialize here to ensure Python None -> JSON null and to have an exact
@@ -341,10 +372,14 @@ class PersistentDelivery:
         return resp
 
     def deliver_batch(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
-        """Send a batch of payloads immediately with retries."""
+        """Send a batch of payloads immediately with retries.
+
+        Permanent client errors (4xx, excluding 408/429) are not retried.
+        """
         for attempt in Retrying(
             stop=stop_after_attempt(self.max_attempts),
             wait=wait_exponential_jitter(initial=1, max=10),
+            retry=retry_if_exception(self._should_retry_exception),
         ):
             with attempt:
                 return self._send_batch_once(payloads)
@@ -408,6 +443,7 @@ class PersistentDelivery:
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(self.max_attempts),
             wait=wait_exponential_jitter(initial=1, max=10),
+            retry=retry_if_exception(self._should_retry_exception),
         ):
             with attempt:
                 return await self._send_batch_async(payloads)
