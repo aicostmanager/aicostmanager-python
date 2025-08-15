@@ -1,7 +1,7 @@
-import time
 import json
-import uuid
+import time
 import urllib.request
+import uuid
 
 import pytest
 
@@ -23,7 +23,9 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
             with urllib.request.urlopen(req, timeout=5) as resp:
                 if resp.status == 200:
                     data = json.load(resp)
-                    event_id = data.get("event_id") or data.get("cost_event", {}).get("event_id")
+                    event_id = data.get("event_id") or data.get("cost_event", {}).get(
+                        "event_id"
+                    )
                     if event_id:
                         uuid.UUID(str(event_id))
                         return data
@@ -51,7 +53,9 @@ def test_openai_responses_tracker(service_key, model, openai_api_key, aicm_api_k
     # Background tracking via queue
     resp = client.responses.create(model=model, input="Say hi")
     response_id = getattr(resp, "id", None)
-    tracker.track("openai_responses", service_key, {"input_tokens": 1}, response_id=response_id)
+    tracker.track(
+        "openai_responses", service_key, {"input_tokens": 1}, response_id=response_id
+    )
     _wait_for_cost_event(aicm_api_key, response_id)
 
     # Immediate delivery

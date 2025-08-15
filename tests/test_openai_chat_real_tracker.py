@@ -24,7 +24,9 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
             with urllib.request.urlopen(req, timeout=5) as resp:
                 if resp.status == 200:
                     data = json.load(resp)
-                    event_id = data.get("event_id") or data.get("cost_event", {}).get("event_id")
+                    event_id = data.get("event_id") or data.get("cost_event", {}).get(
+                        "event_id"
+                    )
                     if event_id:
                         uuid.UUID(str(event_id))
                         return data
@@ -39,7 +41,9 @@ def _make_openai_client(api_key: str):
 
 
 def _make_fireworks_client(api_key: str):
-    return openai.OpenAI(api_key=api_key, base_url="https://api.fireworks.ai/inference/v1")
+    return openai.OpenAI(
+        api_key=api_key, base_url="https://api.fireworks.ai/inference/v1"
+    )
 
 
 def _make_xai_client(api_key: str):
@@ -78,7 +82,9 @@ def test_openai_chat_tracker(service_key, model, key_env, maker, aicm_api_key):
         max_completion_tokens=20,
     )
     response_id = getattr(resp, "id", None)
-    tracker.track("openai_chat", service_key, {"input_tokens": 1}, response_id=response_id)
+    tracker.track(
+        "openai_chat", service_key, {"input_tokens": 1}, response_id=response_id
+    )
     _wait_for_cost_event(aicm_api_key, response_id)
 
     # Immediate delivery
