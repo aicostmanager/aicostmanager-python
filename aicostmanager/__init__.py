@@ -47,6 +47,7 @@ from .models import (
 from .rest_cost_manager import AsyncRestCostManager, RestCostManager
 from .tracker import Tracker
 from .universal_extractor import UniversalExtractor
+from .limits_manager import LimitsManager
 
 __all__ = [
     "AICMError",
@@ -66,6 +67,7 @@ __all__ = [
     "get_global_delivery",
     "get_global_delivery_health",
     "Tracker",
+    "LimitsManager",
     "ApiUsageRecord",
     "ApiUsageRequest",
     "ApiUsageResponse",
