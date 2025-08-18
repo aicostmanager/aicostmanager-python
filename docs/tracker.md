@@ -108,7 +108,7 @@ with Tracker() as tracker:
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": "Give me a haiku about snow."}],
     )
-    tracker.track_llm_usage("openai_chat", resp.model, resp)
+    tracker.track_llm_usage("openai_chat", resp)
     print(resp.choices[0].message.content)
 ```
 
@@ -136,7 +136,7 @@ with Tracker() as tracker:
         stream_options={"include_usage": True},
     )
 
-    for event in tracker.track_llm_stream_usage("openai_chat", "gpt-4o-mini", stream):
+    for event in tracker.track_llm_stream_usage("openai_chat", stream):
         if event.type == "message.delta" and event.delta.get("content"):
             print(event.delta["content"], end="")
     print()

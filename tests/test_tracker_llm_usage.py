@@ -6,8 +6,9 @@ from aicostmanager.ini_manager import IniManager
 
 
 class Resp:
-    def __init__(self, usage):
+    def __init__(self, usage, model):
         self.usage = usage
+        self.model = model
 
 
 class DummyDelivery:
@@ -26,8 +27,8 @@ def test_track_llm_usage():
     delivery = DummyDelivery()
     tracker = Tracker(delivery=delivery, ini_manager=IniManager("ini"))
 
-    resp = Resp({"input_tokens": 1})
-    out = tracker.track_llm_usage("openai_chat", "gpt-5-mini", resp, client_customer_key="abc")
+    resp = Resp({"input_tokens": 1}, "gpt-5-mini")
+    out = tracker.track_llm_usage("openai_chat", resp, client_customer_key="abc")
     assert out is resp
     tracker.close()
 
@@ -47,7 +48,8 @@ def test_track_llm_usage_async():
 
     async def run():
         resp = AResp()
-        out = await tracker.track_llm_usage_async("openai_chat", "gpt-4", resp)
+        resp.model = "gpt-4"
+        out = await tracker.track_llm_usage_async("openai_chat", resp)
         assert out is resp
 
     asyncio.run(run())
@@ -55,6 +57,7 @@ def test_track_llm_usage_async():
 
     record = delivery.records[0]
     assert record["payload"] == {"input_tokens": 2}
+    assert record["service_key"] == "gpt-4"
 
 
 def test_track_llm_stream_usage():
@@ -65,13 +68,19 @@ def test_track_llm_stream_usage():
         def __init__(self, usage=None):
             self.usage = usage
 
-    chunks = [Chunk(), Chunk({"input_tokens": 3})]
-    events = list(tracker.track_llm_stream_usage("openai_chat", "gpt-5-mini", chunks))
+    class Stream(list):
+        def __init__(self, chunks, model):
+            super().__init__(chunks)
+            self.model = model
+
+    chunks = Stream([Chunk(), Chunk({"input_tokens": 3})], model="gpt-5-mini")
+    events = list(tracker.track_llm_stream_usage("openai_chat", chunks))
     assert events == chunks
     tracker.close()
 
     record = delivery.records[0]
     assert record["payload"] == {"input_tokens": 3}
+    assert record["service_key"] == "gpt-5-mini"
 
 
 def test_track_llm_stream_usage_async():
@@ -87,7 +96,9 @@ def test_track_llm_stream_usage_async():
             yield c
 
     async def run():
-        async for _ in tracker.track_llm_stream_usage_async("openai_chat", "gpt-5-mini", stream()):
+        gen = stream()
+        gen.model = "gpt-5-mini"
+        async for _ in tracker.track_llm_stream_usage_async("openai_chat", gen):
             pass
 
     asyncio.run(run())
@@ -95,4 +106,4 @@ def test_track_llm_stream_usage_async():
 
     record = delivery.records[0]
     assert record["payload"] == {"input_tokens": 4}
-
+    assert record["service_key"] == "gpt-5-mini"
