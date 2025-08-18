@@ -16,7 +16,7 @@ class MemQueueDelivery(QueueDelivery):
         self,
         config: DeliveryConfig,
         *,
-        queue_size: int = 1000,
+        queue_size: int = 10000,
         **kwargs: Any,
     ) -> None:
         max_attempts = kwargs.pop("max_attempts", kwargs.pop("max_retries", 5))

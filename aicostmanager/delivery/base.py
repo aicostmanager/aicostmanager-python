@@ -132,7 +132,7 @@ class QueueDelivery(Delivery, QueueWorker):
         config: DeliveryConfig,
         *,
         batch_interval: float = 0.5,
-        max_batch_size: int = 100,
+        max_batch_size: int = 1000,
         max_attempts: int = 5,
         max_retries: int = 5,
         **kwargs: Any,
