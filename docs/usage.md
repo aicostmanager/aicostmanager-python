@@ -87,8 +87,7 @@ When recording custom usage with :class:`Tracker` in a FastAPI application,
 create the tracker during application startup so configuration loading doesn't
 block individual requests. The asynchronous factory ``Tracker.create_async``
 performs the initialization in a thread and returns a ready instance. During
-shutdown, stop the background delivery using ``Tracker.close`` (or
-``get_global_delivery(...).stop()`` if calling the delivery queue directly):
+shutdown, stop the background delivery using ``Tracker.close``:
 
 ```python
 from fastapi import FastAPI

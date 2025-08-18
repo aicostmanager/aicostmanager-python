@@ -106,28 +106,6 @@ def aicm_ini_path(tmp_path_factory):
 
 
 @pytest.fixture
-def clean_delivery():
-    """Reset global delivery state before each test to avoid pollution between tests."""
-    from aicostmanager import delivery as mod
-
-    # Store the current state
-    original_delivery = getattr(mod, "_global_delivery", None)
-
-    # Reset to clean state
-    mod._global_delivery = None
-
-    yield
-
-    # Cleanup: stop any running delivery and reset
-    if mod._global_delivery is not None:
-        try:
-            mod._global_delivery.stop()
-        except Exception:
-            pass
-        mod._global_delivery = None
-
-
-@pytest.fixture
 def clear_triggered_limits(aicm_ini_path):
     """Clear triggered limits from the INI file to prevent test interference from usage limits."""
     import configparser

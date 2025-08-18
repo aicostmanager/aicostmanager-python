@@ -422,11 +422,11 @@ pip install -e .
 You can inspect background delivery metrics programmatically:
 
 ```python
-from aicostmanager import get_global_delivery_health
+from aicostmanager import Tracker
 
-health = get_global_delivery_health()
-if health:
-    print(health["queue_size"], health["total_discarded"], health["last_error"])
+tracker = Tracker()
+health = tracker.delivery.stats()
+print(health["queued"], health["total_failed"])
 ```
 
 ## 🤝 Contributing

@@ -1,11 +1,11 @@
 import pathlib
 import time
-
 import jwt
 
 from aicostmanager.client import CostManagerClient
 from aicostmanager.ini_manager import IniManager
-from aicostmanager.limits_manager import LimitsManager
+from aicostmanager.triggered_limit_manager import TriggeredLimitManager
+from aicostmanager.usage_limit_manager import UsageLimitManager
 from aicostmanager.models import (
     UsageLimitIn,
     UsageLimitOut,
@@ -52,36 +52,35 @@ def test_update_and_check(monkeypatch, tmp_path):
     ini = tmp_path / "AICM.ini"
     client = CostManagerClient(aicm_api_key="sk-test", aicm_ini_path=str(ini))
     ini_mgr = IniManager(str(ini))
-    limits_mgr = LimitsManager(client, ini_mgr)
+    tl_mgr = TriggeredLimitManager(client, ini_mgr)
 
     item, event = _make_triggered_limits()
     monkeypatch.setattr(client, "get_triggered_limits", lambda: item)
 
-    limits_mgr.update_triggered_limits()
+    tl_mgr.update_triggered_limits()
 
     stored = ini_mgr.read_triggered_limits()
     assert stored.get("encrypted_payload") == item["encrypted_payload"]
 
-    matches = limits_mgr.check_triggered_limits(
+    matches = tl_mgr.check_triggered_limits(
         api_key_id=event["api_key_id"], service_key=event["service_key"]
     )
     assert len(matches) == 1
     assert matches[0]["limit_id"] == event["limit_id"]
 
-    no_match = limits_mgr.check_triggered_limits(
+    no_match = tl_mgr.check_triggered_limits(
         api_key_id=event["api_key_id"], service_key="other-service"
     )
     assert no_match == []
 
-    wrong_api = limits_mgr.check_triggered_limits(api_key_id="different")
+    wrong_api = tl_mgr.check_triggered_limits(api_key_id="different")
     assert wrong_api == []
 
 
 def test_usage_limit_management(monkeypatch, tmp_path):
     ini = tmp_path / "AICM.ini"
     client = CostManagerClient(aicm_api_key="sk-test", aicm_ini_path=str(ini))
-    ini_mgr = IniManager(str(ini))
-    limits_mgr = LimitsManager(client, ini_mgr)
+    ul_mgr = UsageLimitManager(client)
 
     limit = UsageLimitOut(
         uuid="lim1",
@@ -105,7 +104,7 @@ def test_usage_limit_management(monkeypatch, tmp_path):
     )
 
     monkeypatch.setattr(client, "list_usage_limits", lambda: [limit])
-    assert limits_mgr.list_usage_limits()[0].uuid == "lim1"
+    assert ul_mgr.list_usage_limits()[0].uuid == "lim1"
 
     new_limit = UsageLimitIn(
         threshold_type=ThresholdType.LIMIT,
@@ -114,14 +113,14 @@ def test_usage_limit_management(monkeypatch, tmp_path):
         team_uuid="team1",
     )
     monkeypatch.setattr(client, "create_usage_limit", lambda data: limit)
-    assert limits_mgr.create_usage_limit(new_limit).uuid == "lim1"
+    assert ul_mgr.create_usage_limit(new_limit).uuid == "lim1"
 
     monkeypatch.setattr(client, "get_usage_limit", lambda lid: limit)
-    assert limits_mgr.get_usage_limit("lim1").uuid == "lim1"
+    assert ul_mgr.get_usage_limit("lim1").uuid == "lim1"
 
     updated = limit.model_copy(update={"amount": 2})
     monkeypatch.setattr(client, "update_usage_limit", lambda lid, data: updated)
-    assert limits_mgr.update_usage_limit("lim1", new_limit).amount == 2
+    assert ul_mgr.update_usage_limit("lim1", new_limit).amount == 2
 
     called = {}
 
@@ -129,8 +128,8 @@ def test_usage_limit_management(monkeypatch, tmp_path):
         called["id"] = lid
 
     monkeypatch.setattr(client, "delete_usage_limit", _delete)
-    limits_mgr.delete_usage_limit("lim1")
+    ul_mgr.delete_usage_limit("lim1")
     assert called["id"] == "lim1"
 
     monkeypatch.setattr(client, "list_usage_limit_progress", lambda: [progress])
-    assert limits_mgr.list_usage_limit_progress()[0].current_spend == 0
+    assert ul_mgr.list_usage_limit_progress()[0].current_spend == 0

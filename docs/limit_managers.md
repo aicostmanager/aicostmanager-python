@@ -1,26 +1,24 @@
-# Limits Manager
+# Limit Managers
 
-The `LimitsManager` wraps the AICostManager usage limit endpoints and
-provides convenience helpers for working with both configured limits and
-triggered limit events stored in the local `AICM.ini` file.
+The library provides separate managers for usage limits and triggered limit
+notifications.
 
 ## Managing Usage Limits
 
-Usage limits can be scoped to a team, individual user or a specific API
-key.  Create and manage limits through the manager which delegates to the
-underlying :class:`~aicostmanager.client.CostManagerClient`.
+Use the :class:`UsageLimitManager` to create and maintain limits via the
+API:
 
 ```python
 from aicostmanager import (
     CostManagerClient,
-    LimitsManager,
+    UsageLimitManager,
     UsageLimitIn,
     ThresholdType,
     Period,
 )
 
 client = CostManagerClient(aicm_api_key="sk-test")
-limits = LimitsManager(client)
+limits = UsageLimitManager(client)
 
 # Create a monthly team limit
 limit = limits.create_usage_limit(
@@ -56,15 +54,21 @@ limits.delete_usage_limit(limit.uuid)
 
 ## Working with Triggered Limits
 
-The manager can also cache triggered limit events in the INI file so they
-can be checked locally without another API call.
+Triggered limit events can be cached locally using the
+:class:`TriggeredLimitManager` so they can be checked without an additional
+API call:
 
 ```python
+from aicostmanager import CostManagerClient, TriggeredLimitManager
+
+client = CostManagerClient(aicm_api_key="sk-test")
+tl_mgr = TriggeredLimitManager(client)
+
 # Refresh the local cache of triggered limits
-limits.update_triggered_limits()
+tl_mgr.update_triggered_limits()
 
 # Filter triggered events for an API key and service
-events = limits.check_triggered_limits(
+events = tl_mgr.check_triggered_limits(
     api_key_id="550e8400-e29b-41d4-a716-446655440000",
     service_key="openai::gpt-4",
 )
