@@ -15,7 +15,7 @@ from .client import (
     UsageLimitExceeded,
 )
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
-from .delivery import MemQueueDelivery, get_global_delivery
+from .delivery import MemQueueDelivery
 from .universal_extractor import UniversalExtractor
 
 _HTTP_METHODS = {
@@ -78,7 +78,7 @@ class RestCostManager:
         if delivery is not None:
             self.delivery = delivery
         else:
-            self.delivery = get_global_delivery(
+            self.delivery = MemQueueDelivery(
                 aicm_api_key=aicm_api_key,
                 aicm_api_base=aicm_api_base,
                 aicm_api_url=aicm_api_url,

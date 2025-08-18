@@ -40,6 +40,6 @@ Overflow behavior when the queue is full:
 - `raise`: raise `queue.Full`
 - `backpressure` (default): drop the oldest payload; increments `total_discarded` and optionally invokes `on_discard`
 
-Inspect metrics using `get_global_delivery_health()`.
+Inspect metrics using the delivery instance's `stats()` method.
 
 

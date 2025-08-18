@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import configparser
 import json
 import logging
 import os
@@ -11,15 +10,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import httpx
-from tenacity import (
-    AsyncRetrying,
-    Retrying,
-    retry_if_exception,
-    stop_after_attempt,
-    wait_exponential_jitter,
-)
 
 from .base import Delivery
+from ..ini_manager import IniManager
 
 
 class PersistentDelivery(Delivery):
@@ -43,51 +36,36 @@ class PersistentDelivery(Delivery):
         max_retries: int = 5,
         transport: httpx.BaseTransport | None = None,
         log_bodies: bool = False,
+        ini_manager: IniManager | None = None,
     ) -> None:
-        super().__init__(log_file=log_file, log_level=log_level, logger=logger)
-        self.api_key = aicm_api_key or os.getenv("AICM_API_KEY")
-        self.api_base = aicm_api_base or os.getenv("AICM_API_BASE", "https://aicostmanager.com")
-        self.api_url = aicm_api_url or os.getenv("AICM_API_URL", "/api/v1")
-        self.ini_path = (
-            aicm_ini_path
-            or os.getenv("AICM_INI_PATH")
-            or str(Path.home() / ".config" / "aicostmanager" / "AICM.INI")
+        ini_path = IniManager.resolve_path(aicm_ini_path)
+        ini_manager = ini_manager or IniManager(ini_path)
+        super().__init__(
+            ini_manager=ini_manager,
+            aicm_api_key=aicm_api_key,
+            aicm_api_base=aicm_api_base,
+            aicm_api_url=aicm_api_url,
+            timeout=timeout,
+            transport=transport,
+            log_file=log_file,
+            log_level=log_level,
+            logger=logger,
         )
-        cp = configparser.ConfigParser()
-        if os.path.exists(self.ini_path):
-            cp.read(self.ini_path)
-
-        def _cfg(env: str, section: str, option: str, default: Optional[str]) -> Optional[str]:
-            if env and (val := os.getenv(env)):
-                return val
-            if cp.has_section(section) and option in cp[section]:
-                return cp[section][option]
-            return default
-
-        self.db_path = db_path or _cfg(
-            "AICM_DELIVERY_DB_PATH",
+        self.db_path = db_path or self.ini_manager.get_option(
             "delivery",
             "db_path",
             str(Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"),
         )
-        self.timeout = timeout
         self.poll_interval = poll_interval
         self.batch_interval = batch_interval
         self.max_attempts = max_attempts
         self.max_retries = max_retries
-        self._transport = transport
         env_log_bodies = os.getenv("AICM_DELIVERY_LOG_BODIES", "false").lower() in (
             "1",
             "true",
             "yes",
         )
         self.log_bodies = log_bodies or env_log_bodies
-        self._client = httpx.Client(timeout=timeout, transport=transport)
-        self._endpoint = self.api_base.rstrip("/") + self.api_url.rstrip("/") + "/track"
-        self._headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "User-Agent": "aicostmanager-python",
-        }
 
         db_dir = os.path.dirname(self.db_path)
         if db_dir:
@@ -178,27 +156,12 @@ class PersistentDelivery(Delivery):
             for row in rows:
                 payloads.append(json.loads(row["payload"]))
                 ids.append(row["id"])
-            body = {"tracked": payloads}
-
-            def _retryable(exc: Exception) -> bool:
-                if isinstance(exc, httpx.HTTPStatusError):
-                    return exc.response is None or exc.response.status_code >= 500
-                return True
-
+            body = {self._body_key: payloads}
             try:
-                for attempt in Retrying(
-                    stop=stop_after_attempt(self.max_attempts),
-                    wait=wait_exponential_jitter(),
-                    retry=retry_if_exception(_retryable),
-                ):
-                    with attempt:
-                        resp = self._client.post(
-                            self._endpoint, json=body, headers=self._headers
-                        )
-                        resp.raise_for_status()
+                self._post_with_retry(body, max_attempts=self.max_attempts)
             except Exception as exc:
                 self.logger.error("Delivery failed: %s", exc)
-                for row, payload in zip(rows, payloads):
+                for row, _payload in zip(rows, payloads):
                     self._reschedule(row["id"], row["retry_count"] + 1)
             else:
                 with self._lock:

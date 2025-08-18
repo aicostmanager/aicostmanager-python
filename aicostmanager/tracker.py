@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import os
-from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import httpx
-import logging
 
 from .delivery import (
     DeliveryType,
@@ -43,21 +40,11 @@ class Tracker:
         transport: httpx.BaseTransport | None = None,
         log_bodies: bool = False,
     ) -> None:
-        log_file = log_file or os.getenv("AICM_TRACKER_LOG_FILE")
-        log_level = (log_level or os.getenv("AICM_TRACKER_LOG_LEVEL", "INFO")).upper()
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(getattr(logging, log_level, logging.INFO))
-        if not self.logger.handlers:
-            handler = logging.FileHandler(log_file) if log_file else logging.StreamHandler()
-            formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-        ini_path = (
-            aicm_ini_path
-            or os.getenv("AICM_INI_PATH")
-            or str(Path.home() / ".config" / "aicostmanager" / "AICM.INI")
-        )
+        ini_path = IniManager.resolve_path(aicm_ini_path)
         self.ini_manager = IniManager(ini_path)
+        self.logger = self.ini_manager.create_logger(
+            __name__, log_file, log_level, "AICM_TRACKER_LOG_FILE", "AICM_TRACKER_LOG_LEVEL"
+        )
         if delivery_type is None:
             name = self.ini_manager.get_option(
                 "tracker", "delivery_manager", DeliveryType.IMMEDIATE.value
@@ -70,6 +57,7 @@ class Tracker:
                 aicm_api_url=aicm_api_url,
                 timeout=timeout,
                 transport=transport,
+                ini_manager=self.ini_manager,
                 log_file=log_file,
                 log_level=log_level,
             )
@@ -84,6 +72,7 @@ class Tracker:
                 batch_interval=batch_interval,
                 max_batch_size=max_batch_size,
                 transport=transport,
+                ini_manager=self.ini_manager,
                 log_file=log_file,
                 log_level=log_level,
             )
@@ -103,6 +92,7 @@ class Tracker:
                 max_retries=max_retries,
                 transport=transport,
                 log_bodies=log_bodies,
+                ini_manager=self.ini_manager,
             )
         self.ini_manager.set_option(
             "tracker", "delivery_manager", delivery_type.value

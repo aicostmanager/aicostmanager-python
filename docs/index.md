@@ -8,7 +8,7 @@
 - [Manual Usage Tracking](tracker.md) - Record custom usage events
 - [REST API Tracking](rest.md) - Wrap requests or httpx sessions
 - [Configuration & Env Vars](configuration.md) - Environment variables and INI behavior
-- [Limits Management](limits_manager.md) - Manage usage limits and triggered limits
+- [Limit Managers](limit_managers.md) - Manage usage limits and triggered limits
 
 ## Development
 

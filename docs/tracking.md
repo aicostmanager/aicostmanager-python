@@ -102,13 +102,11 @@ async with AsyncCostManagerClient() as client:
 ```
 ## Health & Metrics
 
-Use the helper to inspect queue state and metrics such as total sent, failed,
-and discarded payloads:
+Call the ``stats`` method on the delivery instance to inspect queue state and
+metrics such as total sent, failed, and discarded payloads:
 
 ```python
-from aicostmanager import get_global_delivery_health
-
-print(get_global_delivery_health())
+print(tracker.delivery.stats())
 ```
 
 ## Multiprocessing Environments
