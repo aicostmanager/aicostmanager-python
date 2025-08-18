@@ -47,13 +47,21 @@ class Tracker:
         transport: httpx.BaseTransport | None = None,
         log_bodies: bool = False,
     ) -> None:
-        self.ini_manager = ini_manager or IniManager(IniManager.resolve_path(aicm_ini_path))
+        self.ini_manager = ini_manager or IniManager(
+            IniManager.resolve_path(aicm_ini_path)
+        )
         self.logger = create_logger(
-            __name__, log_file, log_level, "AICM_TRACKER_LOG_FILE", "AICM_TRACKER_LOG_LEVEL"
+            __name__,
+            log_file,
+            log_level,
+            "AICM_TRACKER_LOG_FILE",
+            "AICM_TRACKER_LOG_LEVEL",
         )
         if delivery is not None:
             self.delivery = delivery
-            delivery_type = getattr(delivery, "type", delivery_type or DeliveryType.IMMEDIATE)
+            delivery_type = getattr(
+                delivery, "type", delivery_type or DeliveryType.IMMEDIATE
+            )
         else:
             if delivery_type is None:
                 name = self.ini_manager.get_option(
@@ -91,7 +99,7 @@ class Tracker:
     def _build_record(
         self,
         api_id: str,
-        system_key: str,
+        system_key: Optional[str],
         usage: Dict[str, Any],
         *,
         response_id: Optional[str],
@@ -123,7 +131,7 @@ class Tracker:
     def track(
         self,
         api_id: str,
-        system_key: str,
+        system_key: Optional[str],
         usage: Dict[str, Any],
         *,
         response_id: Optional[str] = None,
@@ -146,7 +154,7 @@ class Tracker:
     async def track_async(
         self,
         api_id: str,
-        system_key: str,
+        system_key: Optional[str],
         usage: Dict[str, Any],
         *,
         response_id: Optional[str] = None,
@@ -168,7 +176,6 @@ class Tracker:
     def track_llm_usage(
         self,
         api_id: str,
-        system_key: str,
         response: Any,
         *,
         response_id: Optional[str] = None,
@@ -185,9 +192,10 @@ class Tracker:
         """
         usage = get_usage_from_response(response, api_id)
         if isinstance(usage, dict) and usage:
+            model = getattr(response, "model", None)
             self.track(
                 api_id,
-                system_key,
+                model,
                 usage,
                 response_id=response_id,
                 timestamp=timestamp,
@@ -199,7 +207,6 @@ class Tracker:
     async def track_llm_usage_async(
         self,
         api_id: str,
-        system_key: str,
         response: Any,
         *,
         response_id: Optional[str] = None,
@@ -211,7 +218,6 @@ class Tracker:
         return await asyncio.to_thread(
             self.track_llm_usage,
             api_id,
-            system_key,
             response,
             response_id=response_id,
             timestamp=timestamp,
@@ -222,7 +228,6 @@ class Tracker:
     def track_llm_stream_usage(
         self,
         api_id: str,
-        system_key: str,
         stream: Any,
         *,
         response_id: Optional[str] = None,
@@ -237,6 +242,7 @@ class Tracker:
         :func:`get_streaming_usage_from_response` and sent via :meth:`track` once
         available.
         """
+        system_key = getattr(stream, "model", None)
         usage_sent = False
         for chunk in stream:
             if not usage_sent:
@@ -257,7 +263,6 @@ class Tracker:
     async def track_llm_stream_usage_async(
         self,
         api_id: str,
-        system_key: str,
         stream: Any,
         *,
         response_id: Optional[str] = None,
@@ -266,6 +271,7 @@ class Tracker:
         context: Optional[Dict[str, Any]] = None,
     ):
         """Asynchronous version of :meth:`track_llm_stream_usage`."""
+        system_key = getattr(stream, "model", None)
         usage_sent = False
         async for chunk in stream:
             if not usage_sent:
