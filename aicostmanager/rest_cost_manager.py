@@ -15,7 +15,7 @@ from .client import (
     UsageLimitExceeded,
 )
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
-from .delivery import ResilientDelivery, get_global_delivery
+from .delivery import MemQueueDelivery, get_global_delivery
 from .universal_extractor import UniversalExtractor
 
 _HTTP_METHODS = {
@@ -44,7 +44,7 @@ class RestCostManager:
         aicm_ini_path: Optional[str] = None,
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
-        delivery: ResilientDelivery | None = None,
+        delivery: MemQueueDelivery | None = None,
         delivery_queue_size: int = 1000,
         delivery_max_retries: int = 5,
         delivery_timeout: float = 10.0,
@@ -79,14 +79,16 @@ class RestCostManager:
             self.delivery = delivery
         else:
             self.delivery = get_global_delivery(
-                self.cm_client,
+                aicm_api_key=aicm_api_key,
+                aicm_api_base=aicm_api_base,
+                aicm_api_url=aicm_api_url,
+                timeout=delivery_timeout,
                 max_retries=delivery_max_retries,
                 queue_size=delivery_queue_size,
-                timeout=delivery_timeout,
-                batch_interval=delivery_batch_interval,
+                batch_interval=delivery_batch_interval or 0.05,
                 max_batch_size=delivery_max_batch_size,
-                delivery_mode=delivery_mode,
-                on_full=delivery_on_full,
+                endpoint="/track-usage",
+                body_key="usage_records",
             )
 
     # ------------------------------------------------------------

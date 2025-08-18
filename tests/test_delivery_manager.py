@@ -3,7 +3,7 @@ import time
 
 import httpx
 
-from aicostmanager import Tracker, DeliveryManagerType
+from aicostmanager import Tracker, DeliveryType
 
 
 def test_tracker_default_immediate_delivery():
@@ -29,7 +29,7 @@ def test_tracker_mem_queue_delivery():
 
     transport = httpx.MockTransport(handler)
     tracker = Tracker(
-        delivery_type=DeliveryManagerType.MEM_QUEUE,
+        delivery_type=DeliveryType.MEM_QUEUE,
         aicm_api_key="test",
         transport=transport,
         batch_interval=0.1,
@@ -53,7 +53,7 @@ def test_tracker_persistent_queue_delivery(tmp_path):
     transport = httpx.MockTransport(handler)
     db_path = tmp_path / "queue.db"
     tracker = Tracker(
-        delivery_type=DeliveryManagerType.PERSISTENT_QUEUE,
+        delivery_type=DeliveryType.PERSISTENT_QUEUE,
         aicm_api_key="test",
         db_path=str(db_path),
         transport=transport,

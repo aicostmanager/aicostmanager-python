@@ -13,7 +13,6 @@ from .client import (
 )
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
 from .cost_manager import _AsyncStreamIterator
-from .delivery import _ini_get_or_set
 from .universal_extractor import UniversalExtractor
 
 
@@ -40,14 +39,7 @@ class AsyncResilientDelivery:
         self.timeout = timeout
         self.ini_path = ini_path
         self.max_batch_size = max_batch_size
-        if ini_path:
-            default_interval = batch_interval if batch_interval is not None else 0.05
-            override = batch_interval is not None
-            self.batch_interval = _ini_get_or_set(
-                ini_path, "delivery", "timeout", default_interval, override=override
-            )
-        else:
-            self.batch_interval = batch_interval if batch_interval is not None else 0.05
+        self.batch_interval = batch_interval if batch_interval is not None else 0.05
         self._queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=queue_size)
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
