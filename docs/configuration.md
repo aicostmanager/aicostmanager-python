@@ -26,7 +26,6 @@ avoid corruption. A simple file lock is used to prevent race conditions.
 
 ## Triggered Limits Refresh
 
-- During client initialization, the SDK fetches `/configs` and (if unchanged) then `/triggered-limits`
 - If the INI cache lacks triggered limit payloads, the SDK fetches limits from the API and stores them
 - Delivery responses can also update triggered limits automatically
 

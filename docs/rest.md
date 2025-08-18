@@ -14,7 +14,7 @@ response = tracker.get("/v2/streaming.list", params={"page": 1})
 The hostname of the API (``api.heygen.com`` in this example) becomes both the
 ``api_id`` and ``config_id``. The full URL without the scheme is used as the
 ``service_id``. Any payloads extracted from the call are queued for delivery to
-AICostManager just like with ``CostManager``.
+AICostManager.
 
 The response for ``/v2/streaming.list`` contains a list of streaming sessions.
 A handling configuration can iterate over those sessions and produce a usage

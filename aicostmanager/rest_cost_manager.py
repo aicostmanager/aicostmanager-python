@@ -8,7 +8,6 @@ from urllib.parse import urljoin, urlparse
 import httpx
 import requests
 
-from .async_cost_manager import AsyncResilientDelivery
 from .client import (
     AsyncCostManagerClient,
     CostManagerClient,
@@ -214,10 +213,14 @@ class AsyncRestCostManager:
         aicm_ini_path: Optional[str] = None,
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
-        delivery: AsyncResilientDelivery | None = None,
+        delivery: MemQueueDelivery | None = None,
         delivery_queue_size: int = 1000,
         delivery_max_retries: int = 5,
         delivery_timeout: float = 10.0,
+        delivery_batch_interval: float | None = None,
+        delivery_max_batch_size: int = 1000,
+        delivery_mode: str | None = None,
+        delivery_on_full: str | None = None,
     ) -> None:
         self.session = session or httpx.AsyncClient()
         self.base_url = base_url.rstrip("/")
@@ -251,12 +254,23 @@ class AsyncRestCostManager:
         if delivery is not None:
             self.delivery = delivery
         else:
-            self.delivery = AsyncResilientDelivery(
-                self.cm_client.session,
-                self.cm_client.api_root,
+            cfg = DeliveryConfig(
+                ini_manager=IniManager(self.cm_client.ini_path),
+                aicm_api_key=aicm_api_key,
+                aicm_api_base=aicm_api_base,
+                aicm_api_url=aicm_api_url,
+                timeout=delivery_timeout,
+            )
+            self.delivery = MemQueueDelivery(
+                cfg,
                 max_retries=delivery_max_retries,
                 queue_size=delivery_queue_size,
-                timeout=delivery_timeout,
+                batch_interval=delivery_batch_interval or 0.5,
+                max_batch_size=delivery_max_batch_size,
+                endpoint="/track-usage",
+                body_key="usage_records",
+                mode=delivery_mode,
+                on_full=delivery_on_full,
             )
         self.delivery.start()
 
@@ -346,7 +360,7 @@ class AsyncRestCostManager:
         self.delivery.start()
 
     async def stop_delivery(self) -> None:
-        await self.delivery.stop()
+        self.delivery.stop()
 
     async def __aenter__(self) -> "AsyncRestCostManager":
         self.start_delivery()

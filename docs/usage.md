@@ -48,35 +48,6 @@ filters = UsageEventFilters(client_customer_key="cust1", start_date=date(2024, 1
 for event in client.iter_usage_events(filters):
     print(event.event_id)
 
-# manually refresh configuration
-cfg = CostManagerConfig(client)
-cfg.refresh()
-
-# subsequent calls can use the ETag header for caching
-cfgs = client.get_configs()
-etag = client.configs_etag
-unchanged = client.get_configs(etag=etag)  # returns None when unchanged
-
-The `/configs` endpoint returns an `ETag` header. Send this value back in
-`If-None-Match` to avoid downloading configuration when nothing has changed.
-If configuration payload is unchanged, triggered limits can still be refreshed
-via `/triggered-limits`. The SDK also falls back to fetching triggered limits
-from the API if the local INI cache is empty or missing fields.
-
-# using CostManager with automatic delivery
-from aicostmanager import CostManager
-
-with CostManager(client) as manager:
-    manager.client.list_customers()
-    # payloads delivered in background
-
-# asynchronous tracking
-from aicostmanager import AsyncCostManager, AsyncCostManagerClient
-
-async def async_example():
-    async with AsyncCostManagerClient() as aclient:
-        async with AsyncCostManager(aclient) as manager:
-            await manager.client.list_customers()
 ```
 
 ## FastAPI integration
@@ -141,5 +112,5 @@ data = tracker.get("/v2/streaming.list").json()
 ```
 
 The wrapper automatically extracts payloads from each call and sends them to
-AICostManager just like when using ``CostManager``.
+AICostManager.
 
