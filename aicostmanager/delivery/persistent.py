@@ -6,10 +6,8 @@ import os
 import sqlite3
 import threading
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-import httpx
 
 from .base import DeliveryConfig, DeliveryType, QueueDelivery
 
@@ -23,35 +21,26 @@ class PersistentDelivery(QueueDelivery):
         self,
         *,
         config: DeliveryConfig,
-        db_path: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
+        db_path: str,
         poll_interval: float = 1.0,
         batch_interval: float = 0.5,
         max_attempts: int = 3,
         max_retries: int = 5,
         log_bodies: bool = False,
-        **kwargs: Any,
+        max_batch_size: int = 100,
+        logger: logging.Logger | None = None,
     ) -> None:
         super().__init__(
             config,
             batch_interval=batch_interval,
-            max_batch_size=kwargs.get("max_batch_size", 100),
+            max_batch_size=max_batch_size,
             max_retries=max_retries,
             logger=logger,
         )
-        self.db_path = db_path or self.ini_manager.get_option(
-            "delivery",
-            "db_path",
-            str(Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"),
-        )
+        self.db_path = db_path
         self.poll_interval = poll_interval
         self.max_attempts = max_attempts
-        env_log_bodies = os.getenv("AICM_DELIVERY_LOG_BODIES", "false").lower() in (
-            "1",
-            "true",
-            "yes",
-        )
-        self.log_bodies = log_bodies or env_log_bodies
+        self.log_bodies = log_bodies
 
         db_dir = os.path.dirname(self.db_path)
         if db_dir:

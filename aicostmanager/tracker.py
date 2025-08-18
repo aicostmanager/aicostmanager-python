@@ -7,7 +7,12 @@ from uuid import uuid4
 
 import httpx
 
-from .delivery import Delivery, DeliveryConfig, DeliveryType, ImmediateDelivery, MemQueueDelivery, PersistentDelivery
+from .delivery import (
+    Delivery,
+    DeliveryConfig,
+    DeliveryType,
+    create_delivery,
+)
 from .ini_manager import IniManager
 from .logger import create_logger
 
@@ -61,34 +66,18 @@ class Tracker:
                 log_file=log_file,
                 log_level=log_level,
             )
-            factory = {
-                DeliveryType.IMMEDIATE: ImmediateDelivery,
-                DeliveryType.MEM_QUEUE: MemQueueDelivery,
-                DeliveryType.PERSISTENT_QUEUE: PersistentDelivery,
-            }
-            delivery_kwargs: Dict[str, Any] = {"config": config}
-            if delivery_type is DeliveryType.MEM_QUEUE:
-                delivery_kwargs.update(
-                    {
-                        "queue_size": queue_size,
-                        "batch_interval": batch_interval,
-                        "max_batch_size": max_batch_size,
-                        "max_retries": max_retries,
-                    }
-                )
-            elif delivery_type is DeliveryType.PERSISTENT_QUEUE:
-                delivery_kwargs.update(
-                    {
-                        "db_path": db_path,
-                        "poll_interval": poll_interval,
-                        "batch_interval": batch_interval,
-                        "max_attempts": max_attempts,
-                        "max_retries": max_retries,
-                        "log_bodies": log_bodies,
-                        "max_batch_size": max_batch_size,
-                    }
-                )
-            self.delivery = factory[delivery_type](**delivery_kwargs)
+            self.delivery = create_delivery(
+                delivery_type,
+                config,
+                db_path=db_path,
+                poll_interval=poll_interval,
+                batch_interval=batch_interval,
+                max_attempts=max_attempts,
+                max_retries=max_retries,
+                queue_size=queue_size,
+                max_batch_size=max_batch_size,
+                log_bodies=log_bodies,
+            )
         if delivery_type is not None:
             self.ini_manager.set_option(
                 "tracker", "delivery_manager", delivery_type.value
