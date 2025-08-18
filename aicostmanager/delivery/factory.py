@@ -32,9 +32,9 @@ def create_delivery(delivery_type: DeliveryType, config: DeliveryConfig, **kwarg
 
     if delivery_type is DeliveryType.MEM_QUEUE:
         params = {
-            "queue_size": kwargs.get("queue_size", 1000),
+            "queue_size": kwargs.get("queue_size", 10000),
             "batch_interval": kwargs.get("batch_interval", 0.5),
-            "max_batch_size": kwargs.get("max_batch_size", 100),
+            "max_batch_size": kwargs.get("max_batch_size", 1000),
             "max_retries": kwargs.get("max_retries", 5),
         }
         return MemQueueDelivery(config, **params)
@@ -53,12 +53,12 @@ def create_delivery(delivery_type: DeliveryType, config: DeliveryConfig, **kwarg
         log_bodies = kwargs.get("log_bodies", False) or env_log_bodies
         params = {
             "db_path": db_path,
-            "poll_interval": kwargs.get("poll_interval", 1.0),
+            "poll_interval": kwargs.get("poll_interval", 0.1),
             "batch_interval": kwargs.get("batch_interval", 0.5),
             "max_attempts": kwargs.get("max_attempts", 3),
             "max_retries": kwargs.get("max_retries", 5),
             "log_bodies": log_bodies,
-            "max_batch_size": kwargs.get("max_batch_size", 100),
+            "max_batch_size": kwargs.get("max_batch_size", 1000),
         }
         return PersistentDelivery(config=config, **params)
     return ImmediateDelivery(config)

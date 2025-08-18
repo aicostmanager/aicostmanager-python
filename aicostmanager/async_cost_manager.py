@@ -26,11 +26,11 @@ class AsyncResilientDelivery:
         *,
         endpoint: str = "/track-usage",
         max_retries: int = 5,
-        queue_size: int = 1000,
+        queue_size: int = 10000,
         timeout: float = 10.0,
         ini_path: Optional[str] = None,
         batch_interval: float | None = None,
-        max_batch_size: int = 100,
+        max_batch_size: int = 1000,
     ) -> None:
         self.session = session
         self.api_root = api_root.rstrip("/")
@@ -39,7 +39,7 @@ class AsyncResilientDelivery:
         self.timeout = timeout
         self.ini_path = ini_path
         self.max_batch_size = max_batch_size
-        self.batch_interval = batch_interval if batch_interval is not None else 0.05
+        self.batch_interval = batch_interval if batch_interval is not None else 0.5
         self._queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=queue_size)
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -155,11 +155,11 @@ class AsyncCostManager:
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
         delivery: AsyncResilientDelivery | None = None,
-        delivery_queue_size: int = 1000,
+        delivery_queue_size: int = 10000,
         delivery_max_retries: int = 5,
         delivery_timeout: float = 10.0,
         delivery_batch_interval: float | None = None,
-        delivery_max_batch_size: int = 100,
+        delivery_max_batch_size: int = 1000,
     ) -> None:
         self.client = client
         # synchronous client used for configuration loading only

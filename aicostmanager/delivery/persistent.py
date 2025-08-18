@@ -21,12 +21,12 @@ class PersistentDelivery(QueueDelivery):
         *,
         config: DeliveryConfig,
         db_path: str,
-        poll_interval: float = 1.0,
+        poll_interval: float = 0.1,
         batch_interval: float = 0.5,
         max_attempts: int = 3,
         max_retries: int = 5,
         log_bodies: bool = False,
-        max_batch_size: int = 100,
+        max_batch_size: int = 1000,
         logger: logging.Logger | None = None,
     ) -> None:
         super().__init__(
@@ -77,27 +77,41 @@ class PersistentDelivery(QueueDelivery):
         return msg_id
 
     def get_batch(self, max_batch_size: int, *, block: bool = True) -> List[QueueItem]:
-        with self._lock:
-            cur = self.conn.execute(
-                "SELECT * FROM queue WHERE status='queued' AND scheduled_at <= ? ORDER BY id LIMIT ?",
-                (time.time(), max_batch_size),
-            )
-            rows = cur.fetchall()
-            if rows:
-                now = time.time()
-                self.conn.executemany(
-                    "UPDATE queue SET status='processing', updated_at=? WHERE id=?",
-                    [(now, row["id"]) for row in rows],
+        deadline = time.time() + self.batch_interval if block else time.time()
+        rows: List[sqlite3.Row] = []
+        while len(rows) < max_batch_size:
+            remaining = max_batch_size - len(rows)
+            with self._lock:
+                cur = self.conn.execute(
+                    "SELECT * FROM queue WHERE status='queued' AND scheduled_at <= ? ORDER BY id LIMIT ?",
+                    (time.time(), remaining),
                 )
-                self.conn.commit()
+                fetched = cur.fetchall()
+                if fetched:
+                    now = time.time()
+                    self.conn.executemany(
+                        "UPDATE queue SET status='processing', updated_at=? WHERE id=?",
+                        [(now, row["id"]) for row in fetched],
+                    )
+                    self.conn.commit()
+                    rows.extend(fetched)
+            if len(rows) >= max_batch_size:
+                break
+            if not block:
+                break
+            remaining_time = deadline - time.time()
+            if remaining_time <= 0:
+                break
+            time.sleep(min(self.poll_interval, remaining_time))
         if not rows:
-            if block:
-                time.sleep(self.poll_interval)
             return []
         if self.logger.isEnabledFor(logging.DEBUG):
             ids = ", ".join(str(row["id"]) for row in rows)
             self.logger.debug("Fetched %d messages for processing: %s", len(rows), ids)
-        return [QueueItem(id=row["id"], payload=json.loads(row["payload"]), retry_count=row["retry_count"]) for row in rows]
+        return [
+            QueueItem(id=row["id"], payload=json.loads(row["payload"]), retry_count=row["retry_count"])
+            for row in rows
+        ]
 
     def acknowledge(self, items: List[QueueItem]) -> None:
         ids = [(item.id,) for item in items if item.id is not None]

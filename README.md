@@ -233,11 +233,11 @@ Visit [aicostmanager.com](https://aicostmanager.com) to access:
 ```python
 tracked_client = CostManager(
     client,
-    delivery_queue_size=1000,      # Queue size for batching
+    delivery_queue_size=10000,     # Queue size for batching
     delivery_max_retries=5,        # Retry failed deliveries
     delivery_timeout=10.0,         # Request timeout in seconds
-    delivery_batch_interval=0.05,  # Wait up to 50ms for more items
-    delivery_max_batch_size=100,   # Flush when batch reaches this size
+    delivery_batch_interval=0.5,   # Wait up to 0.5s for more items
+    delivery_max_batch_size=1000,  # Flush when batch reaches this size
     # delivery_mode="async",       # Use async delivery (or set AICM_DELIVERY_MODE)
     # delivery_on_full="backpressure",  # Block, raise, or backpressure when full (or set AICM_DELIVERY_ON_FULL)
 )
