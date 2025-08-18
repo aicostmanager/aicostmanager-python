@@ -8,8 +8,7 @@ import threading
 import time
 from typing import Any, Dict, List
 
-
-from .base import DeliveryConfig, DeliveryType, QueueDelivery
+from .base import DeliveryConfig, DeliveryType, QueueDelivery, QueueItem
 
 
 class PersistentDelivery(QueueDelivery):
@@ -34,12 +33,12 @@ class PersistentDelivery(QueueDelivery):
             config,
             batch_interval=batch_interval,
             max_batch_size=max_batch_size,
+            max_attempts=max_attempts,
             max_retries=max_retries,
             logger=logger,
         )
         self.db_path = db_path
         self.poll_interval = poll_interval
-        self.max_attempts = max_attempts
         self.log_bodies = log_bodies
 
         db_dir = os.path.dirname(self.db_path)
@@ -77,11 +76,11 @@ class PersistentDelivery(QueueDelivery):
         self.logger.debug("Enqueued message id=%s", msg_id)
         return msg_id
 
-    def _get_batch(self, limit: int = 100) -> List[sqlite3.Row]:
+    def get_batch(self, max_batch_size: int, *, block: bool = True) -> List[QueueItem]:
         with self._lock:
             cur = self.conn.execute(
                 "SELECT * FROM queue WHERE status='queued' AND scheduled_at <= ? ORDER BY id LIMIT ?",
-                (time.time(), limit),
+                (time.time(), max_batch_size),
             )
             rows = cur.fetchall()
             if rows:
@@ -91,12 +90,27 @@ class PersistentDelivery(QueueDelivery):
                     [(now, row["id"]) for row in rows],
                 )
                 self.conn.commit()
-        if rows and self.logger.isEnabledFor(logging.DEBUG):
+        if not rows:
+            if block:
+                time.sleep(self.poll_interval)
+            return []
+        if self.logger.isEnabledFor(logging.DEBUG):
             ids = ", ".join(str(row["id"]) for row in rows)
             self.logger.debug("Fetched %d messages for processing: %s", len(rows), ids)
-        return rows
+        return [QueueItem(id=row["id"], payload=json.loads(row["payload"]), retry_count=row["retry_count"]) for row in rows]
 
-    def _reschedule(self, row_id: int, retry_count: int) -> None:
+    def acknowledge(self, items: List[QueueItem]) -> None:
+        ids = [(item.id,) for item in items if item.id is not None]
+        if not ids:
+            return
+        with self._lock:
+            self.conn.executemany("DELETE FROM queue WHERE id=?", ids)
+            self.conn.commit()
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug("Delivered %d messages", len(ids))
+
+    def reschedule(self, item: QueueItem) -> None:
+        retry_count = item.retry_count
         if retry_count >= self.max_retries:
             status = "failed"
             scheduled = time.time()
@@ -106,46 +120,24 @@ class PersistentDelivery(QueueDelivery):
         with self._lock:
             self.conn.execute(
                 "UPDATE queue SET status=?, retry_count=?, scheduled_at=?, updated_at=? WHERE id=?",
-                (status, retry_count, scheduled, time.time(), row_id),
+                (status, retry_count, scheduled, time.time(), item.id),
             )
             self.conn.commit()
-        self.logger.debug(
-            "Rescheduled message id=%s retry=%s status=%s next_at=%.2f",
-            row_id,
-            retry_count,
-            status,
-            scheduled,
-        )
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(
+                "Rescheduled message id=%s retry=%s status=%s next_at=%.2f",
+                item.id,
+                retry_count,
+                status,
+                scheduled,
+            )
 
-    def _run(self) -> None:
-        while not self._stop.is_set():
-            rows = self._get_batch()
-            if not rows:
-                time.sleep(self.poll_interval)
-                continue
-            payloads: List[Dict[str, Any]] = []
-            ids: List[int] = []
-            for row in rows:
-                payloads.append(json.loads(row["payload"]))
-                ids.append(row["id"])
-            body = {self._body_key: payloads}
-            try:
-                self._post_with_retry(body, max_attempts=self.max_attempts)
-            except Exception as exc:
-                self.logger.error("Delivery failed: %s", exc)
-                for row, _payload in zip(rows, payloads):
-                    self._reschedule(row["id"], row["retry_count"] + 1)
-            else:
-                with self._lock:
-                    self.conn.executemany(
-                        "DELETE FROM queue WHERE id=?",
-                        [(row_id,) for row_id in ids],
-                    )
-                    self.conn.commit()
-                self.logger.debug("Delivered %d messages", len(ids))
-            time.sleep(self.batch_interval)
+    def queued(self) -> int:
+        with self._lock:
+            cur = self.conn.execute("SELECT COUNT(*) FROM queue WHERE status='queued'")
+            (count,) = cur.fetchone()
+        return int(count)
 
     def stop(self) -> None:
         super().stop()
-        self._client.close()
         self.conn.close()
