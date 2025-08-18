@@ -4,6 +4,7 @@ import json
 import httpx
 
 from aicostmanager import Tracker
+from aicostmanager.ini_manager import IniManager
 
 
 def test_tracker_builds_record():
@@ -14,7 +15,7 @@ def test_tracker_builds_record():
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
-    tracker = Tracker(aicm_api_key="test", transport=transport)
+    tracker = Tracker(aicm_api_key="test", transport=transport, ini_manager=IniManager("ini"))
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1}, client_customer_key="abc")
     tracker.close()
     assert received
@@ -32,7 +33,7 @@ def test_tracker_track_async():
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
-    tracker = Tracker(aicm_api_key="test", transport=transport)
+    tracker = Tracker(aicm_api_key="test", transport=transport, ini_manager=IniManager("ini"))
 
     async def run():
         await tracker.track_async("openai", "gpt-5-mini", {"input_tokens": 1})

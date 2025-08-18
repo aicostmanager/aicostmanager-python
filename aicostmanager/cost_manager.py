@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional
 from .client import CostManagerClient, UsageLimitExceeded
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
 from .delivery import DeliveryConfig, MemQueueDelivery
+from .ini_manager import IniManager
 from .universal_extractor import UniversalExtractor
 
 
@@ -62,6 +63,7 @@ class CostManager:
             self.delivery = delivery
         else:
             cfg = DeliveryConfig(
+                ini_manager=IniManager(self.cm_client.ini_path),
                 aicm_api_key=aicm_api_key,
                 aicm_api_base=aicm_api_base,
                 aicm_api_url=aicm_api_url,

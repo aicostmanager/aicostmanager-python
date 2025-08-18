@@ -25,12 +25,12 @@ class DeliveryType(str, Enum):
 class DeliveryConfig:
     """Common configuration shared by delivery implementations."""
 
+    ini_manager: IniManager
     aicm_api_key: str | None = None
     aicm_api_base: str | None = None
     aicm_api_url: str | None = None
     timeout: float = 10.0
     transport: httpx.BaseTransport | None = None
-    ini_manager: IniManager | None = None
     log_file: str | None = None
     log_level: str | None = None
 
@@ -46,7 +46,9 @@ class Delivery(ABC):
         body_key: str = "tracked",
         logger: logging.Logger | None = None,
     ) -> None:
-        self.ini_manager = config.ini_manager or IniManager()
+        if config.ini_manager is None:
+            raise ValueError("ini_manager must be provided")
+        self.ini_manager = config.ini_manager
         self.logger = logger or create_logger(
             self.__class__.__name__,
             config.log_file,
