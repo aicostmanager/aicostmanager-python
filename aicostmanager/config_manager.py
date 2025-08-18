@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import configparser
 import json
 import os
-import tempfile
-import time
-from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 import jwt
 
 from .client import AICMError, CostManagerClient
+from .utils.ini_utils import atomic_write, file_lock, safe_read_config
 
 
 class ConfigNotFound(AICMError):
@@ -44,144 +41,6 @@ class TriggeredLimit:
     expires_at: Optional[str]
 
 
-@contextmanager
-def _file_lock(file_path: str):
-    """Context manager for file locking to prevent race conditions."""
-    # Handle empty or None file paths
-    if not file_path:
-        yield
-        return
-
-    lock_file = f"{file_path}.lock"
-
-    # Handle directory creation more carefully
-    dir_path = os.path.dirname(file_path)
-    if dir_path:  # Only create directory if it's not empty
-        os.makedirs(dir_path, exist_ok=True)
-
-    # Retry mechanism for lock acquisition
-    max_retries = 10
-    retry_delay = 0.1
-
-    for attempt in range(max_retries):
-        try:
-            lock_fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            break
-        except FileExistsError:
-            if attempt == max_retries - 1:
-                # Force remove stale lock if it's too old (>30 seconds)
-                try:
-                    stat = os.stat(lock_file)
-                    if time.time() - stat.st_mtime > 30:
-                        os.unlink(lock_file)
-                        continue
-                except (OSError, FileNotFoundError):
-                    pass
-                raise RuntimeError(f"Could not acquire lock for {file_path}")
-            time.sleep(retry_delay * (2**attempt))  # Exponential backoff
-
-    try:
-        yield
-    finally:
-        try:
-            os.close(lock_fd)
-            os.unlink(lock_file)
-        except (OSError, FileNotFoundError):
-            pass
-
-
-def _safe_read_config(ini_path: str) -> configparser.ConfigParser:
-    """Safely read a ConfigParser, handling duplicate sections."""
-    config = configparser.ConfigParser(allow_no_value=True, strict=False)
-
-    if not os.path.exists(ini_path):
-        return config
-
-    # Read and clean the INI file if it has duplicates
-    try:
-        config.read(ini_path)
-        return config
-    except configparser.DuplicateSectionError:
-        # Handle duplicate sections by cleaning the file
-        _clean_duplicate_sections(ini_path)
-        config = configparser.ConfigParser(allow_no_value=True, strict=False)
-        config.read(ini_path)
-        return config
-
-
-def _clean_duplicate_sections(ini_path: str):
-    """Remove duplicate sections from INI file, keeping the last occurrence."""
-    if not os.path.exists(ini_path):
-        return
-
-    # Read the file and remove duplicates
-    seen_sections = set()
-    cleaned_lines = []
-    current_section = None
-    section_content = []
-
-    with open(ini_path, "r") as f:
-        lines = f.readlines()
-
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("[") and stripped.endswith("]"):
-            # Found a section header
-            if current_section is not None:
-                # Save previous section if it's the first occurrence
-                if current_section not in seen_sections:
-                    cleaned_lines.extend(section_content)
-                    seen_sections.add(current_section)
-                section_content = []
-
-            current_section = stripped
-            section_content = [line]
-        else:
-            section_content.append(line)
-
-    # Handle the last section
-    if current_section is not None:
-        if current_section not in seen_sections:
-            cleaned_lines.extend(section_content)
-
-    # Write cleaned content atomically
-    _atomic_write(ini_path, "".join(cleaned_lines))
-
-
-def _atomic_write(file_path: str, content: str):
-    """Atomically write content to a file."""
-    # Handle empty or None file paths
-    if not file_path:
-        return
-
-    # Handle directory creation more carefully
-    dir_path = os.path.dirname(file_path)
-    if dir_path:  # Only create directory if it's not empty
-        os.makedirs(dir_path, exist_ok=True)
-
-    # Write to a temporary file first
-    temp_dir = dir_path if dir_path else "."  # Use current directory if no dir_path
-    temp_fd, temp_path = tempfile.mkstemp(
-        dir=temp_dir, prefix=f".{os.path.basename(file_path)}.tmp"
-    )
-
-    try:
-        with os.fdopen(temp_fd, "w") as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())  # Force write to disk
-
-        # Atomic rename
-        os.rename(temp_path, file_path)
-    except Exception:
-        # Clean up temp file on error
-        try:
-            os.unlink(temp_path)
-        except (OSError, FileNotFoundError):
-            pass
-        raise
-
-
 class CostManagerConfig:
     """Manage tracker configuration and triggered limits stored in ``AICM.ini``."""
 
@@ -190,12 +49,12 @@ class CostManagerConfig:
         self.ini_path = client.ini_path
 
         # Initialize with safe reading
-        with _file_lock(self.ini_path):
-            self._config = _safe_read_config(self.ini_path)
+        with file_lock(self.ini_path):
+            self._config = safe_read_config(self.ini_path)
 
     def _write(self) -> None:
         """Safely write config with file locking."""
-        with _file_lock(self.ini_path):
+        with file_lock(self.ini_path):
             # Create content string
             import io
 
@@ -204,7 +63,7 @@ class CostManagerConfig:
             content_str = content.getvalue()
 
             # Atomic write
-            _atomic_write(self.ini_path, content_str)
+            atomic_write(self.ini_path, content_str)
 
     def _update_config(self, force_refresh_limits: bool = False) -> None:
         """Fetch configs from the API and persist to ``AICM.ini``."""
@@ -279,8 +138,8 @@ class CostManagerConfig:
     def refresh(self) -> None:
         """Force refresh of local configuration from the API."""
         self._update_config(force_refresh_limits=True)
-        with _file_lock(self.ini_path):
-            self._config = _safe_read_config(self.ini_path)
+        with file_lock(self.ini_path):
+            self._config = safe_read_config(self.ini_path)
 
     # internal helper
     def _decode(self, token: str, public_key: str) -> Optional[dict]:
@@ -388,16 +247,16 @@ class CostManagerConfig:
     ) -> List[TriggeredLimit]:
         """Return triggered limits for the given parameters."""
         # Always re-read INI file to get latest triggered_limits from delivery worker updates
-        with _file_lock(self.ini_path):
-            self._config = _safe_read_config(self.ini_path)
+        with file_lock(self.ini_path):
+            self._config = safe_read_config(self.ini_path)
 
         if (
             "triggered_limits" not in self._config
             or "payload" not in self._config["triggered_limits"]
         ):
             self.refresh()
-            with _file_lock(self.ini_path):
-                self._config = _safe_read_config(self.ini_path)
+            with file_lock(self.ini_path):
+                self._config = safe_read_config(self.ini_path)
 
         tl_raw = json.loads(self._config["triggered_limits"].get("payload", "{}"))
         token = tl_raw.get("encrypted_payload")
@@ -412,8 +271,8 @@ class CostManagerConfig:
                 else:
                     tl_data = tl_payload
                 self.store_triggered_limits(tl_data)
-                with _file_lock(self.ini_path):
-                    self._config = _safe_read_config(self.ini_path)
+                with file_lock(self.ini_path):
+                    self._config = safe_read_config(self.ini_path)
                 tl_raw = json.loads(self._config["triggered_limits"].get("payload", "{}"))
                 token = tl_raw.get("encrypted_payload")
                 public_key = tl_raw.get("public_key")
