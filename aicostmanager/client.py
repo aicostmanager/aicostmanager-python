@@ -27,6 +27,7 @@ from .models import (
     UsageEventFilters,
     UsageLimitIn,
     UsageLimitOut,
+    UsageLimitProgressOut,
     UsageRollup,
     VendorOut,
 )
@@ -479,6 +480,10 @@ class CostManagerClient:
         self._request("DELETE", f"/usage-limits/{limit_id}/")
         return None
 
+    def list_usage_limit_progress(self) -> Iterable[UsageLimitProgressOut]:
+        data = self._request("GET", "/usage-limits/progress/")
+        return [UsageLimitProgressOut.model_validate(i) for i in data]
+
     def list_vendors(self) -> Iterable[VendorOut]:
         data = self._request("GET", "/vendors/")
         return [VendorOut.model_validate(i) for i in data]
@@ -785,6 +790,10 @@ class AsyncCostManagerClient:
     async def delete_usage_limit(self, limit_id: str) -> None:
         await self._request("DELETE", f"/usage-limits/{limit_id}/")
         return None
+
+    async def list_usage_limit_progress(self) -> Iterable[UsageLimitProgressOut]:
+        data = await self._request("GET", "/usage-limits/progress/")
+        return [UsageLimitProgressOut.model_validate(i) for i in data]
 
     async def list_vendors(self) -> Iterable[VendorOut]:
         data = await self._request("GET", "/vendors/")

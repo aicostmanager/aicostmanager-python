@@ -262,6 +262,7 @@ def test_methods(monkeypatch):
             None,
             204,
         ),
+        ("GET", "/usage-limits/progress/", client.list_usage_limit_progress, (), {}, []),
         ("GET", "/vendors/", client.list_vendors, (), {}, []),
         (
             "GET",
