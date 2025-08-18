@@ -91,23 +91,63 @@ async def track(payload: dict) -> dict:
 
 ## LLM response helpers
 
-The tracker can derive usage directly from LLM client responses:
+The tracker can derive token usage directly from OpenAI responses. Using the
+tracker as a context manager guarantees the usage is flushed before your
+program exits.
+
+### Non-streaming example
 
 ```python
-resp = client.chat.completions.create(...)
-tracker.track_llm_usage("openai_chat", "gpt-5-mini", resp)
+from aicostmanager import Tracker
+from openai import OpenAI
+
+client = OpenAI()
+
+with Tracker() as tracker:
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "Give me a haiku about snow."}],
+    )
+    tracker.track_llm_usage("openai_chat", resp.model, resp)
+    print(resp.choices[0].message.content)
 ```
 
-For streaming responses, wrap the iterator to capture usage once it becomes
-available:
+1. `OpenAI()` constructs the API client.
+2. `with Tracker() as tracker:` sets up cost tracking and ensures the queue is
+   flushed.
+3. A chat completion call is made.
+4. `track_llm_usage` extracts token usage from the response and sends it to
+   AICostManager.
+5. Exiting the `with` block delivers the queued usage.
+
+### Streaming example
 
 ```python
-stream = client.chat.completions.create(
-    ..., stream=True, stream_options={"include_usage": True}
-)
-for event in tracker.track_llm_stream_usage("openai_chat", "gpt-5-mini", stream):
-    handle(event)
+from aicostmanager import Tracker
+from openai import OpenAI
+
+client = OpenAI()
+
+with Tracker() as tracker:
+    stream = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "Stream a short poem."}],
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+
+    for event in tracker.track_llm_stream_usage("openai_chat", "gpt-4o-mini", stream):
+        if event.type == "message.delta" and event.delta.get("content"):
+            print(event.delta["content"], end="")
+    print()
 ```
+
+1. `stream=True` returns an iterator of events instead of a full response.
+2. `track_llm_stream_usage` wraps the iterator so the tracker can record usage
+   once the stream completes.
+3. `include_usage` must be set so the final event contains the token counts.
+4. The loop handles each incoming delta while the tracker captures usage behind
+   the scenes.
 
 Asynchronous variants ``track_llm_usage_async`` and
 ``track_llm_stream_usage_async`` mirror the synchronous versions.
