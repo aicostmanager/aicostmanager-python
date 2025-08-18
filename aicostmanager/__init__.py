@@ -13,6 +13,13 @@ from .client import (
 )
 from .config_manager import CostManagerConfig
 from .cost_manager import CostManager
+from .delivery_manager import (
+    DeliveryManager,
+    DeliveryManagerType,
+    ImmediateDeliveryManager,
+    MemQueueDeliveryManager,
+    PersistentQueueDeliveryManager,
+)
 from .delivery import (
     ResilientDelivery,
     get_global_delivery,
@@ -63,6 +70,11 @@ __all__ = [
     "UsageLimitExceeded",
     "CostManagerConfig",
     "UniversalExtractor",
+    "DeliveryManager",
+    "DeliveryManagerType",
+    "ImmediateDeliveryManager",
+    "MemQueueDeliveryManager",
+    "PersistentQueueDeliveryManager",
     "ResilientDelivery",
     "PersistentDelivery",
     "get_global_delivery",

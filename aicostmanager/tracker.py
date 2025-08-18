@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import os
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import httpx
 
-from .persistent_delivery import PersistentDelivery
+from .delivery_manager import (
+    DeliveryManagerType,
+    ImmediateDeliveryManager,
+    MemQueueDeliveryManager,
+    PersistentQueueDeliveryManager,
+)
+from .ini_manager import IniManager
 
 
 class Tracker:
@@ -16,7 +24,7 @@ class Tracker:
     def __init__(
         self,
         *,
-        delivery: PersistentDelivery | None = None,
+        delivery_type: DeliveryManagerType | None = None,
         aicm_api_key: Optional[str] = None,
         aicm_api_base: Optional[str] = None,
         aicm_api_url: Optional[str] = None,
@@ -29,15 +37,48 @@ class Tracker:
         batch_interval: float = 0.5,
         max_attempts: int = 3,
         max_retries: int = 5,
+        queue_size: int = 1000,
+        max_batch_size: int = 100,
+        transport: httpx.BaseTransport | None = None,
+        log_bodies: bool = False,
     ) -> None:
-        if delivery is not None:
-            self.delivery = delivery
-        else:
-            self.delivery = PersistentDelivery(
+        ini_path = (
+            aicm_ini_path
+            or os.getenv("AICM_INI_PATH")
+            or str(Path.home() / ".config" / "aicostmanager" / "AICM.INI")
+        )
+        self.ini_manager = IniManager(ini_path)
+        if delivery_type is None:
+            name = self.ini_manager.get_option(
+                "tracker", "delivery_manager", DeliveryManagerType.IMMEDIATE.value
+            )
+            delivery_type = DeliveryManagerType(name)
+        if delivery_type is DeliveryManagerType.IMMEDIATE:
+            self.delivery = ImmediateDeliveryManager(
                 aicm_api_key=aicm_api_key,
                 aicm_api_base=aicm_api_base,
                 aicm_api_url=aicm_api_url,
-                aicm_ini_path=aicm_ini_path,
+                timeout=timeout,
+                transport=transport,
+            )
+        elif delivery_type is DeliveryManagerType.MEM_QUEUE:
+            self.delivery = MemQueueDeliveryManager(
+                aicm_api_key=aicm_api_key,
+                aicm_api_base=aicm_api_base,
+                aicm_api_url=aicm_api_url,
+                timeout=timeout,
+                max_retries=max_retries,
+                queue_size=queue_size,
+                batch_interval=batch_interval,
+                max_batch_size=max_batch_size,
+                transport=transport,
+            )
+        else:
+            self.delivery = PersistentQueueDeliveryManager(
+                aicm_api_key=aicm_api_key,
+                aicm_api_base=aicm_api_base,
+                aicm_api_url=aicm_api_url,
+                aicm_ini_path=ini_path,
                 db_path=db_path,
                 log_file=log_file,
                 log_level=log_level,
@@ -46,7 +87,12 @@ class Tracker:
                 batch_interval=batch_interval,
                 max_attempts=max_attempts,
                 max_retries=max_retries,
+                transport=transport,
+                log_bodies=log_bodies,
             )
+        self.ini_manager.set_option(
+            "tracker", "delivery_manager", delivery_type.value
+        )
 
     # ------------------------------------------------------------------
     def _build_record(
@@ -125,58 +171,6 @@ class Tracker:
             client_customer_key=client_customer_key,
             context=context,
         )
-
-    # ------------------------------------------------------------------
-    def deliver_now(
-        self,
-        api_id: str,
-        system_key: str,
-        usage: Dict[str, Any],
-        *,
-        response_id: Optional[str] = None,
-        timestamp: str | datetime | None = None,
-        client_customer_key: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> httpx.Response:
-        """Immediately deliver a usage record, bypassing the queue."""
-        record = self._build_record(
-            api_id,
-            system_key,
-            usage,
-            response_id=response_id,
-            timestamp=timestamp,
-            client_customer_key=client_customer_key,
-            context=context,
-        )
-        return self.delivery.deliver_now(record)
-
-    async def deliver_now_async(
-        self,
-        api_id: str,
-        system_key: str,
-        usage: Dict[str, Any],
-        *,
-        response_id: Optional[str] = None,
-        timestamp: str | datetime | None = None,
-        client_customer_key: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> httpx.Response:
-        record = self._build_record(
-            api_id,
-            system_key,
-            usage,
-            response_id=response_id,
-            timestamp=timestamp,
-            client_customer_key=client_customer_key,
-            context=context,
-        )
-        return await self.delivery.deliver_now_async(record)
-
-    # Backwards compatible aliases
-    sync_track = deliver_now
-    sync_track_async = deliver_now_async
-    track_sync = deliver_now
-    track_sync_async = deliver_now_async
 
     # ------------------------------------------------------------------
     def __enter__(self):
