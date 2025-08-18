@@ -16,6 +16,7 @@ from .client import (
 )
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
 from .delivery import DeliveryConfig, MemQueueDelivery
+from .ini_manager import IniManager
 from .universal_extractor import UniversalExtractor
 
 _HTTP_METHODS = {
@@ -79,6 +80,7 @@ class RestCostManager:
             self.delivery = delivery
         else:
             cfg = DeliveryConfig(
+                ini_manager=IniManager(self.cm_client.ini_path),
                 aicm_api_key=aicm_api_key,
                 aicm_api_base=aicm_api_base,
                 aicm_api_url=aicm_api_url,

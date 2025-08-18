@@ -4,6 +4,7 @@ import time
 import httpx
 
 from aicostmanager import Tracker, DeliveryType
+from aicostmanager.ini_manager import IniManager
 
 
 def test_tracker_default_immediate_delivery():
@@ -14,7 +15,7 @@ def test_tracker_default_immediate_delivery():
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
-    tracker = Tracker(aicm_api_key="test", transport=transport)
+    tracker = Tracker(aicm_api_key="test", transport=transport, ini_manager=IniManager("ini"))
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     assert received and received[0]["tracked"][0]["api_id"] == "openai"
     tracker.close()
@@ -33,6 +34,7 @@ def test_tracker_mem_queue_delivery():
         aicm_api_key="test",
         transport=transport,
         batch_interval=0.1,
+        ini_manager=IniManager("ini"),
     )
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     for _ in range(20):
@@ -58,6 +60,7 @@ def test_tracker_persistent_queue_delivery(tmp_path):
         db_path=str(db_path),
         transport=transport,
         poll_interval=0.1,
+        ini_manager=IniManager(str(tmp_path / "ini")),
     )
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     for _ in range(20):
@@ -78,7 +81,7 @@ def test_immediate_delivery_retries():
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
-    tracker = Tracker(aicm_api_key="test", transport=transport)
+    tracker = Tracker(aicm_api_key="test", transport=transport, ini_manager=IniManager("ini"))
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     tracker.close()
     assert attempts["count"] == 3
@@ -92,7 +95,7 @@ def test_immediate_delivery_does_not_retry_client_error():
         return httpx.Response(400, json={"ok": False})
 
     transport = httpx.MockTransport(handler)
-    tracker = Tracker(aicm_api_key="test", transport=transport)
+    tracker = Tracker(aicm_api_key="test", transport=transport, ini_manager=IniManager("ini"))
     try:
         tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     except httpx.HTTPStatusError:

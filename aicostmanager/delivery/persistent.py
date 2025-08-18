@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from .base import DeliveryConfig, DeliveryType, QueueDelivery
-from ..ini_manager import IniManager
 
 
 class PersistentDelivery(QueueDelivery):
@@ -24,7 +23,6 @@ class PersistentDelivery(QueueDelivery):
         self,
         *,
         config: DeliveryConfig,
-        aicm_ini_path: Optional[str] = None,
         db_path: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
         poll_interval: float = 1.0,
@@ -32,23 +30,10 @@ class PersistentDelivery(QueueDelivery):
         max_attempts: int = 3,
         max_retries: int = 5,
         log_bodies: bool = False,
-        ini_manager: IniManager | None = None,
         **kwargs: Any,
     ) -> None:
-        ini_path = IniManager.resolve_path(aicm_ini_path)
-        ini_manager = ini_manager or config.ini_manager or IniManager(ini_path)
-        cfg = DeliveryConfig(
-            aicm_api_key=config.aicm_api_key,
-            aicm_api_base=config.aicm_api_base,
-            aicm_api_url=config.aicm_api_url,
-            timeout=config.timeout,
-            transport=config.transport,
-            ini_manager=ini_manager,
-            log_file=config.log_file,
-            log_level=config.log_level,
-        )
         super().__init__(
-            cfg,
+            config,
             batch_interval=batch_interval,
             max_batch_size=kwargs.get("max_batch_size", 100),
             max_retries=max_retries,

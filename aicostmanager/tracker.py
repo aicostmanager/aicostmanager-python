@@ -24,6 +24,7 @@ class Tracker:
         aicm_api_base: Optional[str] = None,
         aicm_api_url: Optional[str] = None,
         aicm_ini_path: Optional[str] = None,
+        ini_manager: IniManager | None = None,
         db_path: Optional[str] = None,
         log_file: Optional[str] = None,
         log_level: Optional[str] = None,
@@ -37,8 +38,7 @@ class Tracker:
         transport: httpx.BaseTransport | None = None,
         log_bodies: bool = False,
     ) -> None:
-        ini_path = IniManager.resolve_path(aicm_ini_path)
-        self.ini_manager = IniManager(ini_path)
+        self.ini_manager = ini_manager or IniManager(IniManager.resolve_path(aicm_ini_path))
         self.logger = create_logger(
             __name__, log_file, log_level, "AICM_TRACKER_LOG_FILE", "AICM_TRACKER_LOG_LEVEL"
         )
@@ -52,12 +52,12 @@ class Tracker:
                 )
                 delivery_type = DeliveryType(name)
             config = DeliveryConfig(
+                ini_manager=self.ini_manager,
                 aicm_api_key=aicm_api_key,
                 aicm_api_base=aicm_api_base,
                 aicm_api_url=aicm_api_url,
                 timeout=timeout,
                 transport=transport,
-                ini_manager=self.ini_manager,
                 log_file=log_file,
                 log_level=log_level,
             )
@@ -66,7 +66,7 @@ class Tracker:
                 DeliveryType.MEM_QUEUE: MemQueueDelivery,
                 DeliveryType.PERSISTENT_QUEUE: PersistentDelivery,
             }
-            delivery_kwargs: Dict[str, Any] = {}
+            delivery_kwargs: Dict[str, Any] = {"config": config}
             if delivery_type is DeliveryType.MEM_QUEUE:
                 delivery_kwargs.update(
                     {
@@ -79,8 +79,6 @@ class Tracker:
             elif delivery_type is DeliveryType.PERSISTENT_QUEUE:
                 delivery_kwargs.update(
                     {
-                        "config": config,
-                        "aicm_ini_path": ini_path,
                         "db_path": db_path,
                         "poll_interval": poll_interval,
                         "batch_interval": batch_interval,
@@ -90,8 +88,6 @@ class Tracker:
                         "max_batch_size": max_batch_size,
                     }
                 )
-            if delivery_type is not DeliveryType.PERSISTENT_QUEUE:
-                delivery_kwargs["config"] = config
             self.delivery = factory[delivery_type](**delivery_kwargs)
         if delivery_type is not None:
             self.ini_manager.set_option(
