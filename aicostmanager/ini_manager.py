@@ -107,6 +107,7 @@ def _atomic_write(file_path: str, content: str) -> None:
         raise
 
 
+
 class IniManager:
     """Handle reading and writing triggered limits to the INI file."""
 
@@ -121,6 +122,26 @@ class IniManager:
             content = io.StringIO()
             self._config.write(content)
             _atomic_write(self.ini_path, content.getvalue())
+
+    def get_option(self, section: str, option: str, fallback: str | None = None) -> str | None:
+        """Return ``option`` from ``section`` or ``fallback`` when missing."""
+        with _file_lock(self.ini_path):
+            config = _safe_read_config(self.ini_path)
+        if config.has_section(section) and option in config[section]:
+            return config[section][option]
+        return fallback
+
+    def set_option(self, section: str, option: str, value: str) -> None:
+        """Persist ``option`` under ``section`` with ``value``."""
+        with _file_lock(self.ini_path):
+            cfg = _safe_read_config(self.ini_path)
+            if section not in cfg:
+                cfg.add_section(section)
+            cfg[section][option] = str(value)
+            import io
+            buf = io.StringIO()
+            cfg.write(buf)
+            _atomic_write(self.ini_path, buf.getvalue())
 
     def read_triggered_limits(self) -> dict:
         with _file_lock(self.ini_path):

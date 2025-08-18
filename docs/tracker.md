@@ -13,6 +13,16 @@ from aicostmanager import Tracker
 tracker = Tracker()
 ```
 
+## Choosing a delivery manager
+
+The tracker supports multiple delivery strategies selected via `DeliveryManagerType`. The default `immediate` mode sends each record synchronously with up to three retries for transient errors. Use `mem_queue` for an in-memory background queue or `persistent_queue` for a durable SQLite-backed queue:
+
+```python
+from aicostmanager import Tracker, DeliveryManagerType
+
+tracker = Tracker(delivery_type=DeliveryManagerType.MEM_QUEUE)
+```
+
 The constructor accepts the same connection options as
 `PersistentDelivery`, such as `aicm_api_key`, `aicm_api_base` and
 `aicm_ini_path`.  The delivery system writes logs to the Python logging
@@ -50,29 +60,14 @@ tracker.track(
 )
 ```
 
-## Immediate delivery
-
-Use `deliver_now` to bypass the queue and synchronously send a record.
-The method returns the `httpx.Response` from the server so tests can
-assert on the result:
-
-```python
-resp = tracker.deliver_now("openai", "gpt-5-mini", usage)
-assert resp.status_code == 200
-```
-
-Alias methods `sync_track` and `track_sync` are provided for backwards
-compatibility and behave identically to `deliver_now`.
-
 ## Asynchronous usage
 
 All operations are safe to call from asynchronous applications.  The
-methods `track_async` and `deliver_now_async` run the corresponding
-synchronous logic in a worker thread:
+method `track_async` runs the corresponding synchronous logic in a worker
+thread:
 
 ```python
 await tracker.track_async("openai", "gpt-5-mini", usage)
-response = await tracker.deliver_now_async("openai", "gpt-5-mini", usage)
 ```
 
 Example FastAPI integration:
