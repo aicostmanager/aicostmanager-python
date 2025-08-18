@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional
 
 from .client import CostManagerClient, UsageLimitExceeded
 from .config_manager import Config, CostManagerConfig, TriggeredLimit
-from .delivery import MemQueueDelivery
+from .delivery import DeliveryConfig, MemQueueDelivery
 from .universal_extractor import UniversalExtractor
 
 
@@ -61,11 +61,14 @@ class CostManager:
         if delivery is not None:
             self.delivery = delivery
         else:
-            self.delivery = MemQueueDelivery(
+            cfg = DeliveryConfig(
                 aicm_api_key=aicm_api_key,
                 aicm_api_base=aicm_api_base,
                 aicm_api_url=aicm_api_url,
                 timeout=delivery_timeout,
+            )
+            self.delivery = MemQueueDelivery(
+                cfg,
                 max_retries=delivery_max_retries,
                 queue_size=delivery_queue_size,
                 batch_interval=delivery_batch_interval or 0.05,

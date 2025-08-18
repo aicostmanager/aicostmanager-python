@@ -1,56 +1,28 @@
 from __future__ import annotations
 
 import queue
-import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import httpx
 
-from .base import Delivery
-from ..ini_manager import IniManager
+from .base import DeliveryConfig, DeliveryType, QueueDelivery
 
 
-class MemQueueDelivery(Delivery):
+class MemQueueDelivery(QueueDelivery):
     """In-memory queue with background delivery."""
+
+    type = DeliveryType.MEM_QUEUE
 
     def __init__(
         self,
+        config: DeliveryConfig,
         *,
-        aicm_api_key: Optional[str] = None,
-        aicm_api_base: Optional[str] = None,
-        aicm_api_url: Optional[str] = None,
-        timeout: float = 10.0,
-        max_retries: int = 5,
         queue_size: int = 1000,
-        batch_interval: float = 0.5,
-        max_batch_size: int = 100,
-        transport: httpx.BaseTransport | None = None,
-        endpoint: str = "/track",
-        body_key: str = "tracked",
-        ini_manager: IniManager | None = None,
-        log_file: str | None = None,
-        log_level: str | None = None,
+        **kwargs: Any,
     ) -> None:
-        super().__init__(
-            ini_manager=ini_manager,
-            aicm_api_key=aicm_api_key,
-            aicm_api_base=aicm_api_base,
-            aicm_api_url=aicm_api_url,
-            timeout=timeout,
-            transport=transport,
-            endpoint=endpoint,
-            body_key=body_key,
-            log_file=log_file,
-            log_level=log_level,
-        )
-        self.max_retries = max_retries
-        self.batch_interval = batch_interval
-        self.max_batch_size = max_batch_size
+        super().__init__(config, **kwargs)
         self._queue: queue.Queue[Dict[str, Any]] = queue.Queue(maxsize=queue_size)
-        self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
         self._total_sent = 0
         self._total_failed = 0
 
@@ -95,10 +67,6 @@ class MemQueueDelivery(Delivery):
         except queue.Full:
             self.logger.warning("Delivery queue full")
             self._total_failed += 1
-
-    def stop(self) -> None:
-        self._stop.set()
-        self._thread.join()
 
     def stats(self) -> Dict[str, Any]:
         return {

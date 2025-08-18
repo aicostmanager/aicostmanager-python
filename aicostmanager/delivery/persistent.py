@@ -11,44 +11,47 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from .base import Delivery
+from .base import DeliveryConfig, DeliveryType, QueueDelivery
 from ..ini_manager import IniManager
 
 
-class PersistentDelivery(Delivery):
+class PersistentDelivery(QueueDelivery):
     """Durable queue based delivery using SQLite."""
+
+    type = DeliveryType.PERSISTENT_QUEUE
 
     def __init__(
         self,
         *,
-        aicm_api_key: Optional[str] = None,
-        aicm_api_base: Optional[str] = None,
-        aicm_api_url: Optional[str] = None,
+        config: DeliveryConfig,
         aicm_ini_path: Optional[str] = None,
         db_path: Optional[str] = None,
-        log_file: Optional[str] = None,
-        log_level: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
-        timeout: float = 10.0,
         poll_interval: float = 1.0,
         batch_interval: float = 0.5,
         max_attempts: int = 3,
         max_retries: int = 5,
-        transport: httpx.BaseTransport | None = None,
         log_bodies: bool = False,
         ini_manager: IniManager | None = None,
+        **kwargs: Any,
     ) -> None:
         ini_path = IniManager.resolve_path(aicm_ini_path)
-        ini_manager = ini_manager or IniManager(ini_path)
-        super().__init__(
+        ini_manager = ini_manager or config.ini_manager or IniManager(ini_path)
+        cfg = DeliveryConfig(
+            aicm_api_key=config.aicm_api_key,
+            aicm_api_base=config.aicm_api_base,
+            aicm_api_url=config.aicm_api_url,
+            timeout=config.timeout,
+            transport=config.transport,
             ini_manager=ini_manager,
-            aicm_api_key=aicm_api_key,
-            aicm_api_base=aicm_api_base,
-            aicm_api_url=aicm_api_url,
-            timeout=timeout,
-            transport=transport,
-            log_file=log_file,
-            log_level=log_level,
+            log_file=config.log_file,
+            log_level=config.log_level,
+        )
+        super().__init__(
+            cfg,
+            batch_interval=batch_interval,
+            max_batch_size=kwargs.get("max_batch_size", 100),
+            max_retries=max_retries,
             logger=logger,
         )
         self.db_path = db_path or self.ini_manager.get_option(
@@ -57,9 +60,7 @@ class PersistentDelivery(Delivery):
             str(Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"),
         )
         self.poll_interval = poll_interval
-        self.batch_interval = batch_interval
         self.max_attempts = max_attempts
-        self.max_retries = max_retries
         env_log_bodies = os.getenv("AICM_DELIVERY_LOG_BODIES", "false").lower() in (
             "1",
             "true",
@@ -88,9 +89,6 @@ class PersistentDelivery(Delivery):
                 """
             )
         self._lock = threading.Lock()
-        self._stop_event = threading.Event()
-        self._worker = threading.Thread(target=self._run_worker, daemon=True)
-        self._worker.start()
 
     def enqueue(self, payload: Dict[str, Any]) -> int:
         now = time.time()
@@ -145,8 +143,8 @@ class PersistentDelivery(Delivery):
             scheduled,
         )
 
-    def _run_worker(self) -> None:
-        while not self._stop_event.is_set():
+    def _run(self) -> None:
+        while not self._stop.is_set():
             rows = self._get_batch()
             if not rows:
                 time.sleep(self.poll_interval)
@@ -174,7 +172,6 @@ class PersistentDelivery(Delivery):
             time.sleep(self.batch_interval)
 
     def stop(self) -> None:
-        self._stop_event.set()
-        self._worker.join()
+        super().stop()
         self._client.close()
         self.conn.close()

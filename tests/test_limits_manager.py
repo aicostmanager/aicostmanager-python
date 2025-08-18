@@ -4,8 +4,7 @@ import jwt
 
 from aicostmanager.client import CostManagerClient
 from aicostmanager.ini_manager import IniManager
-from aicostmanager.triggered_limit_manager import TriggeredLimitManager
-from aicostmanager.usage_limit_manager import UsageLimitManager
+from aicostmanager.limits import TriggeredLimitManager, UsageLimitManager
 from aicostmanager.models import (
     UsageLimitIn,
     UsageLimitOut,

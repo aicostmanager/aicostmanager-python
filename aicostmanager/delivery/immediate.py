@@ -1,38 +1,17 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-import httpx
-
-from .base import Delivery
-from ..ini_manager import IniManager
+from .base import Delivery, DeliveryConfig, DeliveryType
 
 
 class ImmediateDelivery(Delivery):
     """Synchronous delivery using direct HTTP requests with retries."""
 
-    def __init__(
-        self,
-        *,
-        aicm_api_key: Optional[str] = None,
-        aicm_api_base: Optional[str] = None,
-        aicm_api_url: Optional[str] = None,
-        timeout: float = 10.0,
-        transport: httpx.BaseTransport | None = None,
-        ini_manager: IniManager | None = None,
-        log_file: str | None = None,
-        log_level: str | None = None,
-    ) -> None:
-        super().__init__(
-            ini_manager=ini_manager,
-            aicm_api_key=aicm_api_key,
-            aicm_api_base=aicm_api_base,
-            aicm_api_url=aicm_api_url,
-            timeout=timeout,
-            transport=transport,
-            log_file=log_file,
-            log_level=log_level,
-        )
+    type = DeliveryType.IMMEDIATE
+
+    def __init__(self, config: DeliveryConfig) -> None:
+        super().__init__(config)
 
     def enqueue(self, payload: Dict[str, Any]) -> None:
         body = {self._body_key: [payload]}

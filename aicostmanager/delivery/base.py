@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict
 
@@ -10,6 +12,7 @@ import httpx
 from tenacity import Retrying, retry_if_exception, stop_after_attempt, wait_exponential_jitter
 
 from ..ini_manager import IniManager
+from ..logger import create_logger
 
 
 class DeliveryType(str, Enum):
@@ -18,38 +21,45 @@ class DeliveryType(str, Enum):
     PERSISTENT_QUEUE = "persistent_queue"
 
 
+@dataclass
+class DeliveryConfig:
+    """Common configuration shared by delivery implementations."""
+
+    aicm_api_key: str | None = None
+    aicm_api_base: str | None = None
+    aicm_api_url: str | None = None
+    timeout: float = 10.0
+    transport: httpx.BaseTransport | None = None
+    ini_manager: IniManager | None = None
+    log_file: str | None = None
+    log_level: str | None = None
+
+
 class Delivery(ABC):
     """Abstract base class for tracker delivery mechanisms."""
 
     def __init__(
         self,
+        config: DeliveryConfig,
         *,
-        ini_manager: IniManager | None = None,
-        aicm_api_key: str | None = None,
-        aicm_api_base: str | None = None,
-        aicm_api_url: str | None = None,
-        timeout: float = 10.0,
-        transport: httpx.BaseTransport | None = None,
         endpoint: str = "/track",
         body_key: str = "tracked",
-        log_file: str | None = None,
-        log_level: str | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
-        self.ini_manager = ini_manager or IniManager()
-        self.logger = logger or self.ini_manager.create_logger(
+        self.ini_manager = config.ini_manager or IniManager()
+        self.logger = logger or create_logger(
             self.__class__.__name__,
-            log_file,
-            log_level,
+            config.log_file,
+            config.log_level,
             "AICM_DELIVERY_LOG_FILE",
             "AICM_DELIVERY_LOG_LEVEL",
         )
-        self.api_key = aicm_api_key or os.getenv("AICM_API_KEY")
-        self.api_base = aicm_api_base or os.getenv("AICM_API_BASE", "https://aicostmanager.com")
-        self.api_url = aicm_api_url or os.getenv("AICM_API_URL", "/api/v1")
-        self.timeout = timeout
-        self._transport = transport
-        self._client = httpx.Client(timeout=timeout, transport=transport)
+        self.api_key = config.aicm_api_key or os.getenv("AICM_API_KEY")
+        self.api_base = config.aicm_api_base or os.getenv("AICM_API_BASE", "https://aicostmanager.com")
+        self.api_url = config.aicm_api_url or os.getenv("AICM_API_URL", "/api/v1")
+        self.timeout = config.timeout
+        self._transport = config.transport
+        self._client = httpx.Client(timeout=config.timeout, transport=config.transport)
         self._endpoint = self.api_base.rstrip("/") + self.api_url.rstrip("/") + endpoint
         self._body_key = body_key
         self._headers = {
@@ -78,6 +88,41 @@ class Delivery(ABC):
     def enqueue(self, payload: Dict[str, Any]) -> None:
         """Queue ``payload`` for background delivery."""
 
+    def deliver(self, body: Dict[str, Any]) -> None:
+        """Queue payloads from a pre-built request body."""
+        for payload in body.get(self._body_key, []):
+            self.enqueue(payload)
+
     def stop(self) -> None:  # pragma: no cover - default no-op
         """Shutdown any background resources."""
         return None
+
+
+class QueueDelivery(Delivery, ABC):
+    """Base class for threaded queue based deliveries."""
+
+    def __init__(
+        self,
+        config: DeliveryConfig,
+        *,
+        batch_interval: float = 0.5,
+        max_batch_size: int = 100,
+        max_retries: int = 5,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(config, **kwargs)
+        self.batch_interval = batch_interval
+        self.max_batch_size = max_batch_size
+        self.max_retries = max_retries
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    @abstractmethod
+    def _run(self) -> None:
+        """Worker thread implementation."""
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._thread.join()
+        super().stop()

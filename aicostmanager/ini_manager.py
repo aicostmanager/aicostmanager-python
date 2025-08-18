@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 from pathlib import Path
 
@@ -15,26 +14,6 @@ class IniManager:
         self.ini_path = self.resolve_path(ini_path)
         with file_lock(self.ini_path):
             self._config = safe_read_config(self.ini_path)
-
-    @staticmethod
-    def create_logger(
-        name: str,
-        log_file: str | None = None,
-        log_level: str | None = None,
-        log_file_env: str = "AICM_LOG_FILE",
-        log_level_env: str = "AICM_LOG_LEVEL",
-    ) -> logging.Logger:
-        """Return a configured :class:`logging.Logger`."""
-        log_file = log_file or os.getenv(log_file_env)
-        level = (log_level or os.getenv(log_level_env, "INFO")).upper()
-        logger = logging.getLogger(name)
-        logger.setLevel(getattr(logging, level, logging.INFO))
-        if not logger.handlers:
-            handler = logging.FileHandler(log_file) if log_file else logging.StreamHandler()
-            formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-        return logger
 
     @classmethod
     def resolve_path(cls, ini_path: str | None = None) -> str:

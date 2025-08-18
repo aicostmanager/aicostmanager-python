@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from .client import CostManagerClient
-from .models import UsageLimitIn, UsageLimitOut, UsageLimitProgressOut
+from ..client import CostManagerClient
+from ..models import UsageLimitIn, UsageLimitOut, UsageLimitProgressOut
+from .base import BaseLimitManager
 
 
-class UsageLimitManager:
+class UsageLimitManager(BaseLimitManager):
     """Manage usage limits via the :class:`CostManagerClient`."""
-
-    def __init__(self, client: CostManagerClient) -> None:
-        self.client = client
 
     def list_usage_limits(self) -> Iterable[UsageLimitOut]:
         return list(self.client.list_usage_limits())

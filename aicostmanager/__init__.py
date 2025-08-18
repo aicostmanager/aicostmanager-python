@@ -15,6 +15,7 @@ from .config_manager import CostManagerConfig
 from .cost_manager import CostManager
 from .delivery import (
     Delivery,
+    DeliveryConfig,
     DeliveryType,
     ImmediateDelivery,
     MemQueueDelivery,
@@ -49,8 +50,7 @@ from .models import (
 from .rest_cost_manager import AsyncRestCostManager, RestCostManager
 from .tracker import Tracker
 from .universal_extractor import UniversalExtractor
-from .triggered_limit_manager import TriggeredLimitManager
-from .usage_limit_manager import UsageLimitManager
+from .limits import BaseLimitManager, TriggeredLimitManager, UsageLimitManager
 
 __all__ = [
     "AICMError",
@@ -67,10 +67,12 @@ __all__ = [
     "UniversalExtractor",
     "Delivery",
     "DeliveryType",
+    "DeliveryConfig",
     "ImmediateDelivery",
     "MemQueueDelivery",
     "PersistentDelivery",
     "Tracker",
+    "BaseLimitManager",
     "TriggeredLimitManager",
     "UsageLimitManager",
     "ApiUsageRecord",
