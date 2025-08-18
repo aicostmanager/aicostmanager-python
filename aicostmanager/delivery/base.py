@@ -6,7 +6,7 @@ import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import httpx
 from tenacity import Retrying, retry_if_exception, stop_after_attempt, wait_exponential_jitter
@@ -100,7 +100,31 @@ class Delivery(ABC):
         return None
 
 
-class QueueDelivery(Delivery, ABC):
+@dataclass
+class QueueItem:
+    payload: Dict[str, Any]
+    id: Optional[int] = None
+    retry_count: int = 0
+
+
+class QueueWorker(ABC):
+    """Abstract helper for queue based deliveries."""
+
+    @abstractmethod
+    def get_batch(self, max_batch_size: int, *, block: bool = True) -> List[QueueItem]:
+        """Return up to ``max_batch_size`` items for processing."""
+
+    def acknowledge(self, items: List[QueueItem]) -> None:  # pragma: no cover - default no-op
+        return None
+
+    def reschedule(self, item: QueueItem) -> None:  # pragma: no cover - default no-op
+        return None
+
+    def queued(self) -> int:  # pragma: no cover - default no-op
+        return 0
+
+
+class QueueDelivery(Delivery, QueueWorker):
     """Base class for threaded queue based deliveries."""
 
     def __init__(
@@ -109,22 +133,57 @@ class QueueDelivery(Delivery, ABC):
         *,
         batch_interval: float = 0.5,
         max_batch_size: int = 100,
+        max_attempts: int = 5,
         max_retries: int = 5,
         **kwargs: Any,
     ) -> None:
         super().__init__(config, **kwargs)
         self.batch_interval = batch_interval
         self.max_batch_size = max_batch_size
+        self.max_attempts = max_attempts
         self.max_retries = max_retries
+        self._total_sent = 0
+        self._total_failed = 0
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
-    @abstractmethod
+    def _process_batch(self, batch: List[QueueItem]) -> None:
+        payloads = [item.payload for item in batch]
+        body = {self._body_key: payloads}
+        try:
+            self._post_with_retry(body, max_attempts=self.max_attempts)
+        except Exception as exc:  # pragma: no cover - network failures
+            self.logger.error("Delivery failed: %s", exc)
+            for item in batch:
+                item.retry_count += 1
+                self.reschedule(item)
+                self._total_failed += 1
+        else:
+            self.acknowledge(batch)
+            self._total_sent += len(batch)
+
     def _run(self) -> None:
-        """Worker thread implementation."""
+        while not self._stop.is_set():
+            batch = self.get_batch(self.max_batch_size, block=True)
+            if not batch:
+                continue
+            self._process_batch(batch)
+        while True:
+            batch = self.get_batch(self.max_batch_size, block=False)
+            if not batch:
+                break
+            self._process_batch(batch)
+        self._client.close()
 
     def stop(self) -> None:
         self._stop.set()
         self._thread.join()
         super().stop()
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "queued": self.queued(),
+            "total_sent": self._total_sent,
+            "total_failed": self._total_failed,
+        }

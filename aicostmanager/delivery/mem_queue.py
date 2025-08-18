@@ -4,9 +4,7 @@ import queue
 import time
 from typing import Any, Dict, List
 
-import httpx
-
-from .base import DeliveryConfig, DeliveryType, QueueDelivery
+from .base import DeliveryConfig, DeliveryType, QueueDelivery, QueueItem
 
 
 class MemQueueDelivery(QueueDelivery):
@@ -21,45 +19,9 @@ class MemQueueDelivery(QueueDelivery):
         queue_size: int = 1000,
         **kwargs: Any,
     ) -> None:
-        super().__init__(config, **kwargs)
+        max_attempts = kwargs.pop("max_attempts", kwargs.pop("max_retries", 5))
+        super().__init__(config, max_attempts=max_attempts, max_retries=0, **kwargs)
         self._queue: queue.Queue[Dict[str, Any]] = queue.Queue(maxsize=queue_size)
-        self._total_sent = 0
-        self._total_failed = 0
-
-    def _run(self) -> None:
-        batch: List[Dict[str, Any]] = []
-        last_flush = time.time()
-        while not self._stop.is_set():
-            try:
-                item = self._queue.get(timeout=self.batch_interval)
-                batch.append(item)
-                if len(batch) >= self.max_batch_size:
-                    self._send_batch(batch)
-                    batch = []
-                    last_flush = time.time()
-            except queue.Empty:
-                pass
-            if batch and (time.time() - last_flush) >= self.batch_interval:
-                self._send_batch(batch)
-                batch = []
-                last_flush = time.time()
-        while True:
-            try:
-                batch.append(self._queue.get_nowait())
-                if len(batch) >= self.max_batch_size:
-                    self._send_batch(batch)
-                    batch = []
-            except queue.Empty:
-                break
-        if batch:
-            self._send_batch(batch)
-        self._client.close()
-
-    def _send_batch(self, payloads: List[Dict[str, Any]]) -> httpx.Response:
-        body = {self._body_key: payloads}
-        resp = self._post_with_retry(body, max_attempts=self.max_retries)
-        self._total_sent += len(payloads)
-        return resp
 
     def enqueue(self, payload: Dict[str, Any]) -> None:
         try:
@@ -68,9 +30,25 @@ class MemQueueDelivery(QueueDelivery):
             self.logger.warning("Delivery queue full")
             self._total_failed += 1
 
-    def stats(self) -> Dict[str, Any]:
-        return {
-            "queued": self._queue.qsize(),
-            "total_sent": self._total_sent,
-            "total_failed": self._total_failed,
-        }
+    def get_batch(self, max_batch_size: int, *, block: bool = True) -> List[QueueItem]:
+        batch: List[QueueItem] = []
+        if block:
+            deadline = time.time() + self.batch_interval
+            while len(batch) < max_batch_size:
+                timeout = max(0, deadline - time.time())
+                try:
+                    payload = self._queue.get(timeout=timeout)
+                except queue.Empty:
+                    break
+                batch.append(QueueItem(payload=payload))
+        else:
+            while len(batch) < max_batch_size:
+                try:
+                    payload = self._queue.get_nowait()
+                except queue.Empty:
+                    break
+                batch.append(QueueItem(payload=payload))
+        return batch
+
+    def queued(self) -> int:
+        return self._queue.qsize()
