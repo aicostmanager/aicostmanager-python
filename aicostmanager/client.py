@@ -21,7 +21,6 @@ from .models import (
     ErrorResponse,
     PaginatedResponse,
     RollupFilters,
-    ServiceConfigListResponse,
     ServiceOut,
     UsageEvent,
     UsageEventFilters,
@@ -119,15 +118,8 @@ class CostManagerClient:
         if headers:
             self.session.headers.update(headers)
 
-        self._configs_etag: str | None = None
-
-        # Initialize configs and triggered limits during client instantiation
-        self._initialize_configs_and_limits()
-
-    @property
-    def configs_etag(self) -> str | None:
-        """Return the last ETag seen from ``/configs``."""
-        return self._configs_etag
+        # Initialize triggered limits during client instantiation
+        self._initialize_triggered_limits()
 
     @property
     def api_root(self) -> str:
@@ -144,86 +136,18 @@ class CostManagerClient:
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
 
-    def _initialize_configs_and_limits(self) -> None:
-        """Initialize configs and triggered limits during client instantiation."""
+    def _initialize_triggered_limits(self) -> None:
+        """Initialize triggered limits during client instantiation."""
         try:
-            # Skip initialization only for mock objects that use "ini" as the literal path
-            # This prevents creating files in test environments while still allowing
-            # real clients with proper paths to initialize correctly
             if self.ini_path == "ini" or os.path.basename(self.ini_path) == "ini":
                 return
-
-            # Read existing INI file to get current etag
-            etag = None
-            if os.path.exists(self.ini_path):
-                cp = configparser.ConfigParser()
-                cp.read(self.ini_path)
-                if cp.has_section("configs"):
-                    etag = cp["configs"].get("etag")
-
-            # Call /configs endpoint
-            configs_response = self.get_configs(etag=etag)
-
-            # If etag hasn't changed (configs_response is None), call /triggered-limits
-            if configs_response is None:
-                try:
-                    triggered_limits_response = self.get_triggered_limits()
-                    self._store_triggered_limits(triggered_limits_response)
-                except Exception:
-                    # Don't fail initialization if triggered limits call fails
-                    pass
-            else:
-                # If configs changed, update INI with new configs AND triggered_limits
-                self._update_ini_configs(configs_response)
-                # Always update triggered_limits when configs change
-                try:
-                    if hasattr(configs_response, "model_dump"):
-                        payload = configs_response.model_dump(mode="json")
-                    else:
-                        payload = configs_response
-
-                    tl_payload = payload.get("triggered_limits")
-                    if tl_payload is not None:
-                        # Use triggered_limits from configs response
-                        if isinstance(tl_payload, dict):
-                            tl_data = tl_payload.get("triggered_limits", tl_payload)
-                        else:
-                            tl_data = tl_payload
-                        self._store_triggered_limits(tl_data)
-                    else:
-                        # Configs response didn't include triggered_limits, fetch separately
-                        triggered_limits_response = self.get_triggered_limits()
-                        self._store_triggered_limits(triggered_limits_response)
-                except Exception:
-                    # Don't fail initialization if triggered limits update fails
-                    pass
-
-            # Reset ETag to None so first explicit user call behaves as initial call
-            self._configs_etag = None
+            try:
+                triggered_limits_response = self.get_triggered_limits()
+                self._store_triggered_limits(triggered_limits_response)
+            except Exception:
+                pass
         except Exception:
-            # Don't fail client initialization if API calls fail
             pass
-
-    def _update_ini_configs(self, configs_response) -> None:
-        """Update INI file with configs from API response."""
-        cp = configparser.ConfigParser()
-        cp.read(self.ini_path)
-        os.makedirs(os.path.dirname(self.ini_path), exist_ok=True)
-
-        # Handle configs section
-        if "configs" not in cp:
-            cp.add_section("configs")
-
-        if hasattr(configs_response, "model_dump"):
-            payload = configs_response.model_dump(mode="json")
-        else:
-            payload = configs_response
-
-        cp["configs"]["payload"] = json.dumps(payload.get("service_configs", []))
-        cp["configs"]["etag"] = self.configs_etag or ""
-
-        with open(self.ini_path, "w") as f:
-            cp.write(f)
 
     def _store_triggered_limits(self, triggered_limits_response) -> None:
         from .config_manager import CostManagerConfig
@@ -266,32 +190,6 @@ class CostManagerClient:
             params = {}
 
     # endpoint methods
-    def get_configs(
-        self, *, etag: str | None = None
-    ) -> ServiceConfigListResponse | None:
-        """Fetch configuration data with optional caching.
-
-        If ``etag`` is provided it will be sent using ``If-None-Match`` and the
-        method returns ``None`` when the server responds with ``304 Not
-        Modified``.
-        """
-
-        headers: dict[str, str] | None = None
-        if etag:
-            headers = {"If-None-Match": etag}
-        resp = self.session.request("GET", self.api_root + "/configs", headers=headers)
-        if resp.status_code == 304:
-            self._configs_etag = etag
-            return None
-        if not resp.ok:
-            try:
-                detail = resp.json()
-            except Exception:
-                detail = resp.text
-            raise APIRequestError(resp.status_code, detail)
-        self._configs_etag = resp.headers.get("ETag")
-        data = resp.json()
-        return ServiceConfigListResponse.model_validate(data)
 
     def get_triggered_limits(self) -> Dict[str, Any]:
         """Fetch triggered limit information from the API."""
@@ -522,12 +420,6 @@ class AsyncCostManagerClient:
         )
         if headers:
             self.session.headers.update(headers)
-        self._configs_etag: str | None = None
-
-    @property
-    def configs_etag(self) -> str | None:
-        """Return the last ETag seen from ``/configs``."""
-        return self._configs_etag
 
     @property
     def api_root(self) -> str:
@@ -569,29 +461,6 @@ class AsyncCostManagerClient:
                 path = next_url
             params = {}
 
-    async def get_configs(
-        self, *, etag: str | None = None
-    ) -> ServiceConfigListResponse | None:
-        """Asynchronously fetch configuration data with optional caching."""
-
-        headers: dict[str, str] | None = None
-        if etag:
-            headers = {"If-None-Match": etag}
-        resp = await self.session.request(
-            "GET", self.api_root + "/configs", headers=headers
-        )
-        if resp.status_code == 304:
-            self._configs_etag = etag
-            return None
-        if not (200 <= resp.status_code < 300):
-            try:
-                detail = resp.json()
-            except Exception:
-                detail = resp.text
-            raise APIRequestError(resp.status_code, detail)
-        self._configs_etag = resp.headers.get("ETag")
-        data = resp.json()
-        return ServiceConfigListResponse.model_validate(data)
 
     async def get_triggered_limits(self) -> Dict[str, Any]:
         """Asynchronously fetch triggered limit information."""

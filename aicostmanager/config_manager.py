@@ -66,62 +66,16 @@ class CostManagerConfig:
             atomic_write(self.ini_path, content_str)
 
     def _update_config(self, force_refresh_limits: bool = False) -> None:
-        """Fetch configs from the API and persist to ``AICM.ini``."""
-        etag = None
-        if self._config.has_section("configs"):
-            etag = self._config["configs"].get("etag")
-
-        data = self.client.get_configs(etag=etag)
-        if data is None:
-            # Config unchanged - only refresh triggered limits if explicitly requested (via refresh())
-            if force_refresh_limits:
-                try:
-                    tl_payload = self.client.get_triggered_limits() or {}
-                    if isinstance(tl_payload, dict):
-                        tl_data = tl_payload.get("triggered_limits", tl_payload)
-                        self._set_triggered_limits(tl_data)
-                        self._write()
-                except Exception:
-                    pass
-            return
-
-        if hasattr(data, "model_dump"):
-            payload = data.model_dump(mode="json")
-        else:
-            payload = data
-
-        self._config["configs"] = {
-            "payload": json.dumps(payload.get("service_configs", [])),
-            "etag": self.client.configs_etag or "",
-        }
-
-        # Always update triggered_limits when configs change (same logic as client initialization)
-        try:
-            tl_payload = payload.get("triggered_limits")
-            if tl_payload is not None:
-                # Use triggered_limits from configs response
+        """Refresh triggered limits and persist to ``AICM.ini``."""
+        if force_refresh_limits:
+            try:
+                tl_payload = self.client.get_triggered_limits() or {}
                 if isinstance(tl_payload, dict):
                     tl_data = tl_payload.get("triggered_limits", tl_payload)
-                else:
-                    tl_data = tl_payload
-                self._set_triggered_limits(tl_data)
-            else:
-                # Configs response didn't include triggered_limits, fetch separately
-                try:
-                    tl_response = self.client.get_triggered_limits() or {}
-                    if isinstance(tl_response, dict):
-                        tl_data = tl_response.get("triggered_limits", tl_response)
-                    else:
-                        tl_data = tl_response
                     self._set_triggered_limits(tl_data)
-                except Exception:
-                    # Don't fail if triggered limits fetch fails
-                    pass
-        except Exception:
-            # Don't fail config update if triggered limits update fails
-            pass
-
-        self._write()
+                    self._write()
+            except Exception:
+                pass
 
     def _set_triggered_limits(self, data: dict) -> None:
         # Remove existing triggered_limits section if it exists

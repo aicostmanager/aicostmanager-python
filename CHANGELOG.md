@@ -107,7 +107,6 @@ All notable changes to this project will be documented in this file.
 
 ### Enhanced
 - Improved triggered limits lifecycle management with consistent ETag-based fetching logic
-- Strengthened client initialization to always call `/configs` endpoint and conditionally fetch `/triggered-limits`
 - Enhanced config manager alignment with client initialization for better state consistency
 - Added robust test isolation with `clean_delivery` fixture to prevent cross-test pollution
 - Improved mock test safety by preventing file system operations with literal "ini" paths
@@ -129,7 +128,6 @@ All notable changes to this project will be documented in this file.
 - Fixed syntax error in `test_async_client.py` where elif statement had incorrect indentation
 - Fixed config manager test mock functions to properly accept `etag` parameter
 - Added missing `configs_etag` attribute and property to `AsyncCostManagerClient` class
-- Fixed real test failures in `test_anthropic_real_cost_manager.py` by adding triggered limits cleanup
 - Resolved ETag payload validation issues in comprehensive testing scenarios
 
 ### Added
