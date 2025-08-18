@@ -32,14 +32,13 @@ from aicostmanager import PersistentDelivery
 payload = {"api_id": "openai", "service_key": "gpt", "payload": {"tokens": 1}}
 
 delivery = PersistentDelivery(aicm_api_key="sk-test", batch_interval=0.5)
-delivery.enqueue(payload)             # queued for background delivery
-delivery.deliver_now(payload)         # immediate delivery of a single record
+delivery.enqueue(payload)             # queue for background delivery
 ```
 
-The queue can be inspected for health information:
+The queue can be inspected for runtime statistics:
 
 ```python
-stats = delivery.health()
+stats = delivery.stats()
 print(stats)
 ```
 
