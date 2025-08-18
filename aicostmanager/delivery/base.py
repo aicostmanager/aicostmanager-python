@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import threading
@@ -11,7 +12,9 @@ from typing import Any, Dict, List, Optional
 import httpx
 from tenacity import Retrying, retry_if_exception, stop_after_attempt, wait_exponential_jitter
 
+from ..client import AsyncCostManagerClient
 from ..ini_manager import IniManager
+from ..limits import TriggeredLimitManager
 from ..logger import create_logger
 
 
@@ -153,6 +156,22 @@ class QueueDelivery(Delivery, QueueWorker):
         body = {self._body_key: payloads}
         try:
             self._post_with_retry(body, max_attempts=self.max_attempts)
+            async def _update_limits() -> None:
+                client = AsyncCostManagerClient(
+                    aicm_api_key=self.api_key,
+                    aicm_api_base=self.api_base,
+                    aicm_api_url=self.api_url,
+                    aicm_ini_path=self.ini_manager.ini_path,
+                )
+                try:
+                    await TriggeredLimitManager(client).update_triggered_limits_async()
+                finally:
+                    await client.close()
+
+            try:
+                asyncio.run(_update_limits())
+            except Exception as exc:  # pragma: no cover - network failures
+                self.logger.error("Triggered limits update failed: %s", exc)
         except Exception as exc:  # pragma: no cover - network failures
             self.logger.error("Delivery failed: %s", exc)
             for item in batch:
