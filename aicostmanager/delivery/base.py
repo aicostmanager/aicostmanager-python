@@ -10,7 +10,12 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 import httpx
-from tenacity import Retrying, retry_if_exception, stop_after_attempt, wait_exponential_jitter
+from tenacity import (
+    Retrying,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ..client import AsyncCostManagerClient
 from ..ini_manager import IniManager
@@ -60,7 +65,9 @@ class Delivery(ABC):
             "AICM_DELIVERY_LOG_LEVEL",
         )
         self.api_key = config.aicm_api_key or os.getenv("AICM_API_KEY")
-        self.api_base = config.aicm_api_base or os.getenv("AICM_API_BASE", "https://aicostmanager.com")
+        self.api_base = config.aicm_api_base or os.getenv(
+            "AICM_API_BASE", "https://aicostmanager.com"
+        )
         self.api_url = config.aicm_api_url or os.getenv("AICM_API_URL", "/api/v1")
         self.timeout = config.timeout
         self._transport = config.transport
@@ -72,7 +79,9 @@ class Delivery(ABC):
             "User-Agent": "aicostmanager-python",
         }
 
-    def _post_with_retry(self, body: Dict[str, Any], *, max_attempts: int) -> httpx.Response:
+    def _post_with_retry(
+        self, body: Dict[str, Any], *, max_attempts: int
+    ) -> httpx.Response:
         def _retryable(exc: Exception) -> bool:
             if isinstance(exc, httpx.HTTPStatusError):
                 return exc.response is None or exc.response.status_code >= 500
@@ -84,7 +93,9 @@ class Delivery(ABC):
             retry=retry_if_exception(_retryable),
         ):
             with attempt:
-                resp = self._client.post(self._endpoint, json=body, headers=self._headers)
+                resp = self._client.post(
+                    self._endpoint, json=body, headers=self._headers
+                )
                 resp.raise_for_status()
                 return resp
         raise RuntimeError("unreachable")
@@ -117,7 +128,9 @@ class QueueWorker(ABC):
     def get_batch(self, max_batch_size: int, *, block: bool = True) -> List[QueueItem]:
         """Return up to ``max_batch_size`` items for processing."""
 
-    def acknowledge(self, items: List[QueueItem]) -> None:  # pragma: no cover - default no-op
+    def acknowledge(
+        self, items: List[QueueItem]
+    ) -> None:  # pragma: no cover - default no-op
         return None
 
     def reschedule(self, item: QueueItem) -> None:  # pragma: no cover - default no-op
@@ -156,6 +169,7 @@ class QueueDelivery(Delivery, QueueWorker):
         body = {self._body_key: payloads}
         try:
             self._post_with_retry(body, max_attempts=self.max_attempts)
+
             async def _update_limits() -> None:
                 client = AsyncCostManagerClient(
                     aicm_api_key=self.api_key,

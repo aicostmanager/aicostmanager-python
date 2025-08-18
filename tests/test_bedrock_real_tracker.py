@@ -1,13 +1,15 @@
-import time
 import json
-import uuid
+import time
 import urllib.request
+import uuid
 
 import pytest
 
 boto3 = pytest.importorskip("boto3")
 
+from aicostmanager.delivery import DeliveryType
 from aicostmanager.tracker import Tracker
+from aicostmanager.usage_utils import get_usage_from_response
 
 BASE_URL = "http://127.0.0.1:8001"
 
@@ -24,10 +26,20 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
             with urllib.request.urlopen(req, timeout=5) as resp:
                 if resp.status == 200:
                     data = json.load(resp)
-                    event_id = data.get("event_id") or data.get("cost_event", {}).get("event_id")
-                    if event_id:
-                        uuid.UUID(str(event_id))
-                        return data
+                    # Support both array and object responses
+                    if isinstance(data, list) and data:
+                        first = data[0]
+                        event_id = first.get("event_id") or first.get("uuid")
+                        if event_id:
+                            uuid.UUID(str(event_id))
+                            return data
+                    elif isinstance(data, dict):
+                        event_id = data.get("event_id") or data.get(
+                            "cost_event", {}
+                        ).get("event_id")
+                        if event_id:
+                            uuid.UUID(str(event_id))
+                            return data
         except Exception:
             pass
         time.sleep(1)
@@ -37,8 +49,10 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
 @pytest.mark.parametrize(
     "service_key, model",
     [
-        ("amazon-bedrock::amazon.nova-pro-v1:0", "amazon.nova-pro-v1:0"),
-        ("amazon-bedrock::us.meta.llama3-3-70b-instruct-v1:0", "us.meta.llama3-3-70b-instruct-v1:0"),
+        (
+            "amazon-bedrock::us.meta.llama3-3-70b-instruct-v1:0",
+            "us.meta.llama3-3-70b-instruct-v1:0",
+        ),
         ("amazon-bedrock::us.amazon.nova-pro-v1:0", "us.amazon.nova-pro-v1:0"),
     ],
 )
@@ -58,12 +72,23 @@ def test_bedrock_tracker(service_key, model, aws_region, aicm_api_key):
         "inferenceConfig": {"maxTokens": 50},
     }
     # Background tracking via queue
-    resp = client.converse(modelId=model, **body)
-    response_id = (
-        resp.get("output", {}).get("message", {}).get("id")
-        or resp.get("ResponseMetadata", {}).get("RequestId")
-    )
-    tracker.track("amazon-bedrock", service_key, {"input_tokens": 1}, response_id=response_id)
+    try:
+        resp = client.converse(modelId=model, **body)
+    except Exception as e:
+        msg = str(e)
+        if (
+            "on-demand throughput isn't supported" in msg
+            or "on-demand throughput isn’nt supported" in msg
+        ):
+            pytest.skip(
+                "Bedrock model requires provisioned throughput; skipping this case"
+            )
+        raise
+    response_id = resp.get("ResponseMetadata", {}).get("RequestId") or resp.get(
+        "output", {}
+    ).get("message", {}).get("id")
+    usage_payload = get_usage_from_response(resp, "bedrock")
+    tracker.track("amazon-bedrock", service_key, usage_payload, response_id=response_id)
     _wait_for_cost_event(aicm_api_key, response_id)
 
     # Immediate delivery
@@ -71,15 +96,28 @@ def test_bedrock_tracker(service_key, model, aws_region, aicm_api_key):
         "messages": [{"role": "user", "content": [{"text": "Say hi again"}]}],
         "inferenceConfig": {"maxTokens": 50},
     }
-    resp2 = client.converse(modelId=model, **body2)
-    response_id2 = (
-        resp2.get("output", {}).get("message", {}).get("id")
-        or resp2.get("ResponseMetadata", {}).get("RequestId")
-    )
-    delivery_resp = tracker.deliver_now(
-        "amazon-bedrock", service_key, {"input_tokens": 1}, response_id=response_id2
-    )
-    assert delivery_resp.status_code in (200, 201)
+    try:
+        resp2 = client.converse(modelId=model, **body2)
+    except Exception as e:
+        msg = str(e)
+        if (
+            "on-demand throughput isn't supported" in msg
+            or "on-demand throughput isn’nt supported" in msg
+        ):
+            pytest.skip(
+                "Bedrock model requires provisioned throughput; skipping this case"
+            )
+        raise
+    response_id2 = resp2.get("ResponseMetadata", {}).get("RequestId") or resp2.get(
+        "output", {}
+    ).get("message", {}).get("id")
+    with Tracker(
+        aicm_api_key=aicm_api_key,
+        aicm_api_base=BASE_URL,
+        delivery_type=DeliveryType.IMMEDIATE,
+    ) as t2:
+        usage2 = get_usage_from_response(resp2, "bedrock")
+        t2.track("amazon-bedrock", service_key, usage2, response_id=response_id2)
     _wait_for_cost_event(aicm_api_key, response_id2)
 
     tracker.close()

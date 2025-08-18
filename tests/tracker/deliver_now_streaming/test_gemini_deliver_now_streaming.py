@@ -7,6 +7,7 @@ import uuid
 import httpx
 import pytest
 
+from aicostmanager.delivery import DeliveryType
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_streaming_usage_from_response
 
@@ -116,10 +117,12 @@ def test_gemini_deliver_now_streaming(service_key, model, google_api_key, aicm_a
 
         print("gemini final usage payload:", json.dumps(usage_payload, default=str))
         try:
-            delivery_resp = tracker.deliver_now(
-                "gemini", service_key, usage_payload, response_id=response_id
-            )
-            assert delivery_resp.status_code in (200, 201)
+            with Tracker(
+                aicm_api_key=aicm_api_key,
+                aicm_api_base=BASE_URL,
+                delivery_type=DeliveryType.IMMEDIATE,
+            ) as t2:
+                t2.track("gemini", service_key, usage_payload, response_id=response_id)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 422:
                 try:

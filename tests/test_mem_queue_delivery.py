@@ -1,3 +1,4 @@
+import json
 import time
 
 import httpx
@@ -10,7 +11,7 @@ def test_mem_queue_delivery_sends_and_tracks_stats(tmp_path):
     sent = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        sent.append(request.json())
+        sent.append(json.loads(request.content.decode()))
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)

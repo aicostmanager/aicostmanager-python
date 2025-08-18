@@ -7,6 +7,7 @@ import uuid
 
 import pytest
 
+from aicostmanager.delivery import DeliveryType
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_usage_from_response
 
@@ -69,6 +70,7 @@ def test_anthropic_deliver_now_only(
         db_path=str(tmp_path / "anthropic_queue.db"),
         poll_interval=0.1,
         batch_interval=0.1,
+        delivery_type=DeliveryType.IMMEDIATE,
     ) as tracker:
         client = anthropic.Anthropic(api_key=anthropic_api_key)
 
@@ -80,17 +82,9 @@ def test_anthropic_deliver_now_only(
         response_id = getattr(resp, "id", None)
         usage_payload = get_usage_from_response(resp, "anthropic")
 
-        try:
-            delivery_resp = asyncio.run(tracker.deliver_now_async(
+        asyncio.run(
+            tracker.track_async(
                 "anthropic", service_key, usage_payload, response_id=response_id
-            ))
-            print("deliver_now status:", delivery_resp.status_code)
-            try:
-                print("deliver_now json:", delivery_resp.json())
-            except Exception:
-                print("deliver_now text:", delivery_resp.text)
-        except Exception as e:
-            print("deliver_now raised:", repr(e))
-            raise
-
+            )
+        )
         _wait_for_cost_event(aicm_api_key, response_id)

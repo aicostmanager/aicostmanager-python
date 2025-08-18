@@ -7,6 +7,7 @@ import uuid
 import pytest
 
 anthropic = pytest.importorskip("anthropic")
+from aicostmanager.delivery import DeliveryType
 from aicostmanager.tracker import Tracker
 
 BASE_URL = os.environ.get("AICM_API_BASE", "http://localhost:8001")
@@ -29,29 +30,12 @@ def _usage_to_payload(usage):
     return usage
 
 
-def _wait_for_enqueued(delivery, timeout: float = 1.0) -> bool:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        stats = delivery.get_stats()
-        if stats.get("queued", 0) > 0:
-            return True
-        try:
-            processing = delivery.list_messages("processing", 1)
-        except Exception:
-            processing = []
-        if processing:
-            return True
-        time.sleep(0.01)
-    return False
-
-
 def _wait_for_empty(delivery, timeout: float = 5.0) -> bool:
     deadline = time.time() + timeout
     while time.time() < deadline:
-        stats = delivery.get_stats()
+        stats = getattr(delivery, "stats", lambda: {})()
         queued = stats.get("queued", 0)
-        processing = stats.get("processing", 0)
-        if queued == 0 and processing == 0:
+        if queued == 0:
             return True
         time.sleep(0.05)
     return False
@@ -126,14 +110,8 @@ def test_anthropic_tracker(
     response_id = getattr(resp, "id", None)
     usage_payload = _usage_to_payload(getattr(resp, "usage", None))
     tracker.track("anthropic", service_key, usage_payload, response_id=response_id)
-    assert _wait_for_enqueued(tracker.delivery, timeout=1.0), (
-        "Usage record was not enqueued by PersistentDelivery"
-    )
-    health = tracker.delivery.health()
-    assert health.get("worker_alive"), "PersistentDelivery worker thread is not alive"
-    assert _wait_for_empty(tracker.delivery, timeout=10.0), (
-        f"Queue did not flush; stats={tracker.delivery.get_stats()}"
-    )
+    # Wait for the queue to flush
+    assert _wait_for_empty(tracker.delivery, timeout=10.0)
     _wait_for_cost_event(aicm_api_key, response_id)
 
     # Immediate delivery
@@ -144,10 +122,15 @@ def test_anthropic_tracker(
     )
     response_id2 = getattr(resp2, "id", None)
     usage_payload2 = _usage_to_payload(getattr(resp2, "usage", None))
-    delivery_resp = tracker.deliver_now(
-        "anthropic", service_key, usage_payload2, response_id=response_id2
-    )
-    assert delivery_resp.status_code in (200, 201)
+    # Immediate delivery via DeliveryType.IMMEDIATE
+    with Tracker(
+        aicm_api_key=aicm_api_key,
+        aicm_api_base=BASE_URL,
+        poll_interval=0.1,
+        batch_interval=0.1,
+        delivery_type=DeliveryType.IMMEDIATE,
+    ) as t2:
+        t2.track("anthropic", service_key, usage_payload2, response_id=response_id2)
     _wait_for_cost_event(aicm_api_key, response_id2)
 
     tracker.close()

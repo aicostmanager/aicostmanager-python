@@ -19,9 +19,10 @@ class MemQueueDelivery(QueueDelivery):
         queue_size: int = 10000,
         **kwargs: Any,
     ) -> None:
+        # Ensure queue is initialized BEFORE the background thread starts in the base class
+        self._queue: queue.Queue[Dict[str, Any]] = queue.Queue(maxsize=queue_size)
         max_attempts = kwargs.pop("max_attempts", kwargs.pop("max_retries", 5))
         super().__init__(config, max_attempts=max_attempts, max_retries=0, **kwargs)
-        self._queue: queue.Queue[Dict[str, Any]] = queue.Queue(maxsize=queue_size)
 
     def enqueue(self, payload: Dict[str, Any]) -> None:
         try:

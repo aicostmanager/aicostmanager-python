@@ -8,6 +8,7 @@ import uuid
 import pytest
 
 genai = pytest.importorskip("google.genai")
+from aicostmanager.delivery import DeliveryType
 from aicostmanager.tracker import Tracker
 
 BASE_URL = "http://127.0.0.1:8001"
@@ -150,6 +151,7 @@ def test_gemini_deliver_now_only(service_key, model, google_api_key, aicm_api_ke
         aicm_api_base=BASE_URL,
         poll_interval=0.1,
         batch_interval=0.1,
+        delivery_type=DeliveryType.IMMEDIATE,
     ) as tracker:
         client = genai.Client(api_key=google_api_key)
 
@@ -184,17 +186,9 @@ def test_gemini_deliver_now_only(service_key, model, google_api_key, aicm_api_ke
             json.dumps(usage_payload, indent=2, default=str),
         )
 
-        try:
-            delivery_resp = asyncio.run(tracker.deliver_now_async(
+        asyncio.run(
+            tracker.track_async(
                 "gemini", service_key, usage_payload, response_id=response_id
-            ))
-            print("deliver_now status:", delivery_resp.status_code)
-            try:
-                print("deliver_now json:", delivery_resp.json())
-            except Exception:
-                print("deliver_now text:", delivery_resp.text)
-        except Exception as e:
-            print("deliver_now raised:", repr(e))
-            raise
-
+            )
+        )
         _wait_for_cost_event(aicm_api_key, response_id)

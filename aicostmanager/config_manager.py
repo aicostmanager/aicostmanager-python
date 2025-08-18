@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -247,15 +246,43 @@ class CostManagerConfig:
             vendor_name = vendor_info.get("name")
             config_ids = vendor_info.get("config_ids")
             hostname = vendor_info.get("hostname")
-            if (
-                service_id
-                and event.get("service_id") == service_id
-                or service_vendor
-                and vendor_name == service_vendor
-                or client_customer_key
-                and event.get("client_customer_key") == client_customer_key
-                or (not service_id and not service_vendor and not client_customer_key)
-            ):
+            # Support legacy service_key field in addition to service_id/vendor
+            legacy_service_key = event.get("service_key")
+            legacy_vendor = legacy_service_id = None
+            if isinstance(legacy_service_key, str) and "::" in legacy_service_key:
+                legacy_vendor, legacy_service_id = legacy_service_key.split("::", 1)
+
+            matches_service = (
+                (
+                    (
+                        service_id
+                        and (
+                            event.get("service_id") == service_id
+                            or legacy_service_id == service_id
+                        )
+                    )
+                    or (
+                        service_vendor
+                        and (
+                            vendor_name == service_vendor
+                            or legacy_vendor == service_vendor
+                        )
+                    )
+                )
+                if (service_id or service_vendor)
+                else True
+            )
+
+            matches_client = (
+                (
+                    client_customer_key
+                    and event.get("client_customer_key") == client_customer_key
+                )
+                if client_customer_key
+                else True
+            )
+
+            if matches_service and matches_client:
                 results.append(
                     TriggeredLimit(
                         event_id=event.get("event_id"),
@@ -265,7 +292,7 @@ class CostManagerConfig:
                         period=event.get("period"),
                         config_id_list=config_ids,
                         hostname=hostname,
-                        service_id=event.get("service_id"),
+                        service_id=event.get("service_id") or legacy_service_id,
                         client_customer_key=event.get("client_customer_key"),
                         api_key_id=event.get("api_key_id"),
                         triggered_at=event.get("triggered_at"),

@@ -29,14 +29,7 @@ class PersistentDelivery(QueueDelivery):
         max_batch_size: int = 1000,
         logger: logging.Logger | None = None,
     ) -> None:
-        super().__init__(
-            config,
-            batch_interval=batch_interval,
-            max_batch_size=max_batch_size,
-            max_attempts=max_attempts,
-            max_retries=max_retries,
-            logger=logger,
-        )
+        # Initialize DB-related attributes and locking BEFORE starting worker thread
         self.db_path = db_path
         self.poll_interval = poll_interval
         self.log_bodies = log_bodies
@@ -62,6 +55,16 @@ class PersistentDelivery(QueueDelivery):
                 """
             )
         self._lock = threading.Lock()
+
+        # Start background worker after we are fully initialized
+        super().__init__(
+            config,
+            batch_interval=batch_interval,
+            max_batch_size=max_batch_size,
+            max_attempts=max_attempts,
+            max_retries=max_retries,
+            logger=logger,
+        )
 
     def enqueue(self, payload: Dict[str, Any]) -> int:
         now = time.time()
@@ -109,7 +112,11 @@ class PersistentDelivery(QueueDelivery):
             ids = ", ".join(str(row["id"]) for row in rows)
             self.logger.debug("Fetched %d messages for processing: %s", len(rows), ids)
         return [
-            QueueItem(id=row["id"], payload=json.loads(row["payload"]), retry_count=row["retry_count"])
+            QueueItem(
+                id=row["id"],
+                payload=json.loads(row["payload"]),
+                retry_count=row["retry_count"],
+            )
             for row in rows
         ]
 

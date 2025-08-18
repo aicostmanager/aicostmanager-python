@@ -64,10 +64,14 @@ class Tracker:
             )
         else:
             if delivery_type is None:
-                name = self.ini_manager.get_option(
-                    "tracker", "delivery_manager", DeliveryType.IMMEDIATE.value
-                )
-                delivery_type = DeliveryType(name)
+                # If a db_path is provided, prefer persistent queue by default
+                if db_path:
+                    delivery_type = DeliveryType.PERSISTENT_QUEUE
+                else:
+                    name = self.ini_manager.get_option(
+                        "tracker", "delivery_manager", DeliveryType.IMMEDIATE.value
+                    )
+                    delivery_type = DeliveryType(name)
             config = DeliveryConfig(
                 ini_manager=self.ini_manager,
                 aicm_api_key=aicm_api_key,
@@ -138,8 +142,12 @@ class Tracker:
         timestamp: str | datetime | None = None,
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        """Enqueue a usage record for background delivery."""
+    ) -> str:
+        """Enqueue a usage record for background delivery.
+
+        Returns the ``response_id`` that will be used for this record. If none was
+        provided, a new UUID4 hex value is generated and returned.
+        """
         record = self._build_record(
             api_id,
             system_key,
@@ -150,6 +158,7 @@ class Tracker:
             context=context,
         )
         self.delivery.enqueue(record)
+        return record["response_id"]
 
     async def track_async(
         self,
@@ -161,8 +170,8 @@ class Tracker:
         timestamp: str | datetime | None = None,
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        await asyncio.to_thread(
+    ) -> str:
+        return await asyncio.to_thread(
             self.track,
             api_id,
             system_key,
@@ -188,20 +197,37 @@ class Tracker:
         Parameters are identical to :meth:`track` except that ``response`` is
         the raw LLM client response.  Usage information is obtained via
         :func:`get_usage_from_response` using the provided ``api_id``.
-        ``response`` is returned unmodified to allow call chaining.
+        ``response`` is returned to allow call chaining. If a ``response_id`` was
+        not provided and one is generated, it is attached to the response as
+        ``response.aicm_response_id`` for convenience.
         """
         usage = get_usage_from_response(response, api_id)
         if isinstance(usage, dict) and usage:
             model = getattr(response, "model", None)
-            self.track(
+            vendor_map = {
+                "openai_chat": "openai",
+                "openai_responses": "openai",
+                "anthropic": "anthropic",
+                "gemini": "google",
+            }
+            vendor_prefix = vendor_map.get(api_id)
+            system_key = (
+                f"{vendor_prefix}::{model}" if vendor_prefix and model else model
+            )
+            used_response_id = self.track(
                 api_id,
-                model,
+                system_key,
                 usage,
                 response_id=response_id,
                 timestamp=timestamp,
                 client_customer_key=client_customer_key,
                 context=context,
             )
+            try:
+                # Attach for caller convenience
+                setattr(response, "aicm_response_id", used_response_id)
+            except Exception:
+                pass
         return response
 
     async def track_llm_usage_async(
@@ -242,7 +268,15 @@ class Tracker:
         :func:`get_streaming_usage_from_response` and sent via :meth:`track` once
         available.
         """
-        system_key = getattr(stream, "model", None)
+        model = getattr(stream, "model", None)
+        vendor_map = {
+            "openai_chat": "openai",
+            "openai_responses": "openai",
+            "anthropic": "anthropic",
+            "gemini": "google",
+        }
+        vendor_prefix = vendor_map.get(api_id)
+        system_key = f"{vendor_prefix}::{model}" if vendor_prefix and model else model
         usage_sent = False
         for chunk in stream:
             if not usage_sent:

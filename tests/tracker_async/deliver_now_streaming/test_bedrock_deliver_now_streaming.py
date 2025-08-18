@@ -7,6 +7,7 @@ import uuid
 
 import pytest
 
+from aicostmanager.delivery import DeliveryType
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_streaming_usage_from_response
 
@@ -129,9 +130,18 @@ def test_bedrock_deliver_now_streaming(service_key, model, aws_region, aicm_api_
             pytest.skip("No usage found in Bedrock streaming response; skipping")
         usage_payload = final_usage
 
-        delivery_resp = asyncio.run(tracker.deliver_now_async(
-            "amazon-bedrock", service_key, usage_payload, response_id=response_id
-        ))
-        assert delivery_resp.status_code in (200, 201)
+        with Tracker(
+            aicm_api_key=aicm_api_key,
+            aicm_api_base=BASE_URL,
+            delivery_type=DeliveryType.IMMEDIATE,
+        ) as t2:
+            asyncio.run(
+                t2.track_async(
+                    "amazon-bedrock",
+                    service_key,
+                    usage_payload,
+                    response_id=response_id,
+                )
+            )
 
         _wait_for_cost_event(aicm_api_key, response_id)

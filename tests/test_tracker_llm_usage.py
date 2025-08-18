@@ -1,8 +1,7 @@
-import json
 import asyncio
 
-from aicostmanager.tracker import Tracker
 from aicostmanager.ini_manager import IniManager
+from aicostmanager.tracker import Tracker
 
 
 class Resp:
@@ -35,7 +34,7 @@ def test_track_llm_usage():
     record = delivery.records[0]
     assert record["payload"] == {"input_tokens": 1}
     assert record["api_id"] == "openai_chat"
-    assert record["service_key"] == "gpt-5-mini"
+    assert record["service_key"] == "openai::gpt-5-mini"
     assert record["client_customer_key"] == "abc"
 
 
@@ -57,7 +56,7 @@ def test_track_llm_usage_async():
 
     record = delivery.records[0]
     assert record["payload"] == {"input_tokens": 2}
-    assert record["service_key"] == "gpt-4"
+    assert record["service_key"] == "openai::gpt-4"
 
 
 def test_track_llm_stream_usage():
@@ -80,7 +79,7 @@ def test_track_llm_stream_usage():
 
     record = delivery.records[0]
     assert record["payload"] == {"input_tokens": 3}
-    assert record["service_key"] == "gpt-5-mini"
+    assert record["service_key"] == "openai::gpt-5-mini"
 
 
 def test_track_llm_stream_usage_async():
@@ -91,13 +90,23 @@ def test_track_llm_stream_usage_async():
         def __init__(self, usage=None):
             self.usage = usage
 
-    async def stream():
-        for c in [Chunk(), Chunk({"input_tokens": 4})]:
-            yield c
+    class AsyncStream:
+        def __init__(self, items, model: str):
+            self._items = items
+            self.model = model
+
+        def __aiter__(self):
+            self._iter = iter(self._items)
+            return self
+
+        async def __anext__(self):
+            try:
+                return next(self._iter)
+            except StopIteration:
+                raise StopAsyncIteration
 
     async def run():
-        gen = stream()
-        gen.model = "gpt-5-mini"
+        gen = AsyncStream([Chunk(), Chunk({"input_tokens": 4})], model="gpt-5-mini")
         async for _ in tracker.track_llm_stream_usage_async("openai_chat", gen):
             pass
 

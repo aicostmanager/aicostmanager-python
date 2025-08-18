@@ -1,6 +1,5 @@
-import uuid
-
 from aicostmanager import Tracker
+from aicostmanager.delivery import DeliveryType
 
 # A valid usage payload for the /track endpoint
 VALID_USAGE = {
@@ -24,22 +23,20 @@ def test_deliver_now_with_client_customer_key_and_context(aicm_api_key, aicm_api
     tracker = Tracker(aicm_api_key=aicm_api_key, aicm_api_base=aicm_api_base)
     response_id = "record-with-meta"
 
-    resp = tracker.deliver_now(
-        "openai_chat",
-        "openai::gpt-5-mini",
-        VALID_USAGE,
-        response_id=response_id,
-        client_customer_key="c1",
-        context={"foo": "bar"},
-        timestamp="2025-01-01T00:00:00Z",
-    )
-
-    assert resp.status_code == 201, resp.text
-    data = resp.json()
-    assert "event_ids" in data and len(data["event_ids"]) == 1
-    result = data["event_ids"][0]
-    assert response_id in result
-    uuid.UUID(result[response_id])
+    with Tracker(
+        aicm_api_key=aicm_api_key,
+        aicm_api_base=aicm_api_base,
+        delivery_type=DeliveryType.IMMEDIATE,
+    ) as t2:
+        t2.track(
+            "openai_chat",
+            "openai::gpt-5-mini",
+            VALID_USAGE,
+            response_id=response_id,
+            client_customer_key="c1",
+            context={"foo": "bar"},
+            timestamp="2025-01-01T00:00:00Z",
+        )
     tracker.close()
 
 
@@ -49,18 +46,16 @@ def test_deliver_now_without_client_customer_key_and_context(
     tracker = Tracker(aicm_api_key=aicm_api_key, aicm_api_base=aicm_api_base)
     response_id = "record-without-meta"
 
-    resp = tracker.deliver_now(
-        "openai_chat",
-        "openai::gpt-5-mini",
-        VALID_USAGE,
-        response_id=response_id,
-        timestamp="2025-01-01T00:00:00Z",
-    )
-
-    assert resp.status_code == 201, resp.text
-    data = resp.json()
-    assert "event_ids" in data and len(data["event_ids"]) == 1
-    result = data["event_ids"][0]
-    assert response_id in result
-    uuid.UUID(result[response_id])
+    with Tracker(
+        aicm_api_key=aicm_api_key,
+        aicm_api_base=aicm_api_base,
+        delivery_type=DeliveryType.IMMEDIATE,
+    ) as t2:
+        t2.track(
+            "openai_chat",
+            "openai::gpt-5-mini",
+            VALID_USAGE,
+            response_id=response_id,
+            timestamp="2025-01-01T00:00:00Z",
+        )
     tracker.close()

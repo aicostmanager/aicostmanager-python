@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import threading
 import time
 import urllib.request
 import uuid
@@ -77,12 +76,14 @@ def test_anthropic_track_non_streaming(anthropic_api_key, aicm_api_key, tmp_path
         )
         response_id = getattr(resp, "id", None)
         usage = extract_usage(resp)
-        asyncio.run(tracker.track_async(
-            "anthropic",
-            "anthropic::claude-3-5-sonnet-20241022",
-            usage,
-            response_id=response_id,
-        ))
+        asyncio.run(
+            tracker.track_async(
+                "anthropic",
+                "anthropic::claude-3-5-sonnet-20241022",
+                usage,
+                response_id=response_id,
+            )
+        )
         _wait_for_cost_event(aicm_api_key, response_id)
 
 
@@ -123,56 +124,15 @@ def test_anthropic_track_streaming(anthropic_api_key, aicm_api_key, tmp_path):
             pytest.skip("No usage returned in streaming events; skipping")
 
         # Track the usage and get the actual response_id that was used
-        asyncio.run(tracker.track_async(
-            "anthropic",
-            "anthropic::claude-3-5-sonnet-20241022",
-            usage_payload,
-            response_id=response_id,
-        ))
-
-        # If no response_id was provided, we need to get it from the persistent delivery
-        # The persistent delivery generates its own ID when none is provided
-        if response_id is None:
-            # Temporarily stop the worker thread to prevent it from processing our message
-            tracker.delivery._stop_event.set()
-            tracker.delivery._worker.join(timeout=1.0)
-
-            # Query the database to get the response_id
-            import sqlite3
-
-            conn = sqlite3.connect(str(tmp_path / "anthropic_queue.db"))
-
-            # First, let's see what's in the queue
-            cursor = conn.execute("SELECT id, payload FROM queue")
-            rows = cursor.fetchall()
-            print(f"Queue contents: {len(rows)} rows")
-            for row in rows:
-                print(f"  Row {row[0]}: {row[1][:100]}...")
-
-            # Now try to get the most recent payload
-            cursor = conn.execute("SELECT payload FROM queue ORDER BY id DESC LIMIT 1")
-            row = cursor.fetchone()
-            if row:
-                payload_data = json.loads(row[0])
-                print(f"Payload data: {payload_data}")
-                # The local storage format has response_id directly in the payload
-                if "response_id" in payload_data:
-                    response_id = payload_data["response_id"]
-                    print(f"Found response_id: {response_id}")
-            else:
-                print("No rows found in queue")
-            conn.close()
-
-            # If we still don't have a response_id, we can't proceed
-            if response_id is None:
-                pytest.fail("Failed to get response_id from persistent delivery")
-
-            # Restart the worker thread
-            tracker.delivery._stop_event.clear()
-            tracker.delivery._worker = threading.Thread(
-                target=tracker.delivery._run_worker, daemon=True
+        used_id = asyncio.run(
+            tracker.track_async(
+                "anthropic",
+                "anthropic::claude-3-5-sonnet-20241022",
+                usage_payload,
+                response_id=response_id,
             )
-            tracker.delivery._worker.start()
+        )
 
-        print(f"Using response_id: {response_id}")
-        _wait_for_cost_event(aicm_api_key, response_id)
+        final_id = response_id or used_id
+        print(f"Using response_id: {final_id}")
+        _wait_for_cost_event(aicm_api_key, final_id)
