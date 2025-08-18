@@ -108,6 +108,9 @@ class UsageLimitIn(BaseModel):
     vendor: Optional[str] = None
     service: Optional[str] = None
     client: Optional[str] = None
+    team_uuid: Optional[str] = None
+    user_uuid: Optional[str] = None
+    api_key_uuid: Optional[str] = None
     notification_list: Optional[List[str]] = None
     active: Optional[bool] = True
 
@@ -122,10 +125,18 @@ class UsageLimitOut(BaseModel):
     vendor: Optional[str]
     service: Optional[str]
     client: Optional[str]
+    team_uuid: Optional[str] = None
+    user_uuid: Optional[str] = None
+    api_key_uuid: Optional[str] = None
     notification_list: Optional[List[str]]
     active: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UsageLimitProgressOut(UsageLimitOut):
+    current_spend: Decimal
+    remaining_amount: Decimal
 
 
 class VendorOut(BaseModel):
