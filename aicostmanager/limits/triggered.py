@@ -2,25 +2,19 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-import jwt
-
 from ..client import CostManagerClient
-from ..ini_manager import IniManager
+from ..config_manager import CostManagerConfig, TriggeredLimit
 from .base import BaseLimitManager
 
 
 class TriggeredLimitManager(BaseLimitManager):
     """Manage triggered limits fetched from the API and stored locally."""
 
-    def __init__(self, client: CostManagerClient, ini_manager: IniManager | None = None) -> None:
+    def __init__(
+        self, client: CostManagerClient, config_manager: CostManagerConfig | None = None
+    ) -> None:
         super().__init__(client)
-        self.ini_manager = ini_manager or IniManager(client.ini_path)
-
-    def _decode(self, token: str, public_key: str) -> Optional[dict]:
-        try:
-            return jwt.decode(token, public_key, algorithms=["RS256"], issuer="aicm-api")
-        except Exception:
-            return None
+        self.config_manager = config_manager or CostManagerConfig(client)
 
     def update_triggered_limits(self) -> None:
         data = self.client.get_triggered_limits() or {}
@@ -28,29 +22,22 @@ class TriggeredLimitManager(BaseLimitManager):
             tl_data = data.get("triggered_limits", data)
         else:
             tl_data = data
-        self.ini_manager.write_triggered_limits(tl_data)
+        self.config_manager.write_triggered_limits(tl_data)
 
     def check_triggered_limits(
         self,
         api_key_id: str,
         service_key: Optional[str] = None,
         client_customer_key: Optional[str] = None,
-    ) -> List[dict]:
-        tl_raw = self.ini_manager.read_triggered_limits()
-        token = tl_raw.get("encrypted_payload")
-        public_key = tl_raw.get("public_key")
-        if not token or not public_key:
-            return []
-        payload = self._decode(token, public_key)
-        if not payload:
-            return []
-        results: List[dict] = []
-        for event in payload.get("triggered_limits", []):
-            if event.get("api_key_id") != api_key_id:
-                continue
-            if service_key and event.get("service_key") != service_key:
-                continue
-            if client_customer_key and event.get("client_customer_key") != client_customer_key:
-                continue
-            results.append(event)
-        return results
+    ) -> List[TriggeredLimit]:
+        vendor = service_id = None
+        if service_key and "::" in service_key:
+            vendor, service_id = service_key.split("::", 1)
+        elif service_key:
+            service_id = service_key
+        limits = self.config_manager.get_triggered_limits(
+            service_id=service_id,
+            service_vendor=vendor,
+            client_customer_key=client_customer_key,
+        )
+        return [l for l in limits if l.api_key_id == api_key_id]

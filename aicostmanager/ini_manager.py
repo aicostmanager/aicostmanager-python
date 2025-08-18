@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 
@@ -8,7 +7,7 @@ from .utils.ini_utils import atomic_write, file_lock, safe_read_config
 
 
 class IniManager:
-    """Handle reading and writing triggered limits to the INI file."""
+    """Helper for reading and writing generic values to ``AICM.ini``."""
 
     def __init__(self, ini_path: str | None = None) -> None:
         self.ini_path = self.resolve_path(ini_path)
@@ -48,20 +47,3 @@ class IniManager:
             buf = io.StringIO()
             cfg.write(buf)
             atomic_write(self.ini_path, buf.getvalue())
-
-    def read_triggered_limits(self) -> dict:
-        with file_lock(self.ini_path):
-            self._config = safe_read_config(self.ini_path)
-        if (
-            "triggered_limits" not in self._config
-            or "payload" not in self._config["triggered_limits"]
-        ):
-            return {}
-        return json.loads(self._config["triggered_limits"].get("payload", "{}"))
-
-    def write_triggered_limits(self, data: dict) -> None:
-        if "triggered_limits" in self._config:
-            self._config.remove_section("triggered_limits")
-        self._config.add_section("triggered_limits")
-        self._config["triggered_limits"]["payload"] = json.dumps(data or {})
-        self._write()

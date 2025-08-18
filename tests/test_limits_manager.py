@@ -3,7 +3,7 @@ import time
 import jwt
 
 from aicostmanager.client import CostManagerClient
-from aicostmanager.ini_manager import IniManager
+from aicostmanager.config_manager import CostManagerConfig
 from aicostmanager.limits import TriggeredLimitManager, UsageLimitManager
 from aicostmanager.models import (
     UsageLimitIn,
@@ -50,22 +50,22 @@ def _make_triggered_limits():
 def test_update_and_check(monkeypatch, tmp_path):
     ini = tmp_path / "AICM.ini"
     client = CostManagerClient(aicm_api_key="sk-test", aicm_ini_path=str(ini))
-    ini_mgr = IniManager(str(ini))
-    tl_mgr = TriggeredLimitManager(client, ini_mgr)
+    cfg_mgr = CostManagerConfig(client)
+    tl_mgr = TriggeredLimitManager(client, cfg_mgr)
 
     item, event = _make_triggered_limits()
     monkeypatch.setattr(client, "get_triggered_limits", lambda: item)
 
     tl_mgr.update_triggered_limits()
 
-    stored = ini_mgr.read_triggered_limits()
+    stored = cfg_mgr.read_triggered_limits()
     assert stored.get("encrypted_payload") == item["encrypted_payload"]
 
     matches = tl_mgr.check_triggered_limits(
         api_key_id=event["api_key_id"], service_key=event["service_key"]
     )
     assert len(matches) == 1
-    assert matches[0]["limit_id"] == event["limit_id"]
+    assert matches[0].limit_id == event["limit_id"]
 
     no_match = tl_mgr.check_triggered_limits(
         api_key_id=event["api_key_id"], service_key="other-service"
