@@ -89,6 +89,29 @@ async def track(payload: dict) -> dict:
     return {"status": "queued"}
 ```
 
+## LLM response helpers
+
+The tracker can derive usage directly from LLM client responses:
+
+```python
+resp = client.chat.completions.create(...)
+tracker.track_llm_usage("openai_chat", "gpt-5-mini", resp)
+```
+
+For streaming responses, wrap the iterator to capture usage once it becomes
+available:
+
+```python
+stream = client.chat.completions.create(
+    ..., stream=True, stream_options={"include_usage": True}
+)
+for event in tracker.track_llm_stream_usage("openai_chat", "gpt-5-mini", stream):
+    handle(event)
+```
+
+Asynchronous variants ``track_llm_usage_async`` and
+``track_llm_stream_usage_async`` mirror the synchronous versions.
+
 ## Shutting down
 
 `Tracker` owns a background worker responsible for delivering queued
