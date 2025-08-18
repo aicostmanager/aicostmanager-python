@@ -7,20 +7,20 @@ and forwards any JSON-serialisable data that you supply.
 ## Creating a tracker
 
 ```python
-from aicostmanager import Tracker
-
-# Uses API key from environment by default
-tracker = Tracker()
+# Uses API key from environment by default and ensures the
+# delivery queue is flushed on exit
+with Tracker() as tracker:
+    ...  # call track() as needed
 ```
 
 ## Choosing a delivery manager
 
-The tracker supports multiple delivery strategies selected via `DeliveryManagerType`. The default `immediate` mode sends each record synchronously with up to three retries for transient errors. Use `mem_queue` for an in-memory background queue or `persistent_queue` for a durable SQLite-backed queue:
+The tracker supports multiple delivery strategies selected via `DeliveryType`. The default `immediate` mode sends each record synchronously with up to three retries for transient errors. Use `mem_queue` for an in-memory background queue or `persistent_queue` for a durable SQLite-backed queue:
 
 ```python
-from aicostmanager import Tracker, DeliveryManagerType
+from aicostmanager import Tracker, DeliveryType
 
-tracker = Tracker(delivery_type=DeliveryManagerType.MEM_QUEUE)
+tracker = Tracker(delivery_type=DeliveryType.MEM_QUEUE)
 ```
 
 The constructor accepts the same connection options as
@@ -92,10 +92,17 @@ async def track(payload: dict) -> dict:
 ## Shutting down
 
 `Tracker` owns a background worker responsible for delivering queued
-messages.  Call `close()` during application shutdown to flush the queue
-and stop the worker:
+messages. Using it as a context manager ensures the queue is flushed and
+stopped automatically.  If you create a tracker outside of a `with`
+block, call `close()` during application shutdown:
 
 ```python
+with Tracker() as tracker:
+    ...
+
+# or manually
+tracker = Tracker()
+...  # use tracker
 tracker.close()
 ```
 

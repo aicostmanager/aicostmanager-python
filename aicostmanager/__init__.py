@@ -13,19 +13,15 @@ from .client import (
 )
 from .config_manager import CostManagerConfig
 from .cost_manager import CostManager
-from .delivery_manager import (
-    DeliveryManager,
-    DeliveryManagerType,
-    ImmediateDeliveryManager,
-    MemQueueDeliveryManager,
-    PersistentQueueDeliveryManager,
-)
 from .delivery import (
-    ResilientDelivery,
+    Delivery,
+    DeliveryType,
+    ImmediateDelivery,
+    MemQueueDelivery,
+    PersistentDelivery,
     get_global_delivery,
     get_global_delivery_health,
 )
-from .persistent_delivery import PersistentDelivery
 from .models import (
     ApiUsageRecord,
     ApiUsageRequest,
@@ -70,12 +66,10 @@ __all__ = [
     "UsageLimitExceeded",
     "CostManagerConfig",
     "UniversalExtractor",
-    "DeliveryManager",
-    "DeliveryManagerType",
-    "ImmediateDeliveryManager",
-    "MemQueueDeliveryManager",
-    "PersistentQueueDeliveryManager",
-    "ResilientDelivery",
+    "Delivery",
+    "DeliveryType",
+    "ImmediateDelivery",
+    "MemQueueDelivery",
     "PersistentDelivery",
     "get_global_delivery",
     "get_global_delivery_health",
