@@ -168,8 +168,7 @@ class CostManagerClient:
             if configs_response is None:
                 try:
                     triggered_limits_response = self.get_triggered_limits()
-                    # Update INI file with triggered limits
-                    self._update_ini_triggered_limits(triggered_limits_response)
+                    self._store_triggered_limits(triggered_limits_response)
                 except Exception:
                     # Don't fail initialization if triggered limits call fails
                     pass
@@ -190,11 +189,11 @@ class CostManagerClient:
                             tl_data = tl_payload.get("triggered_limits", tl_payload)
                         else:
                             tl_data = tl_payload
-                        self._update_ini_triggered_limits(tl_data)
+                        self._store_triggered_limits(tl_data)
                     else:
                         # Configs response didn't include triggered_limits, fetch separately
                         triggered_limits_response = self.get_triggered_limits()
-                        self._update_ini_triggered_limits(triggered_limits_response)
+                        self._store_triggered_limits(triggered_limits_response)
                 except Exception:
                     # Don't fail initialization if triggered limits update fails
                     pass
@@ -204,16 +203,6 @@ class CostManagerClient:
         except Exception:
             # Don't fail client initialization if API calls fail
             pass
-
-    def _ini_has_triggered_limits(self) -> bool:
-        """Check if INI file has triggered_limits section."""
-        if not os.path.exists(self.ini_path):
-            return False
-        cp = configparser.ConfigParser()
-        cp.read(self.ini_path)
-        return (
-            cp.has_section("triggered_limits") and "payload" in cp["triggered_limits"]
-        )
 
     def _update_ini_configs(self, configs_response) -> None:
         """Update INI file with configs from API response."""
@@ -236,27 +225,17 @@ class CostManagerClient:
         with open(self.ini_path, "w") as f:
             cp.write(f)
 
-    def _update_ini_triggered_limits(self, triggered_limits_response) -> None:
-        """Update INI file with triggered limits from API response."""
-        cp = configparser.ConfigParser()
-        cp.read(self.ini_path)
-        os.makedirs(os.path.dirname(self.ini_path), exist_ok=True)
+    def _store_triggered_limits(self, triggered_limits_response) -> None:
+        from .config_manager import CostManagerConfig
 
-        if "triggered_limits" not in cp:
-            cp.add_section("triggered_limits")
-
-        # Extract triggered_limits data from response
+        cfg_mgr = CostManagerConfig(self)
         if isinstance(triggered_limits_response, dict):
             tl_data = triggered_limits_response.get(
                 "triggered_limits", triggered_limits_response
             )
         else:
             tl_data = triggered_limits_response
-
-        cp["triggered_limits"]["payload"] = json.dumps(tl_data or {})
-
-        with open(self.ini_path, "w") as f:
-            cp.write(f)
+        cfg_mgr.write_triggered_limits(tl_data)
 
     # internal helper
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
@@ -325,14 +304,7 @@ class CostManagerClient:
         resp = self._request("POST", "/track-usage", json=payload)
         result = ApiUsageResponse.model_validate(resp)
         # Always update triggered_limits, even if empty - server may have cleared previous limits
-        cp = configparser.ConfigParser()
-        cp.read(self.ini_path)
-        os.makedirs(os.path.dirname(self.ini_path), exist_ok=True)
-        if "triggered_limits" not in cp:
-            cp["triggered_limits"] = {}
-        cp["triggered_limits"]["payload"] = json.dumps(result.triggered_limits or {})
-        with open(self.ini_path, "w") as f:
-            cp.write(f)
+        self._store_triggered_limits(result.triggered_limits or {})
         return result
 
     def list_usage_events(
@@ -634,14 +606,7 @@ class AsyncCostManagerClient:
         resp = await self._request("POST", "/track-usage", json=payload)
         result = ApiUsageResponse.model_validate(resp)
         # Always update triggered_limits, even if empty - server may have cleared previous limits
-        cp = configparser.ConfigParser()
-        cp.read(self.ini_path)
-        os.makedirs(os.path.dirname(self.ini_path), exist_ok=True)
-        if "triggered_limits" not in cp:
-            cp["triggered_limits"] = {}
-        cp["triggered_limits"]["payload"] = json.dumps(result.triggered_limits or {})
-        with open(self.ini_path, "w") as f:
-            cp.write(f)
+        self._store_triggered_limits(result.triggered_limits or {})
         return result
 
     async def list_usage_events(

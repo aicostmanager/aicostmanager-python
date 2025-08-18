@@ -130,10 +130,21 @@ class CostManagerConfig:
         self._config.add_section("triggered_limits")
         self._config["triggered_limits"]["payload"] = json.dumps(data or {})
 
-    def store_triggered_limits(self, data: dict) -> None:
+    def write_triggered_limits(self, data: dict) -> None:
         """Persist ``triggered_limits`` payload to ``AICM.ini``."""
         self._set_triggered_limits(data)
         self._write()
+
+    def read_triggered_limits(self) -> dict:
+        """Return raw ``triggered_limits`` payload from ``AICM.ini``."""
+        with file_lock(self.ini_path):
+            self._config = safe_read_config(self.ini_path)
+        if (
+            "triggered_limits" not in self._config
+            or "payload" not in self._config["triggered_limits"]
+        ):
+            return {}
+        return json.loads(self._config["triggered_limits"].get("payload", "{}"))
 
     def refresh(self) -> None:
         """Force refresh of local configuration from the API."""
@@ -247,18 +258,10 @@ class CostManagerConfig:
     ) -> List[TriggeredLimit]:
         """Return triggered limits for the given parameters."""
         # Always re-read INI file to get latest triggered_limits from delivery worker updates
-        with file_lock(self.ini_path):
-            self._config = safe_read_config(self.ini_path)
-
-        if (
-            "triggered_limits" not in self._config
-            or "payload" not in self._config["triggered_limits"]
-        ):
+        tl_raw = self.read_triggered_limits()
+        if not tl_raw:
             self.refresh()
-            with file_lock(self.ini_path):
-                self._config = safe_read_config(self.ini_path)
-
-        tl_raw = json.loads(self._config["triggered_limits"].get("payload", "{}"))
+            tl_raw = self.read_triggered_limits()
         token = tl_raw.get("encrypted_payload")
         public_key = tl_raw.get("public_key")
 
@@ -270,10 +273,8 @@ class CostManagerConfig:
                     tl_data = tl_payload.get("triggered_limits", tl_payload)
                 else:
                     tl_data = tl_payload
-                self.store_triggered_limits(tl_data)
-                with file_lock(self.ini_path):
-                    self._config = safe_read_config(self.ini_path)
-                tl_raw = json.loads(self._config["triggered_limits"].get("payload", "{}"))
+                self.write_triggered_limits(tl_data)
+                tl_raw = self.read_triggered_limits()
                 token = tl_raw.get("encrypted_payload")
                 public_key = tl_raw.get("public_key")
             except Exception:
