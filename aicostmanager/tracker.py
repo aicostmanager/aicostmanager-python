@@ -7,13 +7,9 @@ from uuid import uuid4
 
 import httpx
 
-from .delivery import (
-    DeliveryType,
-    ImmediateDelivery,
-    MemQueueDelivery,
-    PersistentDelivery,
-)
+from .delivery import Delivery, DeliveryConfig, DeliveryType, ImmediateDelivery, MemQueueDelivery, PersistentDelivery
 from .ini_manager import IniManager
+from .logger import create_logger
 
 
 class Tracker:
@@ -23,6 +19,7 @@ class Tracker:
         self,
         *,
         delivery_type: DeliveryType | None = None,
+        delivery: Delivery | None = None,
         aicm_api_key: Optional[str] = None,
         aicm_api_base: Optional[str] = None,
         aicm_api_url: Optional[str] = None,
@@ -42,61 +39,64 @@ class Tracker:
     ) -> None:
         ini_path = IniManager.resolve_path(aicm_ini_path)
         self.ini_manager = IniManager(ini_path)
-        self.logger = self.ini_manager.create_logger(
+        self.logger = create_logger(
             __name__, log_file, log_level, "AICM_TRACKER_LOG_FILE", "AICM_TRACKER_LOG_LEVEL"
         )
-        if delivery_type is None:
-            name = self.ini_manager.get_option(
-                "tracker", "delivery_manager", DeliveryType.IMMEDIATE.value
-            )
-            delivery_type = DeliveryType(name)
-        if delivery_type is DeliveryType.IMMEDIATE:
-            self.delivery = ImmediateDelivery(
-                aicm_api_key=aicm_api_key,
-                aicm_api_base=aicm_api_base,
-                aicm_api_url=aicm_api_url,
-                timeout=timeout,
-                transport=transport,
-                ini_manager=self.ini_manager,
-                log_file=log_file,
-                log_level=log_level,
-            )
-        elif delivery_type is DeliveryType.MEM_QUEUE:
-            self.delivery = MemQueueDelivery(
-                aicm_api_key=aicm_api_key,
-                aicm_api_base=aicm_api_base,
-                aicm_api_url=aicm_api_url,
-                timeout=timeout,
-                max_retries=max_retries,
-                queue_size=queue_size,
-                batch_interval=batch_interval,
-                max_batch_size=max_batch_size,
-                transport=transport,
-                ini_manager=self.ini_manager,
-                log_file=log_file,
-                log_level=log_level,
-            )
+        if delivery is not None:
+            self.delivery = delivery
+            delivery_type = getattr(delivery, "type", delivery_type or DeliveryType.IMMEDIATE)
         else:
-            self.delivery = PersistentDelivery(
+            if delivery_type is None:
+                name = self.ini_manager.get_option(
+                    "tracker", "delivery_manager", DeliveryType.IMMEDIATE.value
+                )
+                delivery_type = DeliveryType(name)
+            config = DeliveryConfig(
                 aicm_api_key=aicm_api_key,
                 aicm_api_base=aicm_api_base,
                 aicm_api_url=aicm_api_url,
-                aicm_ini_path=ini_path,
-                db_path=db_path,
+                timeout=timeout,
+                transport=transport,
+                ini_manager=self.ini_manager,
                 log_file=log_file,
                 log_level=log_level,
-                timeout=timeout,
-                poll_interval=poll_interval,
-                batch_interval=batch_interval,
-                max_attempts=max_attempts,
-                max_retries=max_retries,
-                transport=transport,
-                log_bodies=log_bodies,
-                ini_manager=self.ini_manager,
             )
-        self.ini_manager.set_option(
-            "tracker", "delivery_manager", delivery_type.value
-        )
+            factory = {
+                DeliveryType.IMMEDIATE: ImmediateDelivery,
+                DeliveryType.MEM_QUEUE: MemQueueDelivery,
+                DeliveryType.PERSISTENT_QUEUE: PersistentDelivery,
+            }
+            delivery_kwargs: Dict[str, Any] = {}
+            if delivery_type is DeliveryType.MEM_QUEUE:
+                delivery_kwargs.update(
+                    {
+                        "queue_size": queue_size,
+                        "batch_interval": batch_interval,
+                        "max_batch_size": max_batch_size,
+                        "max_retries": max_retries,
+                    }
+                )
+            elif delivery_type is DeliveryType.PERSISTENT_QUEUE:
+                delivery_kwargs.update(
+                    {
+                        "config": config,
+                        "aicm_ini_path": ini_path,
+                        "db_path": db_path,
+                        "poll_interval": poll_interval,
+                        "batch_interval": batch_interval,
+                        "max_attempts": max_attempts,
+                        "max_retries": max_retries,
+                        "log_bodies": log_bodies,
+                        "max_batch_size": max_batch_size,
+                    }
+                )
+            if delivery_type is not DeliveryType.PERSISTENT_QUEUE:
+                delivery_kwargs["config"] = config
+            self.delivery = factory[delivery_type](**delivery_kwargs)
+        if delivery_type is not None:
+            self.ini_manager.set_option(
+                "tracker", "delivery_manager", delivery_type.value
+            )
 
     # ------------------------------------------------------------------
     def _build_record(

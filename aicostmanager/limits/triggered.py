@@ -4,15 +4,16 @@ from typing import List, Optional
 
 import jwt
 
-from .client import CostManagerClient
-from .ini_manager import IniManager
+from ..client import CostManagerClient
+from ..ini_manager import IniManager
+from .base import BaseLimitManager
 
 
-class TriggeredLimitManager:
+class TriggeredLimitManager(BaseLimitManager):
     """Manage triggered limits fetched from the API and stored locally."""
 
     def __init__(self, client: CostManagerClient, ini_manager: IniManager | None = None) -> None:
-        self.client = client
+        super().__init__(client)
         self.ini_manager = ini_manager or IniManager(client.ini_path)
 
     def _decode(self, token: str, public_key: str) -> Optional[dict]:
