@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+### Added
+- `track_llm_usage` and `track_llm_usage_async` methods for automatic usage
+  extraction from LLM responses, with streaming helpers.
+
 ## [0.1.18] - 2025-08-11
 ### Added
 

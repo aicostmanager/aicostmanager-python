@@ -15,6 +15,10 @@ from .delivery import (
 )
 from .ini_manager import IniManager
 from .logger import create_logger
+from .usage_utils import (
+    get_streaming_usage_from_response,
+    get_usage_from_response,
+)
 
 
 class Tracker:
@@ -160,6 +164,124 @@ class Tracker:
             client_customer_key=client_customer_key,
             context=context,
         )
+
+    def track_llm_usage(
+        self,
+        api_id: str,
+        system_key: str,
+        response: Any,
+        *,
+        response_id: Optional[str] = None,
+        timestamp: str | datetime | None = None,
+        client_customer_key: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Extract usage from an LLM response and enqueue it.
+
+        Parameters are identical to :meth:`track` except that ``response`` is
+        the raw LLM client response.  Usage information is obtained via
+        :func:`get_usage_from_response` using the provided ``api_id``.
+        ``response`` is returned unmodified to allow call chaining.
+        """
+        usage = get_usage_from_response(response, api_id)
+        if isinstance(usage, dict) and usage:
+            self.track(
+                api_id,
+                system_key,
+                usage,
+                response_id=response_id,
+                timestamp=timestamp,
+                client_customer_key=client_customer_key,
+                context=context,
+            )
+        return response
+
+    async def track_llm_usage_async(
+        self,
+        api_id: str,
+        system_key: str,
+        response: Any,
+        *,
+        response_id: Optional[str] = None,
+        timestamp: str | datetime | None = None,
+        client_customer_key: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Async version of :meth:`track_llm_usage`."""
+        return await asyncio.to_thread(
+            self.track_llm_usage,
+            api_id,
+            system_key,
+            response,
+            response_id=response_id,
+            timestamp=timestamp,
+            client_customer_key=client_customer_key,
+            context=context,
+        )
+
+    def track_llm_stream_usage(
+        self,
+        api_id: str,
+        system_key: str,
+        stream: Any,
+        *,
+        response_id: Optional[str] = None,
+        timestamp: str | datetime | None = None,
+        client_customer_key: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ):
+        """Yield streaming events while tracking usage.
+
+        ``stream`` should be an iterable of events from an LLM SDK.  Usage
+        information is extracted from events using
+        :func:`get_streaming_usage_from_response` and sent via :meth:`track` once
+        available.
+        """
+        usage_sent = False
+        for chunk in stream:
+            if not usage_sent:
+                usage = get_streaming_usage_from_response(chunk, api_id)
+                if isinstance(usage, dict) and usage:
+                    self.track(
+                        api_id,
+                        system_key,
+                        usage,
+                        response_id=response_id,
+                        timestamp=timestamp,
+                        client_customer_key=client_customer_key,
+                        context=context,
+                    )
+                    usage_sent = True
+            yield chunk
+
+    async def track_llm_stream_usage_async(
+        self,
+        api_id: str,
+        system_key: str,
+        stream: Any,
+        *,
+        response_id: Optional[str] = None,
+        timestamp: str | datetime | None = None,
+        client_customer_key: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ):
+        """Asynchronous version of :meth:`track_llm_stream_usage`."""
+        usage_sent = False
+        async for chunk in stream:
+            if not usage_sent:
+                usage = get_streaming_usage_from_response(chunk, api_id)
+                if isinstance(usage, dict) and usage:
+                    await self.track_async(
+                        api_id,
+                        system_key,
+                        usage,
+                        response_id=response_id,
+                        timestamp=timestamp,
+                        client_customer_key=client_customer_key,
+                        context=context,
+                    )
+                    usage_sent = True
+            yield chunk
 
     # ------------------------------------------------------------------
     def __enter__(self):
