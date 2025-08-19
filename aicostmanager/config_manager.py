@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
+import configparser
 
 import jwt
 
 from .client import AICMError, CostManagerClient
 from .utils.ini_utils import atomic_write, file_lock, safe_read_config
+from .triggered_limits_cache import triggered_limits_cache
 
 
 class ConfigNotFound(AICMError):
@@ -49,6 +51,7 @@ class ConfigManager:
         *,
         ini_path: str | None = None,
         get_triggered_limits: Callable[[], dict] | None = None,
+        load: bool = True,
     ) -> None:
         if client is not None:
             self.ini_path = client.ini_path
@@ -58,10 +61,11 @@ class ConfigManager:
                 raise ValueError("ini_path must be provided if client is not given")
             self.ini_path = ini_path
             self._get_triggered_limits = get_triggered_limits or (lambda: {})
-
-        # Initialize with safe reading
-        with file_lock(self.ini_path):
-            self._config = safe_read_config(self.ini_path)
+        if load:
+            with file_lock(self.ini_path):
+                self._config = safe_read_config(self.ini_path)
+        else:
+            self._config = configparser.ConfigParser()
 
     def _write(self) -> None:
         """Safely write config with file locking."""
@@ -99,6 +103,16 @@ class ConfigManager:
         """Persist ``triggered_limits`` payload to ``AICM.ini``."""
         self._set_triggered_limits(data)
         self._write()
+        token = data.get("encrypted_payload")
+        public_key = data.get("public_key")
+        if token and public_key:
+            payload = self._decode(token, public_key)
+            if payload:
+                triggered_limits_cache.set(payload.get("triggered_limits", []))
+            else:
+                triggered_limits_cache.clear()
+        else:
+            triggered_limits_cache.clear()
 
     def read_triggered_limits(self) -> dict:
         """Return raw ``triggered_limits`` payload from ``AICM.ini``."""
@@ -223,36 +237,33 @@ class ConfigManager:
         client_customer_key: Optional[str] = None,
     ) -> List[TriggeredLimit]:
         """Return triggered limits for the given parameters."""
-        # Always re-read INI file to get latest triggered_limits from delivery worker updates
-        tl_raw = self.read_triggered_limits()
-        if not tl_raw:
-            self.refresh()
+        events = triggered_limits_cache.get()
+        if events is None:
             tl_raw = self.read_triggered_limits()
-        token = tl_raw.get("encrypted_payload")
-        public_key = tl_raw.get("public_key")
+            token = tl_raw.get("encrypted_payload")
+            public_key = tl_raw.get("public_key")
 
-        # If INI doesn't contain encrypted payload, fetch directly from API
-        if not token or not public_key:
-            try:
-                tl_payload = self._get_triggered_limits() or {}
-                if isinstance(tl_payload, dict):
-                    tl_data = tl_payload.get("triggered_limits", tl_payload)
-                else:
-                    tl_data = tl_payload
-                self.write_triggered_limits(tl_data)
-                tl_raw = self.read_triggered_limits()
-                token = tl_raw.get("encrypted_payload")
-                public_key = tl_raw.get("public_key")
-            except Exception:
-                return []
+            if not token or not public_key:
+                try:
+                    tl_payload = self._get_triggered_limits() or {}
+                    if isinstance(tl_payload, dict):
+                        tl_data = tl_payload.get("triggered_limits", tl_payload)
+                    else:
+                        tl_data = tl_payload
+                    self.write_triggered_limits(tl_data)
+                except Exception:
+                    return []
+                events = triggered_limits_cache.get()
+            else:
+                payload = self._decode(token, public_key)
+                if not payload:
+                    triggered_limits_cache.clear()
+                    return []
+                events = payload.get("triggered_limits", [])
+                triggered_limits_cache.set(events)
 
-        if not token or not public_key:
+        if not events:
             return []
-
-        payload = self._decode(token, public_key)
-        if not payload:
-            return []
-        events = payload.get("triggered_limits", [])
         results: List[TriggeredLimit] = []
         for event in events:
             vendor_info = event.get("vendor") or {}

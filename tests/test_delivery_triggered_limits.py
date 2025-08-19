@@ -85,3 +85,28 @@ def test_immediate_enforce_triggered_limit(tmp_path):
     with pytest.raises(UsageLimitExceeded):
         delivery.enqueue(payload)
     assert called.get("called")
+
+
+def test_triggered_limits_cached_in_memory(tmp_path, monkeypatch):
+    ini = tmp_path / "AICM.ini"
+    event = _setup_triggered_limits(ini)
+    config = DeliveryConfig(ini_manager=IniManager(str(ini)), aicm_api_key=event["api_key_id"])
+    delivery = ImmediateDelivery(config)
+    delivery._post_with_retry = lambda body, max_attempts: None
+    delivery._refresh_triggered_limits = lambda: None
+    payload = {
+        "api_id": "openai",
+        "service_key": event["service_key"],
+        "client_customer_key": event["client_customer_key"],
+        "payload": {},
+    }
+    with pytest.raises(UsageLimitExceeded):
+        delivery.enqueue(payload)
+
+    def fail_read(self):
+        raise AssertionError("read_triggered_limits should not be called")
+
+    monkeypatch.setattr(ConfigManager, "read_triggered_limits", fail_read)
+
+    with pytest.raises(UsageLimitExceeded):
+        delivery.enqueue(payload)
