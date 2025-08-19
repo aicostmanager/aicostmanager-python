@@ -90,25 +90,14 @@ def test_track_with_limits_immediate(
     }
     print("creating usage limit:", json.dumps(ul_payload))
     limit = ul_mgr.create_usage_limit(ul_payload)
+    limit_uuid = getattr(limit, "uuid", None)
 
-    resp = client.responses.create(model=MODEL, input="trigger")
-    response_id = getattr(resp, "id", None)
-    usage_payload = get_usage_from_response(resp, "openai_responses")
-    print("trigger response_id:", response_id)
-    print("trigger usage payload:", json.dumps(usage_payload, default=str))
-    tracker.track(
-        "openai_responses",
-        SERVICE_KEY,
-        usage_payload,
-        response_id=response_id,
-    )
-
-    resp = client.responses.create(model=MODEL, input="should fail")
-    response_id = getattr(resp, "id", None)
-    usage_payload = get_usage_from_response(resp, "openai_responses")
-    print("should-fail response_id:", response_id)
-    print("should-fail usage payload:", json.dumps(usage_payload, default=str))
-    with pytest.raises(UsageLimitExceeded):
+    try:
+        resp = client.responses.create(model=MODEL, input="trigger")
+        response_id = getattr(resp, "id", None)
+        usage_payload = get_usage_from_response(resp, "openai_responses")
+        print("trigger response_id:", response_id)
+        print("trigger usage payload:", json.dumps(usage_payload, default=str))
         tracker.track(
             "openai_responses",
             SERVICE_KEY,
@@ -116,48 +105,48 @@ def test_track_with_limits_immediate(
             response_id=response_id,
         )
 
-    with Tracker(aicm_api_key=aicm_api_key, ini_path=str(ini)) as t2:
-        resp_other = client.responses.create(model=OTHER_MODEL, input="other")
-        other_response_id = getattr(resp_other, "id", None)
-        other_usage = get_usage_from_response(resp_other, "openai_responses")
-        other_service_key = f"openai::{OTHER_MODEL}"
-        print("other response_id:", other_response_id)
-        print("other usage payload:", json.dumps(other_usage, default=str))
-        t2.track(
-            "openai_responses",
-            other_service_key,
-            other_usage,
-            response_id=other_response_id,
-        )
+        resp = client.responses.create(model=MODEL, input="should fail")
+        response_id = getattr(resp, "id", None)
+        usage_payload = get_usage_from_response(resp, "openai_responses")
+        print("should-fail response_id:", response_id)
+        print("should-fail usage payload:", json.dumps(usage_payload, default=str))
+        with pytest.raises(UsageLimitExceeded):
+            tracker.track(
+                "openai_responses",
+                SERVICE_KEY,
+                usage_payload,
+                response_id=response_id,
+            )
 
-    upd_payload = {
-        "threshold_type": "limit",
-        "amount": str(Decimal("0.1")),
-        "period": "day",
-        "service_key": SERVICE_KEY,
-        "api_key_uuid": api_key_uuid,
-    }
-    print("updating usage limit:", json.dumps(upd_payload))
-    ul_mgr.update_usage_limit(limit.uuid, upd_payload)
+        with Tracker(aicm_api_key=aicm_api_key, ini_path=str(ini)) as t2:
+            resp_other = client.responses.create(model=OTHER_MODEL, input="other")
+            other_response_id = getattr(resp_other, "id", None)
+            other_usage = get_usage_from_response(resp_other, "openai_responses")
+            other_service_key = f"openai::{OTHER_MODEL}"
+            print("other response_id:", other_response_id)
+            print("other usage payload:", json.dumps(other_usage, default=str))
+            t2.track(
+                "openai_responses",
+                other_service_key,
+                other_usage,
+                response_id=other_response_id,
+            )
 
-    resp = client.responses.create(model=MODEL, input="after raise")
-    response_id = getattr(resp, "id", None)
-    usage_payload = get_usage_from_response(resp, "openai_responses")
-    print("after-raise response_id:", response_id)
-    print("after-raise usage payload:", json.dumps(usage_payload, default=str))
-    tracker.track(
-        "openai_responses",
-        SERVICE_KEY,
-        usage_payload,
-        response_id=response_id,
-    )
+        upd_payload = {
+            "threshold_type": "limit",
+            "amount": str(Decimal("0.1")),
+            "period": "day",
+            "service_key": SERVICE_KEY,
+            "api_key_uuid": api_key_uuid,
+        }
+        print("updating usage limit:", json.dumps(upd_payload))
+        ul_mgr.update_usage_limit(limit.uuid, upd_payload)
 
-    resp = client.responses.create(model=MODEL, input="raise again")
-    response_id = getattr(resp, "id", None)
-    usage_payload = get_usage_from_response(resp, "openai_responses")
-    print("raise-again response_id:", response_id)
-    print("raise-again usage payload:", json.dumps(usage_payload, default=str))
-    with pytest.raises(UsageLimitExceeded):
+        resp = client.responses.create(model=MODEL, input="after raise")
+        response_id = getattr(resp, "id", None)
+        usage_payload = get_usage_from_response(resp, "openai_responses")
+        print("after-raise response_id:", response_id)
+        print("after-raise usage payload:", json.dumps(usage_payload, default=str))
         tracker.track(
             "openai_responses",
             SERVICE_KEY,
@@ -165,21 +154,40 @@ def test_track_with_limits_immediate(
             response_id=response_id,
         )
 
-    ul_mgr.delete_usage_limit(limit.uuid)
+        resp = client.responses.create(model=MODEL, input="raise again")
+        response_id = getattr(resp, "id", None)
+        usage_payload = get_usage_from_response(resp, "openai_responses")
+        print("raise-again response_id:", response_id)
+        print("raise-again usage payload:", json.dumps(usage_payload, default=str))
+        with pytest.raises(UsageLimitExceeded):
+            tracker.track(
+                "openai_responses",
+                SERVICE_KEY,
+                usage_payload,
+                response_id=response_id,
+            )
 
-    resp = client.responses.create(model=MODEL, input="after delete")
-    response_id = getattr(resp, "id", None)
-    usage_payload = get_usage_from_response(resp, "openai_responses")
-    print("after-delete response_id:", response_id)
-    print("after-delete usage payload:", json.dumps(usage_payload, default=str))
-    tracker.track(
-        "openai_responses",
-        SERVICE_KEY,
-        usage_payload,
-        response_id=response_id,
-    )
+        ul_mgr.delete_usage_limit(limit.uuid)
 
-    tracker.close()
+        resp = client.responses.create(model=MODEL, input="after delete")
+        response_id = getattr(resp, "id", None)
+        usage_payload = get_usage_from_response(resp, "openai_responses")
+        print("after-delete response_id:", response_id)
+        print("after-delete usage payload:", json.dumps(usage_payload, default=str))
+        tracker.track(
+            "openai_responses",
+            SERVICE_KEY,
+            usage_payload,
+            response_id=response_id,
+        )
+
+        tracker.close()
+    finally:
+        try:
+            if limit_uuid:
+                ul_mgr.delete_usage_limit(limit_uuid)
+        except Exception:
+            pass
 
 
 @pytest.mark.skipif(
@@ -230,17 +238,19 @@ def test_track_with_limits_queue(
     }
     print("creating usage limit:", json.dumps(ul_payload))
     limit = ul_mgr.create_usage_limit(ul_payload)
+    limit_uuid = getattr(limit, "uuid", None)
 
-    with Tracker(
-        aicm_api_key=aicm_api_key, ini_path=str(ini), delivery=delivery
-    ) as tracker:
-        resp = client.responses.create(model=MODEL, input="hi")
-        rid = getattr(resp, "id", None)
-        up = get_usage_from_response(resp, "openai_responses")
-        print("queue first response_id:", rid)
-        print("queue first usage payload:", json.dumps(up, default=str))
-        tracker.track("openai_responses", SERVICE_KEY, up, response_id=rid)
-        _wait_for_empty(tracker.delivery)
+    try:
+        with Tracker(
+            aicm_api_key=aicm_api_key, ini_path=str(ini), delivery=delivery
+        ) as tracker:
+            resp = client.responses.create(model=MODEL, input="hi")
+            rid = getattr(resp, "id", None)
+            up = get_usage_from_response(resp, "openai_responses")
+            print("queue first response_id:", rid)
+            print("queue first usage payload:", json.dumps(up, default=str))
+            tracker.track("openai_responses", SERVICE_KEY, up, response_id=rid)
+            _wait_for_empty(tracker.delivery)
 
         resp = client.responses.create(model=MODEL, input="trigger")
         rid = getattr(resp, "id", None)
@@ -309,6 +319,12 @@ def test_track_with_limits_queue(
         print("queue after-delete usage payload:", json.dumps(up, default=str))
         tracker.track("openai_responses", SERVICE_KEY, up, response_id=rid)
         _wait_for_empty(tracker.delivery)
+    finally:
+        try:
+            if limit_uuid:
+                ul_mgr.delete_usage_limit(limit_uuid)
+        except Exception:
+            pass
 
 
 @pytest.mark.skipif(
@@ -347,26 +363,14 @@ def test_track_with_limits_customer(
     }
     print("creating usage limit (customer):", json.dumps(ul_payload))
     limit = ul_mgr.create_usage_limit(ul_payload)
+    limit_uuid = getattr(limit, "uuid", None)
 
-    resp = client.responses.create(model=MODEL, input="hi")
-    rid = getattr(resp, "id", None)
-    up = get_usage_from_response(resp, "openai_responses")
-    print("cust first response_id:", rid)
-    print("cust first usage payload:", json.dumps(up, default=str))
-    tracker.track(
-        "openai_responses",
-        SERVICE_KEY,
-        up,
-        response_id=rid,
-        client_customer_key=customer,
-    )
-
-    resp = client.responses.create(model=MODEL, input="should fail")
-    rid = getattr(resp, "id", None)
-    up = get_usage_from_response(resp, "openai_responses")
-    print("cust should-fail response_id:", rid)
-    print("cust should-fail usage payload:", json.dumps(up, default=str))
-    with pytest.raises(UsageLimitExceeded):
+    try:
+        resp = client.responses.create(model=MODEL, input="hi")
+        rid = getattr(resp, "id", None)
+        up = get_usage_from_response(resp, "openai_responses")
+        print("cust first response_id:", rid)
+        print("cust first usage payload:", json.dumps(up, default=str))
         tracker.track(
             "openai_responses",
             SERVICE_KEY,
@@ -375,19 +379,39 @@ def test_track_with_limits_customer(
             client_customer_key=customer,
         )
 
-    ul_mgr.delete_usage_limit(limit.uuid)
+        resp = client.responses.create(model=MODEL, input="should fail")
+        rid = getattr(resp, "id", None)
+        up = get_usage_from_response(resp, "openai_responses")
+        print("cust should-fail response_id:", rid)
+        print("cust should-fail usage payload:", json.dumps(up, default=str))
+        with pytest.raises(UsageLimitExceeded):
+            tracker.track(
+                "openai_responses",
+                SERVICE_KEY,
+                up,
+                response_id=rid,
+                client_customer_key=customer,
+            )
 
-    resp = client.responses.create(model=MODEL, input="after delete")
-    rid = getattr(resp, "id", None)
-    up = get_usage_from_response(resp, "openai_responses")
-    print("cust after-delete response_id:", rid)
-    print("cust after-delete usage payload:", json.dumps(up, default=str))
-    tracker.track(
-        "openai_responses",
-        SERVICE_KEY,
-        up,
-        response_id=rid,
-        client_customer_key=customer,
-    )
+        ul_mgr.delete_usage_limit(limit.uuid)
 
-    tracker.close()
+        resp = client.responses.create(model=MODEL, input="after delete")
+        rid = getattr(resp, "id", None)
+        up = get_usage_from_response(resp, "openai_responses")
+        print("cust after-delete response_id:", rid)
+        print("cust after-delete usage payload:", json.dumps(up, default=str))
+        tracker.track(
+            "openai_responses",
+            SERVICE_KEY,
+            up,
+            response_id=rid,
+            client_customer_key=customer,
+        )
+
+        tracker.close()
+    finally:
+        try:
+            if limit_uuid:
+                ul_mgr.delete_usage_limit(limit_uuid)
+        except Exception:
+            pass
