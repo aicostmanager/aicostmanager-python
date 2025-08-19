@@ -1,5 +1,6 @@
 from aicostmanager import Tracker
-from aicostmanager.delivery import DeliveryType
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 
 # A valid usage payload for the /track endpoint
 VALID_USAGE = {
@@ -20,14 +21,23 @@ VALID_USAGE = {
 
 
 def test_deliver_now_with_client_customer_key_and_context(aicm_api_key, aicm_api_base):
-    tracker = Tracker(aicm_api_key=aicm_api_key, aicm_api_base=aicm_api_base)
-    response_id = "record-with-meta"
-
-    with Tracker(
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=aicm_api_base,
-        delivery_type=DeliveryType.IMMEDIATE,
-    ) as t2:
+    )
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+    tracker = Tracker(aicm_api_key=aicm_api_key, ini_path="ini", delivery=delivery)
+    response_id = "record-with-meta"
+
+    dconfig2 = DeliveryConfig(
+        ini_manager=IniManager("ini"),
+        aicm_api_key=aicm_api_key,
+        aicm_api_base=aicm_api_base,
+    )
+    delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
+    with Tracker(aicm_api_key=aicm_api_key, ini_path="ini", delivery=delivery2) as t2:
         t2.track(
             "openai_chat",
             "openai::gpt-5-mini",
@@ -43,14 +53,23 @@ def test_deliver_now_with_client_customer_key_and_context(aicm_api_key, aicm_api
 def test_deliver_now_without_client_customer_key_and_context(
     aicm_api_key, aicm_api_base
 ):
-    tracker = Tracker(aicm_api_key=aicm_api_key, aicm_api_base=aicm_api_base)
-    response_id = "record-without-meta"
-
-    with Tracker(
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=aicm_api_base,
-        delivery_type=DeliveryType.IMMEDIATE,
-    ) as t2:
+    )
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+    tracker = Tracker(aicm_api_key=aicm_api_key, ini_path="ini", delivery=delivery)
+    response_id = "record-without-meta"
+
+    dconfig2 = DeliveryConfig(
+        ini_manager=IniManager("ini"),
+        aicm_api_key=aicm_api_key,
+        aicm_api_base=aicm_api_base,
+    )
+    delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
+    with Tracker(aicm_api_key=aicm_api_key, ini_path="ini", delivery=delivery2) as t2:
         t2.track(
             "openai_chat",
             "openai::gpt-5-mini",
