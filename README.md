@@ -41,6 +41,16 @@ with Tracker() as tracker:
 Using `with Tracker()` ensures the background delivery queue is flushed before
 the program exits.
 
+Configuration values are loaded from ``AICM.INI`` and environment variables.
+To manage these settings explicitly, construct a ``TrackerConfig``:
+
+```python
+from aicostmanager import Tracker, TrackerConfig
+
+config = TrackerConfig.from_env()
+tracker = Tracker(config)
+```
+
 ## Choosing a delivery strategy
 
 `Tracker` supports multiple delivery components via `DeliveryType`:
