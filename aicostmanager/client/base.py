@@ -40,9 +40,9 @@ class BaseClient:
 
     def _store_triggered_limits(self, triggered_limits_response) -> None:
         """Persist triggered limits using the configuration manager."""
-        from ..config_manager import CostManagerConfig
+        from ..config_manager import ConfigManager
 
-        cfg_mgr = CostManagerConfig(self)
+        cfg_mgr = ConfigManager(ini_path=self.ini_path)
         if isinstance(triggered_limits_response, dict):
             tl_data = triggered_limits_response.get(
                 "triggered_limits", triggered_limits_response

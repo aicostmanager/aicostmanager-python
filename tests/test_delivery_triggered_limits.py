@@ -1,6 +1,5 @@
 import pathlib
 import time
-from types import SimpleNamespace
 
 import jwt
 import pytest
@@ -9,7 +8,7 @@ from aicostmanager.delivery import DeliveryConfig
 from aicostmanager.delivery.immediate import ImmediateDelivery
 from aicostmanager.delivery.mem_queue import MemQueueDelivery
 from aicostmanager.ini_manager import IniManager
-from aicostmanager.config_manager import CostManagerConfig
+from aicostmanager.config_manager import ConfigManager
 from aicostmanager.client.exceptions import UsageLimitExceeded
 
 PRIVATE_KEY = (pathlib.Path(__file__).parent / "threshold_private_key.pem").read_text()
@@ -43,7 +42,7 @@ def _setup_triggered_limits(ini_path):
     }
     token = jwt.encode(payload, PRIVATE_KEY, algorithm="RS256", headers={"kid": "test"})
     item = {"version": "v1", "public_key": PUBLIC_KEY, "key_id": "test", "encrypted_payload": token}
-    cfg = CostManagerConfig(SimpleNamespace(ini_path=str(ini_path), get_triggered_limits=lambda: {}))
+    cfg = ConfigManager(ini_path=str(ini_path))
     cfg.write_triggered_limits(item)
     return event
 

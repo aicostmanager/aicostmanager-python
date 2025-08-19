@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from ..client import AsyncCostManagerClient, CostManagerClient
-from ..config_manager import CostManagerConfig, TriggeredLimit
+from ..config_manager import ConfigManager, TriggeredLimit
 from .base import BaseLimitManager
 
 
@@ -13,10 +13,10 @@ class TriggeredLimitManager(BaseLimitManager):
     def __init__(
         self,
         client: CostManagerClient | AsyncCostManagerClient,
-        config_manager: CostManagerConfig | None = None,
+        config_manager: ConfigManager | None = None,
     ) -> None:
         super().__init__(client)
-        self.config_manager = config_manager or CostManagerConfig(client)
+        self.config_manager = config_manager or ConfigManager(client)
 
     def update_triggered_limits(self) -> None:
         data = self.client.get_triggered_limits() or {}
