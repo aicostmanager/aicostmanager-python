@@ -27,6 +27,16 @@ print("GOOGLE_API_KEY (pre-force):", os.environ.get("GOOGLE_API_KEY"))
 print("DEEPSEEK_API_KEY (pre-force):", os.environ.get("DEEPSEEK_API_KEY"))
 print("AWS_DEFAULT_REGION:", os.environ.get("AWS_DEFAULT_REGION"))
 
+def pytest_collection_modifyitems(config, items):
+    """Skip network-dependent tests unless explicitly enabled."""
+    if os.environ.get("RUN_NETWORK_TESTS") == "1":
+        return
+    skip = pytest.mark.skip(reason="requires network access")
+    for item in items:
+        path = str(item.fspath)
+        if "real" in path or "/tracker/" in path or "/tracker_async/" in path:
+            item.add_marker(skip)
+
 
 @pytest.fixture(scope="session", autouse=True)
 def force_api_keys():

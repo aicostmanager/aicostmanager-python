@@ -4,7 +4,8 @@ import uuid
 import httpx
 
 from aicostmanager import Tracker
-from aicostmanager.delivery import DeliveryType
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 
 VALID_PAYLOAD = {
     "prompt_tokens": 19,
@@ -24,14 +25,20 @@ VALID_PAYLOAD = {
 
 
 def _make_tracker(api_key: str, api_base: str, tmp_path) -> Tracker:
-    return Tracker(
+    ini = IniManager(str(tmp_path / "ini"))
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=api_key,
         aicm_api_base=api_base,
-        delivery_type=DeliveryType.PERSISTENT_QUEUE,
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
         db_path=str(tmp_path / "queue.db"),
         poll_interval=0.1,
         batch_interval=0.1,
     )
+    return Tracker(aicm_api_key=api_key, ini_path=ini.ini_path, delivery=delivery)
 
 
 def _wait_for_empty(delivery, timeout: float = 5.0) -> bool:
@@ -134,10 +141,15 @@ def test_track_multiple_events_with_errors(aicm_api_key, aicm_api_base, tmp_path
 
 
 def test_deliver_now_single_event_success(aicm_api_key, aicm_api_base):
-    with Tracker(
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=aicm_api_base,
-        delivery_type=DeliveryType.IMMEDIATE,
+    )
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+    with Tracker(
+        aicm_api_key=aicm_api_key, ini_path="ini", delivery=delivery
     ) as tracker:
         tracker.track(
             "openai_chat",
@@ -149,11 +161,14 @@ def test_deliver_now_single_event_success(aicm_api_key, aicm_api_base):
 
 
 def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
-    tracker = Tracker(
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=aicm_api_base,
-        delivery_type=DeliveryType.IMMEDIATE,
     )
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+    tracker = Tracker(aicm_api_key=aicm_api_key, ini_path="ini", delivery=delivery)
     events = [
         {
             "api_id": "openai_chat",

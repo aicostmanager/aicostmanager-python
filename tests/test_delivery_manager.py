@@ -3,7 +3,8 @@ import time
 
 import httpx
 
-from aicostmanager import Tracker, DeliveryType
+from aicostmanager import Tracker
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 
 
@@ -11,11 +12,16 @@ def test_tracker_default_immediate_delivery():
     received = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        received.append(json.loads(request.content.decode()))
+        if request.method == "GET":
+            return httpx.Response(200, json={})
+        received.append(json.loads(request.read().decode()))
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
-    tracker = Tracker(aicm_api_key="test", transport=transport, ini_manager=IniManager("ini"))
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+    tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     assert received and received[0]["tracked"][0]["api_id"] == "openai"
     tracker.close()
@@ -25,17 +31,24 @@ def test_tracker_mem_queue_delivery():
     received = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        received.append(json.loads(request.content.decode()))
+        if request.method == "GET":
+            return httpx.Response(200, json={})
+        received.append(json.loads(request.read().decode()))
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
-    tracker = Tracker(
-        delivery_type=DeliveryType.MEM_QUEUE,
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key="test",
         transport=transport,
-        batch_interval=0.1,
-        ini_manager=IniManager("ini"),
     )
+    delivery = create_delivery(
+        DeliveryType.MEM_QUEUE,
+        dconfig,
+        batch_interval=0.1,
+    )
+    tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     for _ in range(20):
         if received:
@@ -49,19 +62,26 @@ def test_tracker_persistent_queue_delivery(tmp_path):
     received = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        received.append(json.loads(request.content.decode()))
+        if request.method == "GET":
+            return httpx.Response(200, json={})
+        received.append(json.loads(request.read().decode()))
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
     db_path = tmp_path / "queue.db"
-    tracker = Tracker(
-        delivery_type=DeliveryType.PERSISTENT_QUEUE,
+    ini = IniManager(str(tmp_path / "ini"))
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key="test",
-        db_path=str(db_path),
         transport=transport,
-        poll_interval=0.1,
-        ini_manager=IniManager(str(tmp_path / "ini")),
     )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
+        db_path=str(db_path),
+        poll_interval=0.1,
+    )
+    tracker = Tracker(aicm_api_key="test", ini_path=str(tmp_path / "ini"), delivery=delivery)
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     for _ in range(20):
         if received:
@@ -75,13 +95,18 @@ def test_immediate_delivery_retries():
     attempts = {"count": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json={})
         attempts["count"] += 1
         if attempts["count"] < 3:
             return httpx.Response(500, json={"ok": False})
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
-    tracker = Tracker(aicm_api_key="test", transport=transport, ini_manager=IniManager("ini"))
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+    tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     tracker.close()
     assert attempts["count"] == 3
@@ -91,11 +116,16 @@ def test_immediate_delivery_does_not_retry_client_error():
     attempts = {"count": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json={})
         attempts["count"] += 1
         return httpx.Response(400, json={"ok": False})
 
     transport = httpx.MockTransport(handler)
-    tracker = Tracker(aicm_api_key="test", transport=transport, ini_manager=IniManager("ini"))
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+    tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
     try:
         tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     except httpx.HTTPStatusError:

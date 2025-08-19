@@ -12,7 +12,9 @@ def test_tracker_builds_record():
     received = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        received.append(json.loads(request.content.decode()))
+        if request.method == "GET":
+            return httpx.Response(200, json={})
+        received.append(json.loads(request.read().decode()))
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
@@ -33,7 +35,9 @@ def test_tracker_track_async():
     received = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        received.append(json.loads(request.content.decode()))
+        if request.method == "GET":
+            return httpx.Response(200, json={})
+        received.append(json.loads(request.read().decode()))
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
