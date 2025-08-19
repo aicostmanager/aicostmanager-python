@@ -12,7 +12,6 @@ from aicostmanager.client.exceptions import UsageLimitExceeded
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.limits import UsageLimitManager
-from aicostmanager.models import Period, ThresholdType, UsageLimitIn
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_usage_from_response
 
@@ -78,15 +77,19 @@ def test_track_with_limits_immediate(
         aicm_ini_path=str(ini),
     )
     ul_mgr = UsageLimitManager(cm_client)
-    ul_in = UsageLimitIn(
-        threshold_type=ThresholdType.LIMIT,
-        amount=LIMIT_AMOUNT,
-        period=Period.DAY,
-        vendor="openai",
-        service=MODEL,
+    api_key_uuid = (
+        aicm_api_key.split(".")[-1] if aicm_api_key and "." in aicm_api_key else None
     )
-    print("creating usage limit:", ul_in.model_dump(mode="json"))
-    limit = ul_mgr.create_usage_limit(ul_in)
+    print("parsed api_key_uuid:", api_key_uuid)
+    ul_payload = {
+        "threshold_type": "limit",
+        "amount": str(LIMIT_AMOUNT),
+        "period": "day",
+        "service_key": SERVICE_KEY,
+        "api_key_uuid": api_key_uuid,
+    }
+    print("creating usage limit:", json.dumps(ul_payload))
+    limit = ul_mgr.create_usage_limit(ul_payload)
 
     resp = client.responses.create(model=MODEL, input="trigger")
     response_id = getattr(resp, "id", None)
@@ -127,15 +130,15 @@ def test_track_with_limits_immediate(
             response_id=other_response_id,
         )
 
-    upd_in = UsageLimitIn(
-        threshold_type=ThresholdType.LIMIT,
-        amount=Decimal("0.1"),
-        period=Period.DAY,
-        vendor="openai",
-        service=MODEL,
-    )
-    print("updating usage limit:", upd_in.model_dump(mode="json"))
-    ul_mgr.update_usage_limit(limit.uuid, upd_in)
+    upd_payload = {
+        "threshold_type": "limit",
+        "amount": str(Decimal("0.1")),
+        "period": "day",
+        "service_key": SERVICE_KEY,
+        "api_key_uuid": api_key_uuid,
+    }
+    print("updating usage limit:", json.dumps(upd_payload))
+    ul_mgr.update_usage_limit(limit.uuid, upd_payload)
 
     resp = client.responses.create(model=MODEL, input="after raise")
     response_id = getattr(resp, "id", None)
@@ -214,15 +217,19 @@ def test_track_with_limits_queue(
         aicm_ini_path=str(ini),
     )
     ul_mgr = UsageLimitManager(cm_client)
-    ul_in = UsageLimitIn(
-        threshold_type=ThresholdType.LIMIT,
-        amount=LIMIT_AMOUNT,
-        period=Period.DAY,
-        vendor="openai",
-        service=MODEL,
+    api_key_uuid = (
+        aicm_api_key.split(".")[-1] if aicm_api_key and "." in aicm_api_key else None
     )
-    print("creating usage limit:", ul_in.model_dump(mode="json"))
-    limit = ul_mgr.create_usage_limit(ul_in)
+    print("parsed api_key_uuid:", api_key_uuid)
+    ul_payload = {
+        "threshold_type": "limit",
+        "amount": str(LIMIT_AMOUNT),
+        "period": "day",
+        "service_key": SERVICE_KEY,
+        "api_key_uuid": api_key_uuid,
+    }
+    print("creating usage limit:", json.dumps(ul_payload))
+    limit = ul_mgr.create_usage_limit(ul_payload)
 
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=str(ini), delivery=delivery
@@ -266,15 +273,15 @@ def test_track_with_limits_queue(
             t2.track("openai_responses", other_service_key, up2, response_id=rid2)
             _wait_for_empty(t2.delivery)
 
-        upd_in = UsageLimitIn(
-            threshold_type=ThresholdType.LIMIT,
-            amount=Decimal("0.1"),
-            period=Period.DAY,
-            vendor="openai",
-            service=MODEL,
-        )
-        print("updating usage limit:", upd_in.model_dump(mode="json"))
-        ul_mgr.update_usage_limit(limit.uuid, upd_in)
+        upd_payload = {
+            "threshold_type": "limit",
+            "amount": str(Decimal("0.1")),
+            "period": "day",
+            "service_key": SERVICE_KEY,
+            "api_key_uuid": api_key_uuid,
+        }
+        print("updating usage limit:", json.dumps(upd_payload))
+        ul_mgr.update_usage_limit(limit.uuid, upd_payload)
 
         resp = client.responses.create(model=MODEL, input="after raise")
         rid = getattr(resp, "id", None)
@@ -326,16 +333,20 @@ def test_track_with_limits_customer(
         aicm_ini_path=str(ini),
     )
     ul_mgr = UsageLimitManager(cm_client)
-    ul_in = UsageLimitIn(
-        threshold_type=ThresholdType.LIMIT,
-        amount=LIMIT_AMOUNT,
-        period=Period.DAY,
-        vendor="openai",
-        service=MODEL,
-        client=customer,
+    api_key_uuid = (
+        aicm_api_key.split(".")[-1] if aicm_api_key and "." in aicm_api_key else None
     )
-    print("creating usage limit (customer):", ul_in.model_dump(mode="json"))
-    limit = ul_mgr.create_usage_limit(ul_in)
+    print("parsed api_key_uuid:", api_key_uuid)
+    ul_payload = {
+        "threshold_type": "limit",
+        "amount": str(LIMIT_AMOUNT),
+        "period": "day",
+        "service_key": SERVICE_KEY,
+        "client": customer,
+        "api_key_uuid": api_key_uuid,
+    }
+    print("creating usage limit (customer):", json.dumps(ul_payload))
+    limit = ul_mgr.create_usage_limit(ul_payload)
 
     resp = client.responses.create(model=MODEL, input="hi")
     rid = getattr(resp, "id", None)
