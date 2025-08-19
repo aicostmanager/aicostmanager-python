@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -39,18 +38,10 @@ def create_delivery(delivery_type: DeliveryType, config: DeliveryConfig, **kwarg
         }
         return MemQueueDelivery(config, **params)
     if delivery_type is DeliveryType.PERSISTENT_QUEUE:
-        ini = config.ini_manager
-        db_path = kwargs.get("db_path") or ini.get_option(
-            "delivery",
-            "db_path",
-            str(Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"),
+        db_path = kwargs.get("db_path") or str(
+            Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"
         )
-        env_log_bodies = os.getenv("AICM_DELIVERY_LOG_BODIES", "false").lower() in (
-            "1",
-            "true",
-            "yes",
-        )
-        log_bodies = kwargs.get("log_bodies", False) or env_log_bodies
+        log_bodies = kwargs.get("log_bodies", False)
         params = {
             "db_path": db_path,
             "poll_interval": kwargs.get("poll_interval", 0.1),

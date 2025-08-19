@@ -3,7 +3,8 @@ import json
 
 import httpx
 
-from aicostmanager import Tracker, TrackerConfig
+from aicostmanager import Tracker
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 
 
@@ -15,10 +16,10 @@ def test_tracker_builds_record():
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
-    cfg = TrackerConfig.from_env(
-        aicm_api_key="test", transport=transport, ini_manager=IniManager("ini")
-    )
-    tracker = Tracker(cfg)
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+    tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1}, client_customer_key="abc")
     tracker.close()
     assert received
@@ -36,10 +37,10 @@ def test_tracker_track_async():
         return httpx.Response(200, json={"ok": True})
 
     transport = httpx.MockTransport(handler)
-    cfg = TrackerConfig.from_env(
-        aicm_api_key="test", transport=transport, ini_manager=IniManager("ini")
-    )
-    tracker = Tracker(cfg)
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+    tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
 
     async def run():
         await tracker.track_async("openai", "gpt-5-mini", {"input_tokens": 1})

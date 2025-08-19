@@ -57,17 +57,11 @@ class Delivery(ABC):
             raise ValueError("ini_manager must be provided")
         self.ini_manager = config.ini_manager
         self.logger = logger or create_logger(
-            self.__class__.__name__,
-            config.log_file,
-            config.log_level,
-            "AICM_DELIVERY_LOG_FILE",
-            "AICM_DELIVERY_LOG_LEVEL",
+            self.__class__.__name__, config.log_file, config.log_level
         )
         self.api_key = config.aicm_api_key or os.getenv("AICM_API_KEY")
-        self.api_base = config.aicm_api_base or os.getenv(
-            "AICM_API_BASE", "https://aicostmanager.com"
-        )
-        self.api_url = config.aicm_api_url or os.getenv("AICM_API_URL", "/api/v1")
+        self.api_base = config.aicm_api_base or "https://aicostmanager.com"
+        self.api_url = config.aicm_api_url or "/api/v1"
         self.timeout = config.timeout
         self._transport = config.transport
         self._client = httpx.Client(timeout=config.timeout, transport=config.transport)

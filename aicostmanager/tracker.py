@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+import os
 from uuid import uuid4
 
 import httpx
@@ -14,7 +15,6 @@ from .delivery import (
     create_delivery,
 )
 from .ini_manager import IniManager
-from .tracker_config import TrackerConfig
 from .logger import create_logger
 from .usage_utils import (
     get_streaming_usage_from_response,
@@ -27,64 +27,74 @@ class Tracker:
 
     def __init__(
         self,
-        config: TrackerConfig | None = None,
         *,
+        aicm_api_key: str | None = None,
+        ini_path: str | None = None,
         delivery: Delivery | None = None,
-        **kwargs: Any,
     ) -> None:
-        if config is not None and kwargs:
-            raise TypeError("Cannot specify both config and individual arguments")
-        if config is None:
-            config = TrackerConfig.from_env(**kwargs)
-        self.ini_manager = config.ini_manager
-        self.logger = create_logger(
-            __name__,
-            config.log_file,
-            config.log_level,
-            "AICM_TRACKER_LOG_FILE",
-            "AICM_TRACKER_LOG_LEVEL",
-        )
+        self.ini_manager = IniManager(IniManager.resolve_path(ini_path))
+        self.ini_path = self.ini_manager.ini_path
+        self.aicm_api_key = aicm_api_key or os.getenv("AICM_API_KEY")
+
+        def _get(option: str, default: str | None = None) -> str | None:
+            return self.ini_manager.get_option("tracker", option, default)
+
+        api_base = _get("AICM_API_BASE", "https://aicostmanager.com")
+        api_url = _get("AICM_API_URL", "/api/v1")
+        db_path = _get("AICM_DB_PATH")
+        log_file = _get("AICM_LOG_FILE")
+        log_level = _get("AICM_LOG_LEVEL")
+        timeout = float(_get("AICM_TIMEOUT", "10.0"))
+        poll_interval = float(_get("AICM_POLL_INTERVAL", "0.1"))
+        batch_interval = float(_get("AICM_BATCH_INTERVAL", "0.5"))
+        max_attempts = int(_get("AICM_MAX_ATTEMPTS", "3"))
+        max_retries = int(_get("AICM_MAX_RETRIES", "5"))
+        queue_size = int(_get("AICM_QUEUE_SIZE", "10000"))
+        max_batch_size = int(_get("AICM_MAX_BATCH_SIZE", "1000"))
+        log_bodies = _get("AICM_LOG_BODIES", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        delivery_name = _get("AICM_DELIVERY_TYPE")
+
+        self.logger = create_logger(__name__, log_file, log_level)
+
         if delivery is not None:
             self.delivery = delivery
-            delivery_type = getattr(
-                delivery, "type", config.delivery_type or DeliveryType.IMMEDIATE
-            )
+            delivery_type = getattr(delivery, "type", None)
         else:
-            delivery_type = config.delivery_type
-            if delivery_type is None:
-                # If a db_path is provided, prefer persistent queue by default
-                if config.db_path:
-                    delivery_type = DeliveryType.PERSISTENT_QUEUE
-                else:
-                    name = self.ini_manager.get_option(
-                        "tracker", "delivery_manager", DeliveryType.IMMEDIATE.value
-                    )
-                    delivery_type = DeliveryType(name)
+            if delivery_name:
+                delivery_type = DeliveryType(delivery_name.lower())
+            elif db_path:
+                delivery_type = DeliveryType.PERSISTENT_QUEUE
+            else:
+                delivery_type = DeliveryType.IMMEDIATE
             dconfig = DeliveryConfig(
                 ini_manager=self.ini_manager,
-                aicm_api_key=config.aicm_api_key,
-                aicm_api_base=config.aicm_api_base,
-                aicm_api_url=config.aicm_api_url,
-                timeout=config.timeout,
-                transport=config.transport,
-                log_file=config.log_file,
-                log_level=config.log_level,
+                aicm_api_key=self.aicm_api_key,
+                aicm_api_base=api_base,
+                aicm_api_url=api_url,
+                timeout=timeout,
+                log_file=log_file,
+                log_level=log_level,
             )
             self.delivery = create_delivery(
                 delivery_type,
                 dconfig,
-                db_path=config.db_path,
-                poll_interval=config.poll_interval,
-                batch_interval=config.batch_interval,
-                max_attempts=config.max_attempts,
-                max_retries=config.max_retries,
-                queue_size=config.queue_size,
-                max_batch_size=config.max_batch_size,
-                log_bodies=config.log_bodies,
+                db_path=db_path,
+                poll_interval=poll_interval,
+                batch_interval=batch_interval,
+                max_attempts=max_attempts,
+                max_retries=max_retries,
+                queue_size=queue_size,
+                max_batch_size=max_batch_size,
+                log_bodies=log_bodies,
             )
         if delivery_type is not None:
             self.ini_manager.set_option(
-                "tracker", "delivery_manager", delivery_type.value
+                "tracker", "AICM_DELIVERY_TYPE", delivery_type.value.upper()
             )
 
     # ------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import asyncio
 
-from aicostmanager.ini_manager import IniManager
+import asyncio
+
 from aicostmanager.tracker import Tracker
 
 
@@ -24,7 +25,7 @@ class DummyDelivery:
 
 def test_track_llm_usage():
     delivery = DummyDelivery()
-    tracker = Tracker(delivery=delivery, ini_manager=IniManager("ini"))
+    tracker = Tracker(delivery=delivery, ini_path="ini")
 
     resp = Resp({"input_tokens": 1}, "gpt-5-mini")
     out = tracker.track_llm_usage("openai_chat", resp, client_customer_key="abc")
@@ -40,7 +41,7 @@ def test_track_llm_usage():
 
 def test_track_llm_usage_async():
     delivery = DummyDelivery()
-    tracker = Tracker(delivery=delivery, ini_manager=IniManager("ini"))
+    tracker = Tracker(delivery=delivery, ini_path="ini")
 
     class AResp:
         usage = {"input_tokens": 2}
@@ -61,7 +62,7 @@ def test_track_llm_usage_async():
 
 def test_track_llm_stream_usage():
     delivery = DummyDelivery()
-    tracker = Tracker(delivery=delivery, ini_manager=IniManager("ini"))
+    tracker = Tracker(delivery=delivery, ini_path="ini")
 
     class Chunk:
         def __init__(self, usage=None):
@@ -84,7 +85,7 @@ def test_track_llm_stream_usage():
 
 def test_track_llm_stream_usage_async():
     delivery = DummyDelivery()
-    tracker = Tracker(delivery=delivery, ini_manager=IniManager("ini"))
+    tracker = Tracker(delivery=delivery, ini_path="ini")
 
     class Chunk:
         def __init__(self, usage=None):
