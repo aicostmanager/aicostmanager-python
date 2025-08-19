@@ -93,6 +93,7 @@ def my_view(request):
     tracker.track("openai", "gpt-4o-mini", {"input_tokens": 10})
     ...
 ```
+For a full setup guide, see [Django integration guide](docs/django.md).
 
 ### FastAPI
 
@@ -110,6 +111,27 @@ async def startup() -> None:
 def shutdown() -> None:
     app.state.tracker.close()
 ```
+For a full setup guide, see [FastAPI integration guide](docs/fastapi.md).
+
+### Streamlit
+
+```python
+import streamlit as st
+from aicostmanager import Tracker
+import atexit
+
+@st.cache_resource
+def get_tracker():
+    tracker = Tracker()
+    atexit.register(tracker.close)
+    return tracker
+
+tracker = get_tracker()
+
+if st.button("Generate"):
+    tracker.track("openai", "gpt-4o-mini", {"input_tokens": 10})
+```
+For a full setup guide, see [Streamlit integration guide](docs/streamlit.md).
 
 ### Celery
 
@@ -139,5 +161,8 @@ to ensure flushing.
 - [Tracker](docs/tracker.md)
 - [Configuration](docs/config.md)
 - [Persistent Delivery](docs/persistent_delivery.md)
+- [Django integration](docs/django.md)
+- [FastAPI integration](docs/fastapi.md)
+- [Streamlit integration](docs/streamlit.md)
 - [Full documentation index](docs/index.md)
 

@@ -10,6 +10,9 @@ pass it directly to the client or tracker.
 - [Manual Usage Tracking](tracker.md) - Record custom usage events
 - [Configuration](config.md) - Settings and defaults
 - [Limit Managers](limit_managers.md) - Manage usage limits and triggered limits
+- [Django](django.md) - Integrate with Django projects
+- [FastAPI](fastapi.md) - Integrate with FastAPI applications
+- [Streamlit](streamlit.md) - Track usage from Streamlit apps
 
 ## Development
 
