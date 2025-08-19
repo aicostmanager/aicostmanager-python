@@ -22,7 +22,6 @@ from .delivery import (
 )
 from .limits import BaseLimitManager, TriggeredLimitManager, UsageLimitManager
 from .tracker import Tracker
-from .tracker_config import TrackerConfig
 
 __all__ = [
     "AICMError",
@@ -40,7 +39,6 @@ __all__ = [
     "MemQueueDelivery",
     "PersistentDelivery",
     "Tracker",
-    "TrackerConfig",
     "BaseLimitManager",
     "TriggeredLimitManager",
     "UsageLimitManager",

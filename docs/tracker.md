@@ -17,35 +17,17 @@ with Tracker() as tracker:
     ...  # call track() as needed
 ```
 
-For explicit control over configuration, build a ``TrackerConfig`` from the
-environment and INI file:
-
-```python
-from aicostmanager import Tracker, TrackerConfig
-
-config = TrackerConfig.from_env()
-tracker = Tracker(config)
-```
+Configuration values are read from an ``AICM.INI`` file. See
+[`config.md`](config.md) for the full list of options.
 
 ## Choosing a delivery manager
 
-The tracker supports multiple delivery strategies selected via `DeliveryType`. The default `immediate` mode sends each record synchronously with up to three retries for transient errors. Use `mem_queue` for an in-memory background queue or `persistent_queue` for a durable SQLite-backed queue:
-
-```python
-from aicostmanager import Tracker, DeliveryType
-
-tracker = Tracker(delivery_type=DeliveryType.MEM_QUEUE)
-```
-
-``TrackerConfig.from_env`` accepts the same connection options as
-`PersistentDelivery`, such as `aicm_api_key`, `aicm_api_base` and
-`aicm_ini_path`.  The delivery system writes logs to the Python logging
-module.  To inspect activity, pass `log_file` and a verbose
-`log_level`:
-
-```python
-tracker = Tracker(log_file="/tmp/aicm.log", log_level="DEBUG", log_bodies=True)
-```
+The tracker supports multiple delivery strategies selected via `DeliveryType`.
+Set ``AICM_DELIVERY_TYPE`` in ``AICM.INI`` or construct a delivery manually and
+pass it to ``Tracker``. The default ``IMMEDIATE`` mode sends each record
+synchronously with up to three retries for transient errors. Use
+``MEM_QUEUE`` for an in-memory background queue or ``PERSISTENT_QUEUE`` for a
+durable SQLite-backed queue.
 
 Logs will contain entries for enqueued items, attempted deliveries and
 failures, allowing you to verify behaviour during tests or development.

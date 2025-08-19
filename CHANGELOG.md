@@ -31,7 +31,7 @@ All notable changes to this project will be documented in this file.
 - Testing guide aligned on `uv venv` and `uv pip` for dependency installs
 
 ### Added
-- New `docs/configuration.md` covering environment variables, INI behavior, delivery modes, and overflow handling
+- New `docs/config.md` covering configuration settings and defaults
 - New `docs/tracker.md` with comprehensive manual usage tracking guide, validation, async init, and FastAPI lifecycle
 
 ### Fixed

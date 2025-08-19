@@ -44,14 +44,14 @@ delivery = PersistentDelivery(logger=logger)
 
 For deep troubleshooting you can log full request and response bodies.  Redaction removes common sensitive fields such as ``authorization`` and ``api_key``.
 
-Enable body logging with the ``log_bodies`` parameter or ``AICM_DELIVERY_LOG_BODIES`` environment variable.
+Enable body logging with the ``log_bodies`` parameter or ``AICM_LOG_BODIES`` setting.
 
 ```python
 delivery = PersistentDelivery(log_bodies=True)
 ```
 
 ```bash
-export AICM_DELIVERY_LOG_BODIES=true
+export AICM_LOG_BODIES=true
 ```
 
 ## Example Output
@@ -70,7 +70,7 @@ With ``log_level="DEBUG"`` the component records queue activity:
 * ``log_level`` / ``AICM_DELIVERY_LOG_LEVEL`` – control verbosity
 * ``log_file`` / ``AICM_DELIVERY_LOG_FILE`` – write logs to a file
 * ``logger`` – plug in a preconfigured ``Logger``
-* ``log_bodies`` / ``AICM_DELIVERY_LOG_BODIES`` – log request/response bodies with redaction
+* ``log_bodies`` / ``AICM_LOG_BODIES`` – log request/response bodies with redaction
 
 These options provide full visibility into the background worker and HTTP delivery process.
 

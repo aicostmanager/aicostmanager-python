@@ -41,15 +41,9 @@ with Tracker() as tracker:
 Using `with Tracker()` ensures the background delivery queue is flushed before
 the program exits.
 
-Configuration values are loaded from ``AICM.INI`` and environment variables.
-To manage these settings explicitly, construct a ``TrackerConfig``:
-
-```python
-from aicostmanager import Tracker, TrackerConfig
-
-config = TrackerConfig.from_env()
-tracker = Tracker(config)
-```
+Configuration values are read from an ``AICM.INI`` file.  See
+[`config.md`](docs/config.md) for the complete list of available settings and
+their defaults.
 
 ## Choosing a delivery strategy
 
@@ -79,9 +73,9 @@ Use the context manager shown above to automatically flush the queue.
 ```python
 # myapp/apps.py
 from django.apps import AppConfig
-from aicostmanager import Tracker, DeliveryType
+from aicostmanager import Tracker
 
-tracker = Tracker(delivery_type=DeliveryType.PERSISTENT_QUEUE)
+tracker = Tracker()
 
 class MyAppConfig(AppConfig):
     name = "myapp"
@@ -143,7 +137,7 @@ to ensure flushing.
 
 - [Usage Guide](docs/usage.md)
 - [Tracker](docs/tracker.md)
-- [Configuration & Env Vars](docs/configuration.md)
+- [Configuration](docs/config.md)
 - [Persistent Delivery](docs/persistent_delivery.md)
 - [Full documentation index](docs/index.md)
 
