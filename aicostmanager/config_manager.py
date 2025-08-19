@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import jwt
 
@@ -40,12 +40,24 @@ class TriggeredLimit:
     expires_at: Optional[str]
 
 
-class CostManagerConfig:
+class ConfigManager:
     """Manage tracker configuration and triggered limits stored in ``AICM.ini``."""
 
-    def __init__(self, client: CostManagerClient) -> None:
-        self.client = client
-        self.ini_path = client.ini_path
+    def __init__(
+        self,
+        client: CostManagerClient | None = None,
+        *,
+        ini_path: str | None = None,
+        get_triggered_limits: Callable[[], dict] | None = None,
+    ) -> None:
+        if client is not None:
+            self.ini_path = client.ini_path
+            self._get_triggered_limits: Callable[[], dict] = client.get_triggered_limits
+        else:
+            if ini_path is None:
+                raise ValueError("ini_path must be provided if client is not given")
+            self.ini_path = ini_path
+            self._get_triggered_limits = get_triggered_limits or (lambda: {})
 
         # Initialize with safe reading
         with file_lock(self.ini_path):
@@ -68,7 +80,7 @@ class CostManagerConfig:
         """Refresh triggered limits and persist to ``AICM.ini``."""
         if force_refresh_limits:
             try:
-                tl_payload = self.client.get_triggered_limits() or {}
+                tl_payload = self._get_triggered_limits() or {}
                 if isinstance(tl_payload, dict):
                     tl_data = tl_payload.get("triggered_limits", tl_payload)
                     self._set_triggered_limits(tl_data)
@@ -162,6 +174,7 @@ class CostManagerConfig:
                 raise ConfigNotFound(f"No configuration found for api_id '{api_id}'")
         return results
 
+
     def get_config_by_id(self, config_id: str) -> Config:
         """Return decrypted config matching ``config_id``."""
         if "configs" not in self._config or "payload" not in self._config["configs"]:
@@ -221,7 +234,7 @@ class CostManagerConfig:
         # If INI doesn't contain encrypted payload, fetch directly from API
         if not token or not public_key:
             try:
-                tl_payload = self.client.get_triggered_limits() or {}
+                tl_payload = self._get_triggered_limits() or {}
                 if isinstance(tl_payload, dict):
                     tl_data = tl_payload.get("triggered_limits", tl_payload)
                 else:
@@ -300,3 +313,4 @@ class CostManagerConfig:
                     )
                 )
         return results
+

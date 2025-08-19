@@ -3,7 +3,7 @@ import time
 import jwt
 
 from aicostmanager.client import CostManagerClient
-from aicostmanager.config_manager import CostManagerConfig
+from aicostmanager.config_manager import ConfigManager
 from aicostmanager.limits import TriggeredLimitManager, UsageLimitManager
 from aicostmanager.models import (
     UsageLimitIn,
@@ -50,7 +50,7 @@ def _make_triggered_limits():
 def test_update_and_check(monkeypatch, tmp_path):
     ini = tmp_path / "AICM.ini"
     client = CostManagerClient(aicm_api_key="sk-test", aicm_ini_path=str(ini))
-    cfg_mgr = CostManagerConfig(client)
+    cfg_mgr = ConfigManager(client)
     tl_mgr = TriggeredLimitManager(client, cfg_mgr)
 
     item, event = _make_triggered_limits()

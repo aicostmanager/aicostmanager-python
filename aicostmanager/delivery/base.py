@@ -6,7 +6,6 @@ import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -18,7 +17,7 @@ from tenacity import (
 )
 
 from ..client.exceptions import UsageLimitExceeded
-from ..config_manager import CostManagerConfig
+from ..config_manager import ConfigManager
 from ..ini_manager import IniManager
 from ..logger import create_logger
 
@@ -112,22 +111,12 @@ class Delivery(ABC):
             tl_data = data.get("triggered_limits", data)
         else:
             tl_data = data
-        cfg = CostManagerConfig(
-            SimpleNamespace(
-                ini_path=self.ini_manager.ini_path,
-                get_triggered_limits=lambda: {},
-            )
-        )
+        cfg = ConfigManager(ini_path=self.ini_manager.ini_path)
         cfg.write_triggered_limits(tl_data)
 
     def _check_triggered_limits(self, payload: Dict[str, Any]) -> None:
         """Raise ``UsageLimitExceeded`` if ``payload`` matches a triggered limit."""
-        cfg = CostManagerConfig(
-            SimpleNamespace(
-                ini_path=self.ini_manager.ini_path,
-                get_triggered_limits=lambda: {},
-            )
-        )
+        cfg = ConfigManager(ini_path=self.ini_manager.ini_path)
         tl_raw = cfg.read_triggered_limits()
         if "encrypted_payload" not in tl_raw or "public_key" not in tl_raw:
             return

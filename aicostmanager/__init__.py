@@ -10,7 +10,7 @@ from .client import (
     MissingConfiguration,
     UsageLimitExceeded,
 )
-from .config_manager import CostManagerConfig
+from .config_manager import ConfigManager
 from .delivery import (
     Delivery,
     DeliveryConfig,
@@ -31,7 +31,7 @@ __all__ = [
     "CostManagerClient",
     "MissingConfiguration",
     "UsageLimitExceeded",
-    "CostManagerConfig",
+    "ConfigManager",
     "Delivery",
     "DeliveryType",
     "create_delivery",
