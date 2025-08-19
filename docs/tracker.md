@@ -74,6 +74,15 @@ tracker.track(
 )
 ```
 
+### Triggered limit enforcement
+
+Every delivery mechanism refreshes triggered limit data from the API after
+successfully sending a batch. Once a payload is enqueued, the tracker compares
+it against the cached limits and raises
+:class:`~aicostmanager.client.exceptions.UsageLimitExceeded` if the payload
+matches a triggered limit. The check occurs *after* the enqueue or delivery
+action so tracking data is never discarded even when a limit has been reached.
+
 ## Asynchronous usage
 
 All operations are safe to call from asynchronous applications.  The

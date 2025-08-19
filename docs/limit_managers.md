@@ -75,3 +75,7 @@ events = tl_mgr.check_triggered_limits(
 for tl in events:
     print(tl.limit_id, tl.threshold_type)
 ```
+
+Delivery components use the same cached data to enforce limits automatically.
+After a payload is sent or enqueued, the tracker checks these events and raises
+``UsageLimitExceeded`` when a matching limit has already been triggered.

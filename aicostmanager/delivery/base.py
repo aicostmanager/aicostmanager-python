@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -17,9 +17,9 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-from ..client import AsyncCostManagerClient
+from ..client.exceptions import UsageLimitExceeded
+from ..config_manager import CostManagerConfig
 from ..ini_manager import IniManager
-from ..limits import TriggeredLimitManager
 from ..logger import create_logger
 
 
@@ -72,7 +72,8 @@ class Delivery(ABC):
         self.timeout = config.timeout
         self._transport = config.transport
         self._client = httpx.Client(timeout=config.timeout, transport=config.transport)
-        self._endpoint = self.api_base.rstrip("/") + self.api_url.rstrip("/") + endpoint
+        self._root = self.api_base.rstrip("/") + self.api_url.rstrip("/")
+        self._endpoint = self._root + endpoint
         self._body_key = body_key
         self._headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -100,9 +101,63 @@ class Delivery(ABC):
                 return resp
         raise RuntimeError("unreachable")
 
+    def _refresh_triggered_limits(self) -> None:
+        """Fetch latest triggered limits from the API and persist them."""
+        resp = self._client.get(
+            f"{self._root}/triggered-limits", headers=self._headers
+        )
+        resp.raise_for_status()
+        data = resp.json() or {}
+        if isinstance(data, dict):
+            tl_data = data.get("triggered_limits", data)
+        else:
+            tl_data = data
+        cfg = CostManagerConfig(
+            SimpleNamespace(
+                ini_path=self.ini_manager.ini_path,
+                get_triggered_limits=lambda: {},
+            )
+        )
+        cfg.write_triggered_limits(tl_data)
+
+    def _check_triggered_limits(self, payload: Dict[str, Any]) -> None:
+        """Raise ``UsageLimitExceeded`` if ``payload`` matches a triggered limit."""
+        cfg = CostManagerConfig(
+            SimpleNamespace(
+                ini_path=self.ini_manager.ini_path,
+                get_triggered_limits=lambda: {},
+            )
+        )
+        tl_raw = cfg.read_triggered_limits()
+        if "encrypted_payload" not in tl_raw or "public_key" not in tl_raw:
+            return
+        service_key = payload.get("service_key")
+        vendor = service_id = None
+        if service_key and "::" in service_key:
+            vendor, service_id = service_key.split("::", 1)
+        elif service_key:
+            service_id = service_key
+        client_customer_key = payload.get("client_customer_key")
+        limits = cfg.get_triggered_limits(
+            service_id=service_id,
+            service_vendor=vendor,
+            client_customer_key=client_customer_key,
+        )
+        api_key_id = self.api_key
+        if api_key_id:
+            limits = [l for l in limits if l.api_key_id == api_key_id]
+        if limits:
+            raise UsageLimitExceeded(limits)
+
     @abstractmethod
-    def enqueue(self, payload: Dict[str, Any]) -> None:
-        """Queue ``payload`` for background delivery."""
+    def _enqueue(self, payload: Dict[str, Any]) -> Any:
+        """Implementation-specific enqueue logic."""
+
+    def enqueue(self, payload: Dict[str, Any]) -> Any:
+        """Queue ``payload`` for background delivery and enforce triggered limits."""
+        result = self._enqueue(payload)
+        self._check_triggered_limits(payload)
+        return result
 
     def deliver(self, body: Dict[str, Any]) -> None:
         """Queue payloads from a pre-built request body."""
@@ -169,21 +224,8 @@ class QueueDelivery(Delivery, QueueWorker):
         body = {self._body_key: payloads}
         try:
             self._post_with_retry(body, max_attempts=self.max_attempts)
-
-            async def _update_limits() -> None:
-                client = AsyncCostManagerClient(
-                    aicm_api_key=self.api_key,
-                    aicm_api_base=self.api_base,
-                    aicm_api_url=self.api_url,
-                    aicm_ini_path=self.ini_manager.ini_path,
-                )
-                try:
-                    await TriggeredLimitManager(client).update_triggered_limits_async()
-                finally:
-                    await client.close()
-
             try:
-                asyncio.run(_update_limits())
+                self._refresh_triggered_limits()
             except Exception as exc:  # pragma: no cover - network failures
                 self.logger.error("Triggered limits update failed: %s", exc)
         except Exception as exc:  # pragma: no cover - network failures

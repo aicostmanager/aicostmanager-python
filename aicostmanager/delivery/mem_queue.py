@@ -24,7 +24,7 @@ class MemQueueDelivery(QueueDelivery):
         max_attempts = kwargs.pop("max_attempts", kwargs.pop("max_retries", 5))
         super().__init__(config, max_attempts=max_attempts, max_retries=0, **kwargs)
 
-    def enqueue(self, payload: Dict[str, Any]) -> None:
+    def _enqueue(self, payload: Dict[str, Any]) -> None:
         try:
             self._queue.put_nowait(payload)
         except queue.Full:
