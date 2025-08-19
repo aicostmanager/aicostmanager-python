@@ -17,6 +17,16 @@ with Tracker() as tracker:
     ...  # call track() as needed
 ```
 
+For explicit control over configuration, build a ``TrackerConfig`` from the
+environment and INI file:
+
+```python
+from aicostmanager import Tracker, TrackerConfig
+
+config = TrackerConfig.from_env()
+tracker = Tracker(config)
+```
+
 ## Choosing a delivery manager
 
 The tracker supports multiple delivery strategies selected via `DeliveryType`. The default `immediate` mode sends each record synchronously with up to three retries for transient errors. Use `mem_queue` for an in-memory background queue or `persistent_queue` for a durable SQLite-backed queue:
@@ -27,7 +37,7 @@ from aicostmanager import Tracker, DeliveryType
 tracker = Tracker(delivery_type=DeliveryType.MEM_QUEUE)
 ```
 
-The constructor accepts the same connection options as
+``TrackerConfig.from_env`` accepts the same connection options as
 `PersistentDelivery`, such as `aicm_api_key`, `aicm_api_base` and
 `aicm_ini_path`.  The delivery system writes logs to the Python logging
 module.  To inspect activity, pass `log_file` and a verbose

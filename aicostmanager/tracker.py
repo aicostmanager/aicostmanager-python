@@ -14,6 +14,7 @@ from .delivery import (
     create_delivery,
 )
 from .ini_manager import IniManager
+from .tracker_config import TrackerConfig
 from .logger import create_logger
 from .usage_utils import (
     get_streaming_usage_from_response,
@@ -26,73 +27,60 @@ class Tracker:
 
     def __init__(
         self,
+        config: TrackerConfig | None = None,
         *,
-        delivery_type: DeliveryType | None = None,
         delivery: Delivery | None = None,
-        aicm_api_key: Optional[str] = None,
-        aicm_api_base: Optional[str] = None,
-        aicm_api_url: Optional[str] = None,
-        aicm_ini_path: Optional[str] = None,
-        ini_manager: IniManager | None = None,
-        db_path: Optional[str] = None,
-        log_file: Optional[str] = None,
-        log_level: Optional[str] = None,
-        timeout: float = 10.0,
-        poll_interval: float = 0.1,
-        batch_interval: float = 0.5,
-        max_attempts: int = 3,
-        max_retries: int = 5,
-        queue_size: int = 10000,
-        max_batch_size: int = 1000,
-        transport: httpx.BaseTransport | None = None,
-        log_bodies: bool = False,
+        **kwargs: Any,
     ) -> None:
-        self.ini_manager = ini_manager or IniManager(
-            IniManager.resolve_path(aicm_ini_path)
-        )
+        if config is not None and kwargs:
+            raise TypeError("Cannot specify both config and individual arguments")
+        if config is None:
+            config = TrackerConfig.from_env(**kwargs)
+        self.ini_manager = config.ini_manager
         self.logger = create_logger(
             __name__,
-            log_file,
-            log_level,
+            config.log_file,
+            config.log_level,
             "AICM_TRACKER_LOG_FILE",
             "AICM_TRACKER_LOG_LEVEL",
         )
         if delivery is not None:
             self.delivery = delivery
             delivery_type = getattr(
-                delivery, "type", delivery_type or DeliveryType.IMMEDIATE
+                delivery, "type", config.delivery_type or DeliveryType.IMMEDIATE
             )
         else:
+            delivery_type = config.delivery_type
             if delivery_type is None:
                 # If a db_path is provided, prefer persistent queue by default
-                if db_path:
+                if config.db_path:
                     delivery_type = DeliveryType.PERSISTENT_QUEUE
                 else:
                     name = self.ini_manager.get_option(
                         "tracker", "delivery_manager", DeliveryType.IMMEDIATE.value
                     )
                     delivery_type = DeliveryType(name)
-            config = DeliveryConfig(
+            dconfig = DeliveryConfig(
                 ini_manager=self.ini_manager,
-                aicm_api_key=aicm_api_key,
-                aicm_api_base=aicm_api_base,
-                aicm_api_url=aicm_api_url,
-                timeout=timeout,
-                transport=transport,
-                log_file=log_file,
-                log_level=log_level,
+                aicm_api_key=config.aicm_api_key,
+                aicm_api_base=config.aicm_api_base,
+                aicm_api_url=config.aicm_api_url,
+                timeout=config.timeout,
+                transport=config.transport,
+                log_file=config.log_file,
+                log_level=config.log_level,
             )
             self.delivery = create_delivery(
                 delivery_type,
-                config,
-                db_path=db_path,
-                poll_interval=poll_interval,
-                batch_interval=batch_interval,
-                max_attempts=max_attempts,
-                max_retries=max_retries,
-                queue_size=queue_size,
-                max_batch_size=max_batch_size,
-                log_bodies=log_bodies,
+                dconfig,
+                db_path=config.db_path,
+                poll_interval=config.poll_interval,
+                batch_interval=config.batch_interval,
+                max_attempts=config.max_attempts,
+                max_retries=config.max_retries,
+                queue_size=config.queue_size,
+                max_batch_size=config.max_batch_size,
+                log_bodies=config.log_bodies,
             )
         if delivery_type is not None:
             self.ini_manager.set_option(
