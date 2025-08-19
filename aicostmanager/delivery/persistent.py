@@ -66,7 +66,7 @@ class PersistentDelivery(QueueDelivery):
             logger=logger,
         )
 
-    def enqueue(self, payload: Dict[str, Any]) -> int:
+    def _enqueue(self, payload: Dict[str, Any]) -> int:
         now = time.time()
         data = json.dumps(payload)
         with self._lock:
