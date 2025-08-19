@@ -1,0 +1,139 @@
+# AICostManager Python SDK
+
+The AICostManager SDK reports AI usage to [AICostManager](https://aicostmanager.com),
+helping you track costs across providers.
+
+## Prerequisites
+
+1. Create a **free** account at [aicostmanager.com](https://aicostmanager.com) and
+   generate an API key.
+2. Export the key as `AICM_API_KEY` or pass it directly to the client or
+   tracker.
+
+## Installation
+
+### uv (recommended)
+
+```bash
+uv pip install aicostmanager
+# or add to an existing project
+uv add aicostmanager
+```
+
+### pip (fallback)
+
+```bash
+pip install aicostmanager
+```
+
+## Quick start
+
+```python
+from aicostmanager import Tracker
+
+with Tracker() as tracker:
+    tracker.track("openai", "gpt-4o-mini", {
+        "input_tokens": 10,
+        "output_tokens": 20,
+    })
+```
+
+Using `with Tracker()` ensures the background delivery queue is flushed before
+the program exits.
+
+## Choosing a delivery strategy
+
+`Tracker` supports multiple delivery components via `DeliveryType`:
+
+- **Immediate** – send each record synchronously. Ideal for simple scripts or
+  tests.
+- **In-memory queue** (`DeliveryType.MEM_QUEUE`) – buffer records in memory and
+  deliver them in the background.
+- **Persistent queue** (`DeliveryType.PERSISTENT_QUEUE`) – durable SQLite-backed
+  queue for reliability across restarts.
+
+Use the persistent queue for long-running services where losing usage data is
+unacceptable, the in-memory queue for short-lived apps, and immediate delivery
+when every call can block on the API. See
+[Persistent Delivery](docs/persistent_delivery.md) and the
+[Tracker guide](docs/tracker.md#choosing-a-delivery-manager) for details.
+
+## Tracking in different environments
+
+### Python scripts
+
+Use the context manager shown above to automatically flush the queue.
+
+### Django
+
+```python
+# myapp/apps.py
+from django.apps import AppConfig
+from aicostmanager import Tracker, DeliveryType
+
+tracker = Tracker(delivery_type=DeliveryType.PERSISTENT_QUEUE)
+
+class MyAppConfig(AppConfig):
+    name = "myapp"
+
+    def ready(self):
+        import atexit
+        atexit.register(tracker.close)
+```
+
+```python
+# myapp/views.py
+from .apps import tracker
+
+def my_view(request):
+    tracker.track("openai", "gpt-4o-mini", {"input_tokens": 10})
+    ...
+```
+
+### FastAPI
+
+```python
+from fastapi import FastAPI
+from aicostmanager import Tracker
+
+app = FastAPI()
+
+@app.on_event("startup")
+async def startup() -> None:
+    app.state.tracker = await Tracker.create_async()
+
+@app.on_event("shutdown")
+def shutdown() -> None:
+    app.state.tracker.close()
+```
+
+### Celery
+
+```python
+from celery import Celery
+from aicostmanager import Tracker
+from celery.signals import worker_shutdown
+
+app = Celery("proj")
+tracker = Tracker()
+
+@app.task
+def do_work():
+    tracker.track("openai", "gpt-4o-mini", {"input_tokens": 10})
+
+@worker_shutdown.connect
+def close_tracker(**_):
+    tracker.close()
+```
+
+For very short tasks, use `with Tracker() as tracker:` inside the task
+to ensure flushing.
+
+## More documentation
+
+- [Usage Guide](docs/usage.md)
+- [Tracker](docs/tracker.md)
+- [Configuration & Env Vars](docs/configuration.md)
+- [Persistent Delivery](docs/persistent_delivery.md)
+- [Full documentation index](docs/index.md)
+

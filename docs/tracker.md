@@ -4,6 +4,10 @@ The `Tracker` provides a lightweight way to send arbitrary usage payloads to
 AICostManager's `/track` endpoint.  It does not require configuration metadata
 and forwards any JSON-serialisable data that you supply.
 
+Before using the tracker, create a free account at
+[AICostManager](https://aicostmanager.com) and set your API key in the
+`AICM_API_KEY` environment variable or pass it to the constructor.
+
 ## Creating a tracker
 
 ```python

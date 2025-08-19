@@ -1,5 +1,9 @@
 # AICostManager Documentation
 
+To use the SDK you must create a free account at [AICostManager](https://aicostmanager.com)
+and generate an API key. Set it in the `AICM_API_KEY` environment variable or
+pass it directly to the client or tracker.
+
 ## User Guides
 
 - [Usage](usage.md) - Basic SDK usage and API examples
