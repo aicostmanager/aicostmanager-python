@@ -1,5 +1,9 @@
 # Using the Python SDK
 
+Before you begin, sign up for a free account at [AICostManager](https://aicostmanager.com)
+and obtain an API key. Export it as `AICM_API_KEY` or pass it directly to
+`CostManagerClient` or `Tracker`.
+
 Install with:
 
 ```bash
