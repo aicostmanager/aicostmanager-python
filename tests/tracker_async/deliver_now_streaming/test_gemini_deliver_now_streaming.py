@@ -8,7 +8,8 @@ import uuid
 import httpx
 import pytest
 
-from aicostmanager.delivery import DeliveryType
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_streaming_usage_from_response
 
@@ -60,11 +61,15 @@ def test_gemini_deliver_now_streaming(service_key, model, google_api_key, aicm_a
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = genai.Client(api_key=google_api_key)
 
@@ -118,10 +123,12 @@ def test_gemini_deliver_now_streaming(service_key, model, google_api_key, aicm_a
 
         print("gemini final usage payload:", json.dumps(usage_payload, default=str))
         try:
+            dconfig2 = DeliveryConfig(
+                ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+            )
+            delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
             with Tracker(
-                aicm_api_key=aicm_api_key,
-                aicm_api_base=BASE_URL,
-                delivery_type=DeliveryType.IMMEDIATE,
+                aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
             ) as t2:
                 asyncio.run(
                     t2.track_async(

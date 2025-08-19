@@ -7,6 +7,8 @@ import pytest
 
 boto3 = pytest.importorskip("boto3")
 
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import extract_usage
 
@@ -72,11 +74,15 @@ def _make_client(region: str):
 def test_bedrock_track_non_streaming(service_key, model, aws_region, aicm_api_key):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = _make_client(aws_region)
 
@@ -106,11 +112,15 @@ def test_bedrock_track_non_streaming(service_key, model, aws_region, aicm_api_ke
 def test_bedrock_track_streaming(service_key, model, aws_region, aicm_api_key):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
+    ini = IniManager("ini2")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = _make_client(aws_region)
 

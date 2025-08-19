@@ -8,6 +8,8 @@ import pytest
 
 openai = pytest.importorskip("openai")
 
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import extract_usage
 
@@ -64,11 +66,15 @@ def test_openai_responses_track_non_streaming(aicm_api_key):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = _make_client(api_key)
 
@@ -85,11 +91,15 @@ def test_openai_responses_track_streaming(aicm_api_key):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
+    ini = IniManager("ini2")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = _make_client(api_key)
 

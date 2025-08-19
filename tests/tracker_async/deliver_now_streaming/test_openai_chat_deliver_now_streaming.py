@@ -7,7 +7,8 @@ import uuid
 
 import pytest
 
-from aicostmanager.delivery import DeliveryType
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_streaming_usage_from_response
 
@@ -61,11 +62,15 @@ def test_openai_chat_deliver_now_streaming(
     if not openai_api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = openai.OpenAI(api_key=openai_api_key)
 
@@ -93,10 +98,12 @@ def test_openai_chat_deliver_now_streaming(
         if not usage_payload:
             pytest.skip("No usage returned in streaming chunks; skipping")
 
+        dconfig2 = DeliveryConfig(
+            ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+        )
+        delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
         with Tracker(
-            aicm_api_key=aicm_api_key,
-            aicm_api_base=BASE_URL,
-            delivery_type=DeliveryType.IMMEDIATE,
+            aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
         ) as t2:
             asyncio.run(
                 t2.track_async(

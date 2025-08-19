@@ -6,7 +6,8 @@ import uuid
 
 import pytest
 
-from aicostmanager.delivery import DeliveryType
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_usage_from_response
 
@@ -60,12 +61,13 @@ def test_openai_responses_deliver_now_only(
     if not openai_api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
-        delivery_type=DeliveryType.IMMEDIATE,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = openai.OpenAI(api_key=openai_api_key)
 

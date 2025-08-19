@@ -7,19 +7,32 @@ import uuid
 import pytest
 
 openai = pytest.importorskip("openai")
-from aicostmanager.delivery import DeliveryType
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_usage_from_response
 
-BASE_URL = "http://127.0.0.1:8001"
+BASE_URL = os.environ.get("AICM_API_BASE", "http://localhost:8001")
+
+
+def _wait_for_empty(delivery, timeout: float = 10.0) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        stats = getattr(delivery, "stats", lambda: {})()
+        queued = stats.get("queued", 0)
+        if queued == 0:
+            return True
+        time.sleep(0.05)
+    return False
 
 
 def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30):
     headers = {"Authorization": f"Bearer {aicm_api_key}"}
-    # Wait an initial 2 seconds before attempting up to 3 fetches
+    # small initial delay to allow ingestion
     time.sleep(2)
-    attempts = 3
-    for _ in range(attempts):
+    deadline = time.time() + timeout
+    last_data = None
+    while time.time() < deadline:
         try:
             req = urllib.request.Request(
                 f"{BASE_URL}/api/v1/cost-events/{response_id}",
@@ -28,32 +41,56 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
             with urllib.request.urlopen(req, timeout=5) as resp:
                 if resp.status == 200:
                     data = json.load(resp)
-                    event_id = data.get("event_id") or data.get("cost_event", {}).get(
-                        "event_id"
-                    )
-                    if event_id:
-                        uuid.UUID(str(event_id))
-                        return data
+                    last_data = data
+                    if isinstance(data, list):
+                        if data:
+                            evt = data[0]
+                            evt_id = evt.get("event_id") or evt.get("uuid")
+                            if evt_id:
+                                uuid.UUID(str(evt_id))
+                                return data
+                    else:
+                        event_id = data.get("event_id") or data.get(
+                            "cost_event", {}
+                        ).get("event_id")
+                        if event_id:
+                            uuid.UUID(str(event_id))
+                            return data
         except Exception:
             pass
         time.sleep(1)
-    raise AssertionError(f"cost event for {response_id} not found")
+    raise AssertionError(
+        f"cost event for {response_id} not found; last_data={last_data} base_url={BASE_URL}"
+    )
 
 
 @pytest.mark.parametrize(
     "service_key, model",
     [("openai::gpt-5-mini", "gpt-5-mini")],
 )
-def test_openai_responses_tracker(service_key, model, openai_api_key, aicm_api_key):
+def test_openai_responses_tracker(
+    service_key, model, openai_api_key, aicm_api_key, tmp_path
+):
     if not openai_api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
     # Ensure PersistentDelivery logs request/response bodies from the server
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
-    tracker = Tracker(
+    ini = IniManager(str(tmp_path / "ini"))
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
+        db_path=str(tmp_path / "openai_responses_queue.db"),
         poll_interval=0.1,
         batch_interval=0.1,
+        log_bodies=True,
+    )
+    tracker = Tracker(
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     )
     client = openai.OpenAI(api_key=openai_api_key)
 
@@ -61,28 +98,30 @@ def test_openai_responses_tracker(service_key, model, openai_api_key, aicm_api_k
     resp = client.responses.create(model=model, input="Say hi")
     response_id = getattr(resp, "id", None)
     usage_payload = get_usage_from_response(resp, "openai_responses")
-    tracker.track(
+    used_id = tracker.track(
         "openai_responses", service_key, usage_payload, response_id=response_id
     )
-    try:
-        _wait_for_cost_event(aicm_api_key, response_id)
-    except AssertionError as e:
-        print("background wait failed:", str(e))
-        pytest.skip("Cost event not found for OpenAI responses background; skipping")
+    final_id = response_id or used_id
+    assert _wait_for_empty(tracker.delivery, timeout=10.0)
+    _wait_for_cost_event(aicm_api_key, final_id)
 
     # Immediate delivery
     resp2 = client.responses.create(model=model, input="Say hi again")
     response_id2 = getattr(resp2, "id", None)
-    with Tracker(
+    dconfig2 = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
-        delivery_type=DeliveryType.IMMEDIATE,
+    )
+    delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
+    with Tracker(
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:
         usage2 = get_usage_from_response(resp2, "openai_responses")
-        t2.track("openai_responses", service_key, usage2, response_id=response_id2)
-    try:
-        _wait_for_cost_event(aicm_api_key, response_id2)
-    except AssertionError:
-        pytest.skip("Cost event not found for OpenAI responses immediate; skipping")
+        used2 = t2.track(
+            "openai_responses", service_key, usage2, response_id=response_id2
+        )
+    final2 = response_id2 or used2
+    _wait_for_cost_event(aicm_api_key, final2)
 
     tracker.close()

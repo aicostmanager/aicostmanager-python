@@ -10,6 +10,8 @@ import pytest
 
 openai = pytest.importorskip("openai")
 
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import extract_usage
 
@@ -68,11 +70,15 @@ def test_openai_chat_track_non_streaming(aicm_api_key):
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
 
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = _make_client(api_key)
 
@@ -83,9 +89,11 @@ def test_openai_chat_track_non_streaming(aicm_api_key):
         )
         response_id = getattr(resp, "id", None)
         usage = extract_usage(resp)
-        asyncio.run(tracker.track_async(
-            "openai_chat", "openai::gpt-5-mini", usage, response_id=response_id
-        ))
+        asyncio.run(
+            tracker.track_async(
+                "openai_chat", "openai::gpt-5-mini", usage, response_id=response_id
+            )
+        )
         _wait_for_cost_event(aicm_api_key, response_id)
 
 
@@ -94,11 +102,15 @@ def test_openai_chat_track_streaming(aicm_api_key):
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
 
+    ini = IniManager("ini2")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = _make_client(api_key)
 
@@ -131,9 +143,14 @@ def test_openai_chat_track_streaming(aicm_api_key):
             pytest.skip("No usage returned in streaming events; skipping")
 
         # Track the usage and get the actual response_id that was used
-        asyncio.run(tracker.track_async(
-            "openai_chat", "openai::gpt-5-mini", usage_payload, response_id=response_id
-        ))
+        asyncio.run(
+            tracker.track_async(
+                "openai_chat",
+                "openai::gpt-5-mini",
+                usage_payload,
+                response_id=response_id,
+            )
+        )
 
         # If no response_id was provided, we need to get it from the persistent delivery
         # The persistent delivery generates its own ID when none is provided

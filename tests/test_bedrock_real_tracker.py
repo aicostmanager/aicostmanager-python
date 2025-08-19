@@ -7,7 +7,8 @@ import pytest
 
 boto3 = pytest.importorskip("boto3")
 
-from aicostmanager.delivery import DeliveryType
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_usage_from_response
 
@@ -59,11 +60,17 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
 def test_bedrock_tracker(service_key, model, aws_region, aicm_api_key):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    tracker = Tracker(
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
+    tracker = Tracker(
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     )
     client = boto3.client("bedrock-runtime", region_name=aws_region)
 
@@ -111,10 +118,14 @@ def test_bedrock_tracker(service_key, model, aws_region, aicm_api_key):
     response_id2 = resp2.get("ResponseMetadata", {}).get("RequestId") or resp2.get(
         "output", {}
     ).get("message", {}).get("id")
-    with Tracker(
+    dconfig2 = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
-        delivery_type=DeliveryType.IMMEDIATE,
+    )
+    delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
+    with Tracker(
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:
         usage2 = get_usage_from_response(resp2, "bedrock")
         t2.track("amazon-bedrock", service_key, usage2, response_id=response_id2)

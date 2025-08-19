@@ -246,7 +246,8 @@ def extract_usage(response: Any) -> dict[str, Any]:
         # Looks like Gemini format
         usage = get_usage_from_response(response, "gemini")
         # Normalize Gemini usage to match server schema expectations
-        return _normalize_gemini_usage(usage)
+        return usage
+        # return _normalize_gemini_usage(usage)
     elif hasattr(response, "input_tokens") or hasattr(response, "inputTokens"):
         # Looks like Anthropic/Bedrock format
         return get_usage_from_response(response, "anthropic")

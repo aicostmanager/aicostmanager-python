@@ -6,7 +6,8 @@ import uuid
 
 import pytest
 
-from aicostmanager.delivery import DeliveryType
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_streaming_usage_from_response
 
@@ -63,11 +64,15 @@ def test_anthropic_deliver_now_streaming(
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = anthropic.Anthropic(api_key=anthropic_api_key)
 
@@ -100,10 +105,12 @@ def test_anthropic_deliver_now_streaming(
             pytest.skip("No usage returned in streaming events; skipping")
 
         print("anthropic final usage payload:", json.dumps(usage_payload, default=str))
+        dconfig2 = DeliveryConfig(
+            ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+        )
+        delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
         with Tracker(
-            aicm_api_key=aicm_api_key,
-            aicm_api_base=BASE_URL,
-            delivery_type=DeliveryType.IMMEDIATE,
+            aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
         ) as t2:
             t2.track("anthropic", service_key, usage_payload, response_id=response_id)
 

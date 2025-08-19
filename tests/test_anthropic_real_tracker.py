@@ -7,7 +7,8 @@ import uuid
 import pytest
 
 anthropic = pytest.importorskip("anthropic")
-from aicostmanager.delivery import DeliveryType
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 
 BASE_URL = os.environ.get("AICM_API_BASE", "http://localhost:8001")
@@ -92,12 +93,22 @@ def test_anthropic_tracker(
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
-    tracker = Tracker(
+    ini = IniManager(str(tmp_path / "ini"))
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
         db_path=str(tmp_path / "anthropic_queue.db"),
         poll_interval=0.1,
         batch_interval=0.1,
+        log_bodies=True,
+    )
+    tracker = Tracker(
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     )
     client = anthropic.Anthropic(api_key=anthropic_api_key)
 
@@ -122,13 +133,15 @@ def test_anthropic_tracker(
     )
     response_id2 = getattr(resp2, "id", None)
     usage_payload2 = _usage_to_payload(getattr(resp2, "usage", None))
-    # Immediate delivery via DeliveryType.IMMEDIATE
-    with Tracker(
+    # Immediate delivery via explicit delivery configuration
+    dconfig2 = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
-        delivery_type=DeliveryType.IMMEDIATE,
+    )
+    delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
+    with Tracker(
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:
         t2.track("anthropic", service_key, usage_payload2, response_id=response_id2)
     _wait_for_cost_event(aicm_api_key, response_id2)

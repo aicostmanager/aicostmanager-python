@@ -8,6 +8,8 @@ import pytest
 
 genai = pytest.importorskip("google.genai")
 
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import extract_usage
 
@@ -59,11 +61,15 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
 def test_gemini_track_non_streaming(google_api_key, aicm_api_key):
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = genai.Client(api_key=google_api_key)
 
@@ -93,11 +99,15 @@ def test_gemini_track_non_streaming(google_api_key, aicm_api_key):
 def test_gemini_track_streaming(google_api_key, aicm_api_key):
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
+    ini = IniManager("ini2")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+    )
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = genai.Client(api_key=google_api_key)
 

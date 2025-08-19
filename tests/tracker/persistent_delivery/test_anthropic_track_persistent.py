@@ -8,6 +8,8 @@ import pytest
 
 anthropic = pytest.importorskip("anthropic")
 
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 
 BASE_URL = os.environ.get("AICM_API_BASE", "http://127.0.0.1:8001")
@@ -58,12 +60,21 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
 def test_anthropic_track_non_streaming(anthropic_api_key, aicm_api_key, tmp_path):
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
-    with Tracker(
+    ini = IniManager(str(tmp_path / "ini"))
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
         db_path=str(tmp_path / "anthropic_queue.db"),
         poll_interval=0.1,
         batch_interval=0.1,
+    )
+    with Tracker(
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = anthropic.Anthropic(api_key=anthropic_api_key)
 
@@ -83,12 +94,21 @@ def test_anthropic_track_non_streaming(anthropic_api_key, aicm_api_key, tmp_path
 def test_anthropic_track_streaming(anthropic_api_key, aicm_api_key, tmp_path):
     if not anthropic_api_key:
         pytest.skip("ANTHROPIC_API_KEY not set in .env file")
-    with Tracker(
+    ini = IniManager(str(tmp_path / "ini2"))
+    dconfig = DeliveryConfig(
+        ini_manager=ini,
         aicm_api_key=aicm_api_key,
         aicm_api_base=BASE_URL,
+    )
+    delivery = create_delivery(
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
         db_path=str(tmp_path / "anthropic_queue.db"),
         poll_interval=0.1,
         batch_interval=0.1,
+    )
+    with Tracker(
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = anthropic.Anthropic(api_key=anthropic_api_key)
 

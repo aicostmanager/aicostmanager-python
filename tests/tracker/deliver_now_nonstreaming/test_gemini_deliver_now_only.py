@@ -7,7 +7,8 @@ import uuid
 import pytest
 
 genai = pytest.importorskip("google.genai")
-from aicostmanager.delivery import DeliveryType
+from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
+from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 
 BASE_URL = "http://127.0.0.1:8001"
@@ -145,12 +146,14 @@ def test_gemini_deliver_now_only(service_key, model, google_api_key, aicm_api_ke
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
     os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(
+        ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
+    )
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+    response_id = None
     with Tracker(
-        aicm_api_key=aicm_api_key,
-        aicm_api_base=BASE_URL,
-        poll_interval=0.1,
-        batch_interval=0.1,
-        delivery_type=DeliveryType.IMMEDIATE,
+        aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
         client = genai.Client(api_key=google_api_key)
 
@@ -175,15 +178,15 @@ def test_gemini_deliver_now_only(service_key, model, google_api_key, aicm_api_ke
             print("No response_id from Gemini; using generated id:", response_id)
 
         # Build usage payload from Gemini response
-        raw_usage_payload = _extract_usage_payload(resp)
-        usage_payload = _normalize_gemini_usage(raw_usage_payload)
-        print(
-            "raw usage payload:", json.dumps(raw_usage_payload, indent=2, default=str)
-        )
+        usage_payload = _extract_usage_payload(resp)
+        # usage_payload = _normalize_gemini_usage(raw_usage_payload)
+        # print(
+        #     "raw usage payload:", json.dumps(raw_usage_payload, indent=2, default=str)
+        # )
         print(
             "normalized usage payload:",
             json.dumps(usage_payload, indent=2, default=str),
         )
 
         tracker.track("gemini", service_key, usage_payload, response_id=response_id)
-        _wait_for_cost_event(aicm_api_key, response_id)
+    _wait_for_cost_event(aicm_api_key, response_id)
