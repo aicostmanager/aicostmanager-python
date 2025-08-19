@@ -110,10 +110,7 @@ class Delivery(ABC):
 
     def _check_triggered_limits(self, payload: Dict[str, Any]) -> None:
         """Raise ``UsageLimitExceeded`` if ``payload`` matches a triggered limit."""
-        cfg = ConfigManager(ini_path=self.ini_manager.ini_path)
-        tl_raw = cfg.read_triggered_limits()
-        if "encrypted_payload" not in tl_raw or "public_key" not in tl_raw:
-            return
+        cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=False)
         service_key = payload.get("service_key")
         vendor = service_id = None
         if service_key and "::" in service_key:

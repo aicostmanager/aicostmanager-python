@@ -6,6 +6,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import os
 
 import pytest
+from aicostmanager.triggered_limits_cache import triggered_limits_cache
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
@@ -152,3 +153,10 @@ def cleanup_ini_files():
             os.remove(ini_file)
         except OSError:
             pass
+
+
+@pytest.fixture(autouse=True)
+def reset_triggered_limits_cache():
+    triggered_limits_cache.clear()
+    yield
+    triggered_limits_cache.clear()
