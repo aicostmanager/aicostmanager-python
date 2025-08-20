@@ -28,6 +28,7 @@ All configuration keys are fully capitalised and prefixed with `AICM_`.
 | `AICM_LOG_FILE` | – | Path to a log file |
 | `AICM_LOG_LEVEL` | `INFO` | Logging level |
 | `AICM_LOG_BODIES` | `false` | Include request bodies in logs |
+| `AICM_LIMITS_ENABLED` | `false` | Enable triggered limit checks during delivery |
 
 \* If `AICM_DB_PATH` is set and `AICM_DELIVERY_TYPE` is not specified, the
 tracker defaults to `PERSISTENT_QUEUE`.

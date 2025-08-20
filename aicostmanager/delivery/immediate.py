@@ -19,10 +19,11 @@ class ImmediateDelivery(Delivery):
             # Base class enqueue already refreshed and checked limits pre-send
             self._post_with_retry(body, max_attempts=3)
             # Refresh after successful send so subsequent calls see updated state
-            try:
-                self._refresh_triggered_limits()
-            except Exception as exc:  # pragma: no cover - network failures
-                self.logger.error("Triggered limits update failed: %s", exc)
+            if self._limits_enabled():
+                try:
+                    self._refresh_triggered_limits()
+                except Exception as exc:  # pragma: no cover - network failures
+                    self.logger.error("Triggered limits update failed: %s", exc)
         except Exception as exc:
             self.logger.exception("Immediate delivery failed: %s", exc)
             raise
