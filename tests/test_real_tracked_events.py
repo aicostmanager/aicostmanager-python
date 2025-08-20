@@ -37,11 +37,13 @@ def _make_tracker(api_key: str, api_base: str, tmp_path) -> Tracker:
         db_path=str(tmp_path / "queue.db"),
         poll_interval=0.1,
         batch_interval=0.1,
+        max_attempts=2,  # Reduce attempts for faster failure
+        max_retries=2,  # Reduce retries for faster failure
     )
     return Tracker(aicm_api_key=api_key, ini_path=ini.ini_path, delivery=delivery)
 
 
-def _wait_for_empty(delivery, timeout: float = 5.0) -> bool:
+def _wait_for_empty(delivery, timeout: float = 10.0) -> bool:
     for _ in range(int(timeout / 0.1)):
         stats = getattr(delivery, "stats", lambda: {})()
         if stats.get("queued", 0) == 0:

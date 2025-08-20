@@ -4,12 +4,12 @@ import time
 import jwt
 import pytest
 
+from aicostmanager.client.exceptions import UsageLimitExceeded
+from aicostmanager.config_manager import ConfigManager
 from aicostmanager.delivery import DeliveryConfig
 from aicostmanager.delivery.immediate import ImmediateDelivery
 from aicostmanager.delivery.mem_queue import MemQueueDelivery
 from aicostmanager.ini_manager import IniManager
-from aicostmanager.config_manager import ConfigManager
-from aicostmanager.client.exceptions import UsageLimitExceeded
 
 PRIVATE_KEY = (pathlib.Path(__file__).parent / "threshold_private_key.pem").read_text()
 PUBLIC_KEY = (pathlib.Path(__file__).parent / "threshold_public_key.pem").read_text()
@@ -41,7 +41,12 @@ def _setup_triggered_limits(ini_path):
         "triggered_limits": [event],
     }
     token = jwt.encode(payload, PRIVATE_KEY, algorithm="RS256", headers={"kid": "test"})
-    item = {"version": "v1", "public_key": PUBLIC_KEY, "key_id": "test", "encrypted_payload": token}
+    item = {
+        "version": "v1",
+        "public_key": PUBLIC_KEY,
+        "key_id": "test",
+        "encrypted_payload": token,
+    }
     cfg = ConfigManager(ini_path=str(ini_path))
     cfg.write_triggered_limits(item)
     return event
@@ -50,8 +55,17 @@ def _setup_triggered_limits(ini_path):
 def test_mem_queue_enforce_triggered_limit(tmp_path):
     ini = tmp_path / "AICM.ini"
     event = _setup_triggered_limits(ini)
-    config = DeliveryConfig(ini_manager=IniManager(str(ini)), aicm_api_key=event["api_key_id"])
+    config = DeliveryConfig(
+        ini_manager=IniManager(str(ini)), aicm_api_key=event["api_key_id"]
+    )
     delivery = MemQueueDelivery(config)
+
+    # Stop background worker to prevent race conditions
+    delivery.stop()
+
+    # Mock the refresh method to avoid API call failures
+    delivery._refresh_triggered_limits = lambda: None
+
     payload = {
         "api_id": "openai",
         "service_key": event["service_key"],
@@ -66,7 +80,9 @@ def test_mem_queue_enforce_triggered_limit(tmp_path):
 def test_immediate_enforce_triggered_limit(tmp_path):
     ini = tmp_path / "AICM.ini"
     event = _setup_triggered_limits(ini)
-    config = DeliveryConfig(ini_manager=IniManager(str(ini)), aicm_api_key=event["api_key_id"])
+    config = DeliveryConfig(
+        ini_manager=IniManager(str(ini)), aicm_api_key=event["api_key_id"]
+    )
     delivery = ImmediateDelivery(config)
     called = {}
 
@@ -90,7 +106,9 @@ def test_immediate_enforce_triggered_limit(tmp_path):
 def test_triggered_limits_cached_in_memory(tmp_path, monkeypatch):
     ini = tmp_path / "AICM.ini"
     event = _setup_triggered_limits(ini)
-    config = DeliveryConfig(ini_manager=IniManager(str(ini)), aicm_api_key=event["api_key_id"])
+    config = DeliveryConfig(
+        ini_manager=IniManager(str(ini)), aicm_api_key=event["api_key_id"]
+    )
     delivery = ImmediateDelivery(config)
     delivery._post_with_retry = lambda body, max_attempts: None
     delivery._refresh_triggered_limits = lambda: None

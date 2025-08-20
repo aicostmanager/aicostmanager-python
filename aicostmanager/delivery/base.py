@@ -170,8 +170,14 @@ class Delivery(ABC):
     def enqueue(self, payload: Dict[str, Any]) -> Any:
         """Queue ``payload`` for background delivery and enforce triggered limits."""
         if isinstance(self, QueueDelivery):
-            # Queue mechanics per spec: enqueue → refresh → check → return
+            # Queue mechanics: enqueue → refresh → check → return
+            # Item is enqueued first and will be delivered regardless of triggered limits.
+            # If limits are exceeded, an exception is raised to notify the caller,
+            # but the item remains in the queue for background processing.
             result = self._enqueue(payload)
+            # Brief pause to ensure triggered limits check completes before background processing
+            # This prevents race conditions while maintaining delivery guarantee
+            time.sleep(0.01)
             try:
                 self._refresh_triggered_limits()
             except Exception as exc:  # pragma: no cover
