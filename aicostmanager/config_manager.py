@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import configparser
 import json
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
-import configparser
 
 import jwt
 
 from .client import AICMError, CostManagerClient
-from .utils.ini_utils import atomic_write, file_lock, safe_read_config
 from .triggered_limits_cache import triggered_limits_cache
+from .utils.ini_utils import atomic_write, file_lock, safe_read_config
 
 
 class ConfigNotFound(AICMError):
@@ -36,6 +36,7 @@ class TriggeredLimit:
     config_id_list: Optional[List[str]]
     hostname: Optional[str]
     service_id: Optional[str]
+    service_key: Optional[str]
     client_customer_key: Optional[str]
     api_key_id: str
     triggered_at: str
@@ -188,7 +189,6 @@ class ConfigManager:
                 raise ConfigNotFound(f"No configuration found for api_id '{api_id}'")
         return results
 
-
     def get_config_by_id(self, config_id: str) -> Config:
         """Return decrypted config matching ``config_id``."""
         if "configs" not in self._config or "payload" not in self._config["configs"]:
@@ -307,6 +307,13 @@ class ConfigManager:
             )
 
             if matches_service and matches_client:
+                # Prefer explicit service_key from event if provided. Fallback
+                # to composing from vendor name and service_id for matching.
+                sk = event.get("service_key")
+                if not sk:
+                    sid_for_key = event.get("service_id") or legacy_service_id
+                    if vendor_name and sid_for_key:
+                        sk = f"{vendor_name}::{sid_for_key}"
                 results.append(
                     TriggeredLimit(
                         event_id=event.get("event_id"),
@@ -317,6 +324,7 @@ class ConfigManager:
                         config_id_list=config_ids,
                         hostname=hostname,
                         service_id=event.get("service_id") or legacy_service_id,
+                        service_key=sk,
                         client_customer_key=event.get("client_customer_key"),
                         api_key_id=event.get("api_key_id"),
                         triggered_at=event.get("triggered_at"),
@@ -324,4 +332,3 @@ class ConfigManager:
                     )
                 )
         return results
-

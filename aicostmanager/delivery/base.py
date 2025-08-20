@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -40,6 +41,8 @@ class DeliveryConfig:
     transport: httpx.BaseTransport | None = None
     log_file: str | None = None
     log_level: str | None = None
+    # For immediate delivery post-send wait before checking limits
+    immediate_pause_seconds: float = 5.0
 
 
 class Delivery(ABC):
@@ -72,6 +75,7 @@ class Delivery(ABC):
             "Authorization": f"Bearer {self.api_key}",
             "User-Agent": "aicostmanager-python",
         }
+        self.immediate_pause_seconds = getattr(config, "immediate_pause_seconds", 5.0)
 
     def _post_with_retry(
         self, body: Dict[str, Any], *, max_attempts: int
@@ -96,9 +100,7 @@ class Delivery(ABC):
 
     def _refresh_triggered_limits(self) -> None:
         """Fetch latest triggered limits from the API and persist them."""
-        resp = self._client.get(
-            f"{self._root}/triggered-limits", headers=self._headers
-        )
+        resp = self._client.get(f"{self._root}/triggered-limits", headers=self._headers)
         resp.raise_for_status()
         data = resp.json() or {}
         if isinstance(data, dict):
@@ -118,16 +120,48 @@ class Delivery(ABC):
         elif service_key:
             service_id = service_key
         client_customer_key = payload.get("client_customer_key")
+        # Prefer matching on full service_key; fall back to service_id/vendor filtering
         limits = cfg.get_triggered_limits(
             service_id=service_id,
             service_vendor=vendor,
             client_customer_key=client_customer_key,
         )
-        api_key_id = self.api_key
+        if service_key:
+            limits = [
+                l for l in limits if getattr(l, "service_key", None) == service_key
+            ]
+        # Match against the API key ID used by the server (typically the UUID
+        # suffix of the API key string "....<uuid>"). Fallback to the full
+        # key if no dot is present for compatibility with older formats.
+        api_key_id = None
+        if self.api_key:
+            api_key_id = (
+                self.api_key.split(".")[-1] if "." in self.api_key else self.api_key
+            )
         if api_key_id:
             limits = [l for l in limits if l.api_key_id == api_key_id]
         if limits:
-            raise UsageLimitExceeded(limits)
+            # Refresh once to avoid acting on stale limits (e.g., after an
+            # update/delete on the server) and re-check before raising.
+            try:
+                self._refresh_triggered_limits()
+            except Exception:  # pragma: no cover - network failures ignored here
+                pass
+            # Recompute with latest state
+            cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=False)
+            limits = cfg.get_triggered_limits(
+                service_id=service_id,
+                service_vendor=vendor,
+                client_customer_key=client_customer_key,
+            )
+            if service_key:
+                limits = [
+                    l for l in limits if getattr(l, "service_key", None) == service_key
+                ]
+            if api_key_id:
+                limits = [l for l in limits if l.api_key_id == api_key_id]
+            if limits:
+                raise UsageLimitExceeded(limits)
 
     @abstractmethod
     def _enqueue(self, payload: Dict[str, Any]) -> Any:
@@ -135,7 +169,25 @@ class Delivery(ABC):
 
     def enqueue(self, payload: Dict[str, Any]) -> Any:
         """Queue ``payload`` for background delivery and enforce triggered limits."""
+        if isinstance(self, QueueDelivery):
+            # Queue mechanics per spec: enqueue → refresh → check → return
+            result = self._enqueue(payload)
+            try:
+                self._refresh_triggered_limits()
+            except Exception as exc:  # pragma: no cover
+                self.logger.error("Triggered limits update failed: %s", exc)
+            self._check_triggered_limits(payload)
+            return result
+
+        # Immediate mechanics: send → sleep → refresh → check → return
         result = self._enqueue(payload)
+        pause = max(0.0, float(self.immediate_pause_seconds or 0.0))
+        if pause > 0:
+            time.sleep(pause)
+        try:
+            self._refresh_triggered_limits()
+        except Exception as exc:  # pragma: no cover
+            self.logger.error("Triggered limits update failed: %s", exc)
         self._check_triggered_limits(payload)
         return result
 
