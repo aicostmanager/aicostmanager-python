@@ -49,6 +49,7 @@ def _setup_triggered_limits(ini_path):
     }
     cfg = ConfigManager(ini_path=str(ini_path))
     cfg.write_triggered_limits(item)
+    IniManager(str(ini_path)).set_option("tracker", "AICM_LIMITS_ENABLED", "true")
     return event
 
 

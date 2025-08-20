@@ -77,6 +77,13 @@ class Delivery(ABC):
         }
         self.immediate_pause_seconds = getattr(config, "immediate_pause_seconds", 5.0)
 
+    def _limits_enabled(self) -> bool:
+        """Return ``True`` when triggered limits should be enforced."""
+        val = self.ini_manager.get_option(
+            "tracker", "AICM_LIMITS_ENABLED", "false"
+        )
+        return str(val).lower() in {"1", "true", "yes", "on"}
+
     def _post_with_retry(
         self, body: Dict[str, Any], *, max_attempts: int
     ) -> httpx.Response:
@@ -170,7 +177,7 @@ class Delivery(ABC):
     def enqueue(self, payload: Dict[str, Any]) -> Any:
         """Queue ``payload`` for background delivery and enforce triggered limits."""
         if isinstance(self, QueueDelivery):
-            # Queue mechanics: enqueue → refresh → check → return
+            # Queue mechanics: enqueue → optional refresh/check → return
             # Item is enqueued first and will be delivered regardless of triggered limits.
             # If limits are exceeded, an exception is raised to notify the caller,
             # but the item remains in the queue for background processing.
@@ -178,23 +185,25 @@ class Delivery(ABC):
             # Brief pause to ensure triggered limits check completes before background processing
             # This prevents race conditions while maintaining delivery guarantee
             time.sleep(0.01)
+            if self._limits_enabled():
+                try:
+                    self._refresh_triggered_limits()
+                except Exception as exc:  # pragma: no cover
+                    self.logger.error("Triggered limits update failed: %s", exc)
+                self._check_triggered_limits(payload)
+            return result
+
+        # Immediate mechanics: send → optional refresh/check → return
+        result = self._enqueue(payload)
+        pause = max(0.0, float(self.immediate_pause_seconds or 0.0))
+        if pause > 0:
+            time.sleep(pause)
+        if self._limits_enabled():
             try:
                 self._refresh_triggered_limits()
             except Exception as exc:  # pragma: no cover
                 self.logger.error("Triggered limits update failed: %s", exc)
             self._check_triggered_limits(payload)
-            return result
-
-        # Immediate mechanics: send → sleep → refresh → check → return
-        result = self._enqueue(payload)
-        pause = max(0.0, float(self.immediate_pause_seconds or 0.0))
-        if pause > 0:
-            time.sleep(pause)
-        try:
-            self._refresh_triggered_limits()
-        except Exception as exc:  # pragma: no cover
-            self.logger.error("Triggered limits update failed: %s", exc)
-        self._check_triggered_limits(payload)
         return result
 
     def deliver(self, body: Dict[str, Any]) -> None:
@@ -262,10 +271,11 @@ class QueueDelivery(Delivery, QueueWorker):
         body = {self._body_key: payloads}
         try:
             self._post_with_retry(body, max_attempts=self.max_attempts)
-            try:
-                self._refresh_triggered_limits()
-            except Exception as exc:  # pragma: no cover - network failures
-                self.logger.error("Triggered limits update failed: %s", exc)
+            if self._limits_enabled():
+                try:
+                    self._refresh_triggered_limits()
+                except Exception as exc:  # pragma: no cover - network failures
+                    self.logger.error("Triggered limits update failed: %s", exc)
         except Exception as exc:  # pragma: no cover - network failures
             self.logger.error("Delivery failed: %s", exc)
             for item in batch:

@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 - `track_llm_usage` and `track_llm_usage_async` methods for automatic usage
   extraction from LLM responses, with streaming helpers.
+- `AICM_LIMITS_ENABLED` configuration to toggle triggered limit enforcement in
+  delivery components.
 
 ## [0.1.18] - 2025-08-11
 ### Added

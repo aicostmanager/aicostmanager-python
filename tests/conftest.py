@@ -133,6 +133,11 @@ def clear_triggered_limits(aicm_ini_path):
     if "triggered_limits" in cp:
         cp.remove_section("triggered_limits")
 
+    # Ensure triggered limits checks are enabled for tests that rely on them
+    if "tracker" not in cp:
+        cp.add_section("tracker")
+    cp["tracker"]["AICM_LIMITS_ENABLED"] = "true"
+
     # Write the cleaned config back
     os.makedirs(os.path.dirname(aicm_ini_path), exist_ok=True)
     with open(aicm_ini_path, "w") as f:
