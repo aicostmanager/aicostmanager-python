@@ -3,13 +3,34 @@ import sys
 import types
 from pathlib import Path
 
+
 PACKAGE_DIR = Path(__file__).resolve().parent.parent / "aicostmanager"
+
+# ``test_llm_wrappers`` loads the ``wrappers`` module without importing the
+# entire package and stubs out ``Tracker``.  Previously this test modified
+# ``sys.modules`` globally which leaked into subsequent tests and caused
+# ``ImportError: cannot import name 'Tracker'`` when other tests tried to import
+# the real package.  We capture any existing modules and restore them once the
+# wrappers have been imported so that later tests see the normal package
+# structure.
+_ORIGINAL_MODULES = {
+    name: sys.modules.get(name)
+    for name in [
+        "aicostmanager",
+        "aicostmanager.tracker",
+        "aicostmanager.usage_utils",
+        "aicostmanager.wrappers",
+    ]
+}
+
+# Create a minimal package with a stub ``Tracker`` implementation so that the
+# wrappers module can be imported in isolation.
 pkg = types.ModuleType("aicostmanager")
 pkg.__path__ = [str(PACKAGE_DIR)]
 sys.modules["aicostmanager"] = pkg
 
-# Provide a minimal Tracker stub to satisfy imports
 tracker_stub = types.ModuleType("aicostmanager.tracker")
+
 
 class Tracker:  # pragma: no cover - stub for tests
     def __init__(self, *args, **kwargs):
@@ -28,7 +49,7 @@ class Tracker:  # pragma: no cover - stub for tests
 tracker_stub.Tracker = Tracker
 sys.modules["aicostmanager.tracker"] = tracker_stub
 
-# Load usage_utils normally
+# Load ``usage_utils`` and ``wrappers`` from the source tree
 spec_usage = importlib.util.spec_from_file_location(
     "aicostmanager.usage_utils", PACKAGE_DIR / "usage_utils.py"
 )
@@ -48,6 +69,15 @@ OpenAIResponsesWrapper = wrappers.OpenAIResponsesWrapper
 AnthropicWrapper = wrappers.AnthropicWrapper
 GeminiWrapper = wrappers.GeminiWrapper
 BedrockWrapper = wrappers.BedrockWrapper
+
+# Restore any modules that were present before importing the stubs so that
+# other tests importing :mod:`aicostmanager` are not affected by the temporary
+# replacements above.
+for name, module in _ORIGINAL_MODULES.items():
+    if module is not None:
+        sys.modules[name] = module
+    else:
+        sys.modules.pop(name, None)
 
 
 class DummyTracker:
