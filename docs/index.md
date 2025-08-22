@@ -8,6 +8,7 @@ pass it directly to the client or tracker.
 
 - [Usage](usage.md) - Basic SDK usage and API examples
 - [Manual Usage Tracking](tracker.md) - Record custom usage events
+- [LLM Wrappers](llm_wrappers.md) - Drop-in clients that track usage automatically
 - [Configuration](config.md) - Settings and defaults
 - [Limit Managers](limit_managers.md) - Manage usage limits and triggered limits
 - [Django](django.md) - Integrate with Django projects

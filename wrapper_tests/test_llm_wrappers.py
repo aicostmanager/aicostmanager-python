@@ -1,0 +1,227 @@
+import importlib.util
+import sys
+import types
+from pathlib import Path
+
+PACKAGE_DIR = Path(__file__).resolve().parent.parent / "aicostmanager"
+pkg = types.ModuleType("aicostmanager")
+pkg.__path__ = [str(PACKAGE_DIR)]
+sys.modules["aicostmanager"] = pkg
+
+# Provide a minimal Tracker stub to satisfy imports
+tracker_stub = types.ModuleType("aicostmanager.tracker")
+
+class Tracker:  # pragma: no cover - stub for tests
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def track(self, *args, **kwargs):
+        pass
+
+    async def track_async(self, *args, **kwargs):
+        pass
+
+    def close(self):
+        pass
+
+
+tracker_stub.Tracker = Tracker
+sys.modules["aicostmanager.tracker"] = tracker_stub
+
+# Load usage_utils normally
+spec_usage = importlib.util.spec_from_file_location(
+    "aicostmanager.usage_utils", PACKAGE_DIR / "usage_utils.py"
+)
+usage_utils = importlib.util.module_from_spec(spec_usage)
+sys.modules["aicostmanager.usage_utils"] = usage_utils
+spec_usage.loader.exec_module(usage_utils)
+
+spec = importlib.util.spec_from_file_location(
+    "aicostmanager.wrappers", PACKAGE_DIR / "wrappers.py"
+)
+wrappers = importlib.util.module_from_spec(spec)
+sys.modules["aicostmanager.wrappers"] = wrappers
+spec.loader.exec_module(wrappers)
+
+OpenAIChatWrapper = wrappers.OpenAIChatWrapper
+OpenAIResponsesWrapper = wrappers.OpenAIResponsesWrapper
+AnthropicWrapper = wrappers.AnthropicWrapper
+GeminiWrapper = wrappers.GeminiWrapper
+BedrockWrapper = wrappers.BedrockWrapper
+
+
+class DummyTracker:
+    def __init__(self):
+        self.calls = []
+
+    def track(self, api_id, service_key, usage, **kwargs):
+        self.calls.append((api_id, service_key, usage))
+
+    async def track_async(self, api_id, service_key, usage, **kwargs):
+        self.calls.append((api_id, service_key, usage))
+
+    def close(self):
+        pass
+
+
+def _stream_chunk():
+    yield types.SimpleNamespace(usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2})
+    yield types.SimpleNamespace(data="done")
+
+
+def make_openai_chat_client(base_url: str | None = None):
+    class Completions:
+        def create(self, *args, **kwargs):
+            if kwargs.get("stream"):
+                return _stream_chunk()
+            return types.SimpleNamespace(
+                id="resp-1",
+                model=kwargs.get("model"),
+                usage={"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+            )
+
+    class Chat:
+        completions = Completions()
+
+    class Client:
+        chat = Chat()
+
+    client = Client()
+    if base_url:
+        client.base_url = base_url
+    return client
+
+
+def make_openai_responses_client():
+    class Responses:
+        def create(self, *args, **kwargs):
+            return types.SimpleNamespace(
+                id="resp-2",
+                model=kwargs.get("model"),
+                usage={"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+            )
+
+    class Client:
+        responses = Responses()
+
+    return Client()
+
+
+def make_anthropic_client():
+    class Messages:
+        def create(self, *args, **kwargs):
+            return types.SimpleNamespace(
+                id="resp-3",
+                usage={"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},
+            )
+
+    class Client:
+        messages = Messages()
+
+    return Client()
+
+
+def make_gemini_client():
+    class Models:
+        def generate_content(self, *args, **kwargs):
+            return types.SimpleNamespace(
+                model=kwargs.get("model"),
+                usage_metadata={
+                    "promptTokenCount": 1,
+                    "candidatesTokenCount": 2,
+                    "totalTokenCount": 3,
+                },
+            )
+
+    class Client:
+        models = Models()
+
+    return Client()
+
+
+def make_bedrock_client():
+    class Client:
+        def invoke_model(self, *args, **kwargs):
+            return {
+                "usage": {
+                    "inputTokens": 1,
+                    "outputTokens": 2,
+                    "totalTokens": 3,
+                }
+            }
+
+    return Client()
+
+
+def test_wrappers_track_usage_non_streaming():
+    tracker = DummyTracker()
+    cases = [
+        (
+            OpenAIChatWrapper,
+            make_openai_chat_client(),
+            "chat.completions.create",
+            {"model": "gpt-4"},
+            "openai::gpt-4",
+        ),
+        (
+            OpenAIResponsesWrapper,
+            make_openai_responses_client(),
+            "responses.create",
+            {"model": "gpt-4"},
+            "openai::gpt-4",
+        ),
+        (
+            AnthropicWrapper,
+            make_anthropic_client(),
+            "messages.create",
+            {"model": "claude-3"},
+            "anthropic::claude-3",
+        ),
+        (
+            GeminiWrapper,
+            make_gemini_client(),
+            "models.generate_content",
+            {"model": "models/gemini"},
+            "google::models/gemini",
+        ),
+        (
+            BedrockWrapper,
+            make_bedrock_client(),
+            "invoke_model",
+            {"modelId": "anthropic.claude-v2"},
+            "amazon-bedrock::anthropic.claude-v2",
+        ),
+    ]
+    for wrapper_cls, client, call_path, kwargs, expected in cases:
+        tracker.calls.clear()
+        wrapper = wrapper_cls(client, tracker=tracker)
+        obj = wrapper
+        for attr in call_path.split('.'):
+            obj = getattr(obj, attr)
+        obj(**kwargs)
+        assert tracker.calls and tracker.calls[0][0] == wrapper_cls.api_id
+        assert tracker.calls[0][1] == expected
+
+
+def test_openai_chat_wrapper_streaming_tracks_once():
+    tracker = DummyTracker()
+    client = make_openai_chat_client()
+    wrapper = OpenAIChatWrapper(client, tracker=tracker)
+    stream = wrapper.chat.completions.create(model="gpt-4", stream=True)
+    list(stream)
+    assert tracker.calls and tracker.calls[0][0] == "openai_chat"
+    assert tracker.calls[0][1] == "openai::gpt-4"
+
+
+def test_openai_chat_vendor_detection():
+    tracker = DummyTracker()
+    fw_client = make_openai_chat_client("https://api.fireworks.ai")
+    wrapper_fw = OpenAIChatWrapper(fw_client, tracker=tracker)
+    wrapper_fw.chat.completions.create(model="m1")
+    assert tracker.calls[0][1] == "fireworks-ai::m1"
+
+    tracker.calls.clear()
+    x_client = make_openai_chat_client("https://api.x.ai")
+    wrapper_x = OpenAIChatWrapper(x_client, tracker=tracker)
+    wrapper_x.chat.completions.create(model="m2")
+    assert tracker.calls[0][1] == "xai::m2"

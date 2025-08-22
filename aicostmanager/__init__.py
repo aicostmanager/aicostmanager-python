@@ -22,6 +22,13 @@ from .delivery import (
 )
 from .limits import BaseLimitManager, TriggeredLimitManager, UsageLimitManager
 from .tracker import Tracker
+from .wrappers import (
+    OpenAIChatWrapper,
+    OpenAIResponsesWrapper,
+    AnthropicWrapper,
+    GeminiWrapper,
+    BedrockWrapper,
+)
 
 __all__ = [
     "AICMError",
@@ -42,5 +49,10 @@ __all__ = [
     "BaseLimitManager",
     "TriggeredLimitManager",
     "UsageLimitManager",
+    "OpenAIChatWrapper",
+    "OpenAIResponsesWrapper",
+    "AnthropicWrapper",
+    "GeminiWrapper",
+    "BedrockWrapper",
     "__version__",
 ]
