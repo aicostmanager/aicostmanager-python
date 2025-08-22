@@ -63,6 +63,7 @@ resp = wrapper.chat.completions.create(
 )
 print(resp.choices[0].message.content)
 
+
 wrapper.close()  # optional for immediate delivery; required for queued delivery
 ```
 

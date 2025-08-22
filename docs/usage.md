@@ -69,6 +69,7 @@ resp = wrapper.chat.completions.create(
     messages=[{"role": "user", "content": "Hello"}],
 )
 print(resp.choices[0].message.content)
+
 wrapper.close()  # required only for queued delivery
 ```
 
