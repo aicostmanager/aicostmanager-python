@@ -1,10 +1,3 @@
-import pathlib
-import sys
-
-base = pathlib.Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(base / "sdks" / "python"))
-sys.path.insert(0, str(base / ".venv" / "lib" / "python3.12" / "site-packages"))
-
 from aicostmanager.client import CostManagerClient
 from aicostmanager.models import CustomerOut, PaginatedResponse, UsageEvent, UsageRollup
 
