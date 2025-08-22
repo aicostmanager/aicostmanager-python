@@ -17,9 +17,9 @@ Values can be supplied directly or through environment variables and the
 - `AICM_API_KEY`
 - `AICM_API_BASE` (default: `https://aicostmanager.com`)
 - `AICM_API_URL` (default: `/api/v1`)
-- `AICM_DELIVERY_DB_PATH`
-- `AICM_DELIVERY_LOG_FILE`
-- `AICM_DELIVERY_LOG_LEVEL`
+- `AICM_DB_PATH`
+- `AICM_LOG_FILE`
+- `AICM_LOG_LEVEL`
 - `AICM_LOG_BODIES`
 
 The same options may be placed in a `[delivery]` section inside the INI file.

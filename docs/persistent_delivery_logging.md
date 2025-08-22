@@ -6,7 +6,7 @@
 
 ### Log Level
 
-Set the verbosity with the ``log_level`` parameter or ``AICM_DELIVERY_LOG_LEVEL`` environment variable.  The default is ``INFO``.  Use ``DEBUG`` to see detailed queue operations and worker activity.
+Set the verbosity with the ``log_level`` parameter or ``AICM_LOG_LEVEL`` environment variable.  The default is ``INFO``.  Use ``DEBUG`` to see detailed queue operations and worker activity.
 
 ```python
 from aicostmanager import PersistentDelivery
@@ -15,12 +15,12 @@ delivery = PersistentDelivery(log_level="DEBUG")
 ```
 
 ```bash
-export AICM_DELIVERY_LOG_LEVEL=DEBUG
+export AICM_LOG_LEVEL=DEBUG
 ```
 
 ### Log Destination
 
-By default logs are written to ``stdout`` via a ``StreamHandler``.  Provide ``log_file`` (or ``AICM_DELIVERY_LOG_FILE``) to write to a file instead.  The parent directory is created automatically.
+By default logs are written to ``stdout`` via a ``StreamHandler``.  Provide ``log_file`` (or ``AICM_LOG_FILE``) to write to a file instead.  The parent directory is created automatically.
 
 ```python
 delivery = PersistentDelivery(log_file="/var/log/aicm/delivery.log")
@@ -67,8 +67,8 @@ With ``log_level="DEBUG"`` the component records queue activity:
 
 ## Summary
 
-* ``log_level`` / ``AICM_DELIVERY_LOG_LEVEL`` – control verbosity
-* ``log_file`` / ``AICM_DELIVERY_LOG_FILE`` – write logs to a file
+* ``log_level`` / ``AICM_LOG_LEVEL`` – control verbosity
+* ``log_file`` / ``AICM_LOG_FILE`` – write logs to a file
 * ``logger`` – plug in a preconfigured ``Logger``
 * ``log_bodies`` / ``AICM_LOG_BODIES`` – log request/response bodies with redaction
 

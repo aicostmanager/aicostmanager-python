@@ -100,7 +100,9 @@ async def track(payload: dict) -> dict:
 
 The tracker can derive token usage directly from OpenAI responses. Using the
 tracker as a context manager guarantees the usage is flushed before your
-program exits.
+program exits. If you prefer automatic tracking without calling these helper
+methods, see the [LLM wrappers](llm_wrappers.md) which proxy common SDK clients
+and record usage for you.
 
 ### Non-streaming example
 
