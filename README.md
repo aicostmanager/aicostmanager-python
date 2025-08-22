@@ -45,6 +45,30 @@ Configuration values are read from an ``AICM.INI`` file.  See
 [`config.md`](docs/config.md) for the complete list of available settings and
 their defaults.
 
+## LLM wrappers
+
+Wrap popular LLM SDK clients to record usage automatically without calling
+`track` manually:
+
+```python
+from aicostmanager import OpenAIChatWrapper
+from openai import OpenAI
+
+client = OpenAI()
+wrapper = OpenAIChatWrapper(client)
+
+resp = wrapper.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Say hello"}],
+)
+print(resp.choices[0].message.content)
+
+wrapper.close()  # optional for immediate delivery; required for queued delivery
+```
+
+See [LLM wrappers](docs/llm_wrappers.md) for the full list of supported
+providers and advanced usage.
+
 ## Choosing a delivery strategy
 
 `Tracker` supports multiple delivery components via `DeliveryType`:
@@ -105,7 +129,7 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def startup() -> None:
-    app.state.tracker = await Tracker.create_async()
+    app.state.tracker = Tracker()
 
 @app.on_event("shutdown")
 def shutdown() -> None:
@@ -160,6 +184,7 @@ to ensure flushing.
 - [Usage Guide](docs/usage.md)
 - [Tracker](docs/tracker.md)
 - [Configuration](docs/config.md)
+- [LLM wrappers](docs/llm_wrappers.md)
 - [Persistent Delivery](docs/persistent_delivery.md)
 - [Django integration](docs/django.md)
 - [FastAPI integration](docs/fastapi.md)
