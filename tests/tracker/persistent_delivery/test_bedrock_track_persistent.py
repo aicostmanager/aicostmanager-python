@@ -161,7 +161,7 @@ def test_bedrock_track_streaming(service_key, model, aws_region, aicm_api_key):
                 pass
             from aicostmanager.usage_utils import get_streaming_usage_from_response
 
-            up = get_streaming_usage_from_response(chunk, "bedrock")
+            up = get_streaming_usage_from_response(chunk, "amazon-bedrock")
             if isinstance(up, dict) and up:
                 print("bedrock usage chunk:", json.dumps(up, default=str))
                 final_usage = up

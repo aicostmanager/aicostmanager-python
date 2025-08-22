@@ -126,7 +126,7 @@ def test_bedrock_deliver_now_streaming(service_key, model, aws_region, aicm_api_
                     )
             except Exception:
                 pass
-            up = get_streaming_usage_from_response(chunk, "bedrock")
+            up = get_streaming_usage_from_response(chunk, "amazon-bedrock")
             if isinstance(up, dict) and up:
                 print("bedrock usage chunk:", json.dumps(up, default=str))
                 final_usage = up
