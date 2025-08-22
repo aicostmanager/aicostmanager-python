@@ -111,7 +111,7 @@ def get_usage_from_response(response: Any, api_id: str) -> dict[str, Any]:
         usage = (
             response if not hasattr(response, "usage") else getattr(response, "usage")
         )
-    elif api_id == "bedrock":
+    elif api_id == "amazon-bedrock":
         if isinstance(response, Mapping):
             if "usage" in response:
                 usage = response["usage"]
@@ -171,7 +171,7 @@ def get_streaming_usage_from_response(chunk: Any, api_id: str) -> dict[str, Any]
         elif hasattr(chunk, "message") and hasattr(chunk.message, "usage"):
             usage = getattr(chunk.message, "usage")
 
-    elif api_id == "bedrock":
+    elif api_id == "amazon-bedrock":
         if isinstance(chunk, Mapping):
             if "metadata" in chunk and "usage" in chunk["metadata"]:
                 usage = chunk["metadata"]["usage"]

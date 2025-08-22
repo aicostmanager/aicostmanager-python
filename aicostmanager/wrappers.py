@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Iterable, AsyncIterable
+from collections.abc import AsyncIterable, Iterable, Iterator
 from typing import Any
 
 from .tracker import Tracker
-from .usage_utils import get_usage_from_response, get_streaming_usage_from_response
+from .usage_utils import get_streaming_usage_from_response, get_usage_from_response
 
 
 class _Proxy:
@@ -19,6 +19,7 @@ class _Proxy:
         attr = getattr(self._obj, name)
         if callable(attr):
             if inspect.iscoroutinefunction(attr):
+
                 async def async_call(*args, **kwargs):
                     model = self._wrapper._extract_model(attr, args, kwargs)
                     result = await attr(*args, **kwargs)
@@ -26,6 +27,7 @@ class _Proxy:
 
                 return async_call
             else:
+
                 def sync_call(*args, **kwargs):
                     model = self._wrapper._extract_model(attr, args, kwargs)
                     result = attr(*args, **kwargs)
@@ -125,17 +127,30 @@ class BaseLLMWrapper:
             if not usage_sent:
                 usage = get_streaming_usage_from_response(chunk, self.api_id)
                 if usage:
-                    await self._tracker.track_async(
-                        self.api_id, service_key, usage
-                    )
+                    await self._tracker.track_async(self.api_id, service_key, usage)
                     usage_sent = True
             yield chunk
 
     def _handle_result(self, result: Any, model: str | None):
+        # Special-case: Bedrock streaming returns a dict with an inner "stream"
+        # Replace the inner stream with a wrapped stream that tracks usage once
+        if (
+            getattr(self, "api_id", "") == "amazon-bedrock"
+            and isinstance(result, dict)
+            and "stream" in result
+        ):
+            inner_stream = result.get("stream")
+            if isinstance(inner_stream, (Iterator, Iterable)) and not isinstance(
+                inner_stream, (str, bytes, bytearray, dict)
+            ):
+                wrapped = self._wrap_stream(inner_stream, model)
+                new_result = dict(result)
+                new_result["stream"] = wrapped
+                return new_result
         if isinstance(result, AsyncIterable):
             return self._wrap_stream_async(result, model)
-        if isinstance(result, Iterable) and not isinstance(
-            result, (str, bytes, bytearray, dict)
+        if isinstance(result, Iterator) and not isinstance(
+            result, (str, bytes, bytearray)
         ):
             return self._wrap_stream(result, model)
         return self._track_usage(result, model)
@@ -143,8 +158,8 @@ class BaseLLMWrapper:
     async def _handle_async_result(self, result: Any, model: str | None):
         if isinstance(result, AsyncIterable):
             return self._wrap_stream_async(result, model)
-        if isinstance(result, Iterable) and not isinstance(
-            result, (str, bytes, bytearray, dict)
+        if isinstance(result, Iterator) and not isinstance(
+            result, (str, bytes, bytearray)
         ):
             return self._wrap_stream(result, model)
         return self._track_usage(result, model)
@@ -197,7 +212,7 @@ class GeminiWrapper(BaseLLMWrapper):
 
 
 class BedrockWrapper(BaseLLMWrapper):
-    api_id = "bedrock"
+    api_id = "amazon-bedrock"
     vendor_name = "amazon-bedrock"
 
 

@@ -94,7 +94,7 @@ def test_bedrock_tracker(service_key, model, aws_region, aicm_api_key):
     response_id = resp.get("ResponseMetadata", {}).get("RequestId") or resp.get(
         "output", {}
     ).get("message", {}).get("id")
-    usage_payload = get_usage_from_response(resp, "bedrock")
+    usage_payload = get_usage_from_response(resp, "amazon-bedrock")
     tracker.track("amazon-bedrock", service_key, usage_payload, response_id=response_id)
     _wait_for_cost_event(aicm_api_key, response_id)
 
@@ -127,7 +127,7 @@ def test_bedrock_tracker(service_key, model, aws_region, aicm_api_key):
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:
-        usage2 = get_usage_from_response(resp2, "bedrock")
+        usage2 = get_usage_from_response(resp2, "amazon-bedrock")
         t2.track("amazon-bedrock", service_key, usage2, response_id=response_id2)
     _wait_for_cost_event(aicm_api_key, response_id2)
 

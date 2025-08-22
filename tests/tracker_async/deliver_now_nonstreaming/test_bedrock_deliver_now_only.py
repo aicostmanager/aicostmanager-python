@@ -104,7 +104,7 @@ def test_bedrock_deliver_now_only(service_key, model, aws_region, aicm_api_key):
         response_id = resp.get("output", {}).get("message", {}).get("id") or resp.get(
             "ResponseMetadata", {}
         ).get("RequestId")
-        usage_payload = get_usage_from_response(resp, "bedrock")
+        usage_payload = get_usage_from_response(resp, "amazon-bedrock")
 
         asyncio.run(
             tracker.track_async(

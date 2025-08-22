@@ -1,12 +1,13 @@
 import os
+
 import pytest
 
 from aicostmanager.wrappers import (
+    AnthropicWrapper,
+    BedrockWrapper,
+    GeminiWrapper,
     OpenAIChatWrapper,
     OpenAIResponsesWrapper,
-    AnthropicWrapper,
-    GeminiWrapper,
-    BedrockWrapper,
 )
 
 
@@ -59,6 +60,7 @@ def test_openai_chat_real():
             model=model,
             messages=[{"role": "user", "content": "hi"}],
             stream=True,
+            stream_options={"include_usage": True},
         )
         for _ in stream:
             pass
@@ -140,9 +142,9 @@ def test_anthropic_real():
 
 @pytest.mark.skipif("CI" in os.environ, reason="avoid real API calls in CI")
 def test_gemini_real():
-    genai = pytest.importorskip("google.generativeai")
+    genai = pytest.importorskip("google.genai")
     _require_env("GOOGLE_API_KEY")
-    model = os.getenv("GEMINI_MODEL", "models/gemini-1.5-flash")
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     wrapper = GeminiWrapper(client)
     calls = _setup_capture(wrapper)
@@ -159,10 +161,9 @@ def test_gemini_real():
     calls.clear()
 
     def stream():
-        stream = wrapper.models.generate_content(
+        stream = wrapper.models.generate_content_stream(
             model=model,
-            contents="hi",
-            stream=True,
+            contents=["hi"],
         )
         for _ in stream:
             pass
@@ -177,25 +178,33 @@ def test_bedrock_real():
     boto3 = pytest.importorskip("boto3")
     if not (os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("AWS_SECRET_ACCESS_KEY")):
         pytest.skip("AWS credentials not set")
-    client = boto3.client("bedrock-runtime")
+    aws_region = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+    client = boto3.client("bedrock-runtime", region_name=aws_region)
     wrapper = BedrockWrapper(client)
     calls = _setup_capture(wrapper)
-    model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-v2")
-    payload = '{"prompt":"hi","max_tokens_to_sample":32}'
+    model_id = os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-pro-v1:0")
 
     def non_stream():
-        wrapper.invoke_model(modelId=model_id, body=payload)
+        wrapper.converse(
+            modelId=model_id,
+            messages=[{"role": "user", "content": [{"text": "hi"}]}],
+            inferenceConfig={"maxTokens": 32},
+        )
 
     _call_or_skip(non_stream, "bedrock non-stream")
-    assert calls and calls[-1]["api_id"] == "bedrock"
+    assert calls and calls[-1]["api_id"] == "amazon-bedrock"
     assert calls[-1]["service_key"] == f"amazon-bedrock::{model_id}"
     calls.clear()
 
     def stream():
-        stream = wrapper.invoke_model_with_response_stream(modelId=model_id, body=payload)
-        for _ in stream.get("body", []):
+        response = wrapper.converse_stream(
+            modelId=model_id,
+            messages=[{"role": "user", "content": [{"text": "hi"}]}],
+            inferenceConfig={"maxTokens": 32},
+        )
+        for _ in response["stream"]:
             pass
 
     _call_or_skip(stream, "bedrock stream")
-    assert calls and calls[-1]["api_id"] == "bedrock"
+    assert calls and calls[-1]["api_id"] == "amazon-bedrock"
     assert calls[-1]["service_key"] == f"amazon-bedrock::{model_id}"
