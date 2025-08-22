@@ -208,3 +208,78 @@ def test_bedrock_real():
     _call_or_skip(stream, "bedrock stream")
     assert calls and calls[-1]["api_id"] == "amazon-bedrock"
     assert calls[-1]["service_key"] == f"amazon-bedrock::{model_id}"
+
+
+@pytest.mark.skipif("CI" in os.environ, reason="avoid real API calls in CI")
+def test_xai_real():
+    openai = pytest.importorskip("openai")
+    _require_env("GROK_API_KEY")
+    model = os.getenv("XAI_MODEL", "grok-3-mini")
+    client = openai.OpenAI(
+        api_key=os.environ["GROK_API_KEY"], base_url="https://api.x.ai/v1"
+    )
+    wrapper = OpenAIChatWrapper(client)
+    calls = _setup_capture(wrapper)
+
+    def non_stream():
+        wrapper.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "hi"}],
+        )
+
+    _call_or_skip(non_stream, "xai non-stream")
+    assert calls and calls[-1]["api_id"] == "openai_chat"
+    assert calls[-1]["service_key"] == f"xai::{model}"
+    calls.clear()
+
+    def stream():
+        stream = wrapper.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "hi"}],
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        for _ in stream:
+            pass
+
+    _call_or_skip(stream, "xai stream")
+    assert calls and calls[-1]["api_id"] == "openai_chat"
+    assert calls[-1]["service_key"] == f"xai::{model}"
+
+
+@pytest.mark.skipif("CI" in os.environ, reason="avoid real API calls in CI")
+def test_fireworks_real():
+    openai = pytest.importorskip("openai")
+    _require_env("FIREWORKS_API_KEY")
+    model = os.getenv("FIREWORKS_MODEL", "accounts/fireworks/models/deepseek-r1")
+    client = openai.OpenAI(
+        api_key=os.environ["FIREWORKS_API_KEY"],
+        base_url="https://api.fireworks.ai/inference/v1",
+    )
+    wrapper = OpenAIChatWrapper(client)
+    calls = _setup_capture(wrapper)
+
+    def non_stream():
+        wrapper.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "hi"}],
+        )
+
+    _call_or_skip(non_stream, "fireworks non-stream")
+    assert calls and calls[-1]["api_id"] == "openai_chat"
+    assert calls[-1]["service_key"] == f"fireworks-ai::{model}"
+    calls.clear()
+
+    def stream():
+        stream = wrapper.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "hi"}],
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        for _ in stream:
+            pass
+
+    _call_or_skip(stream, "fireworks stream")
+    assert calls and calls[-1]["api_id"] == "openai_chat"
+    assert calls[-1]["service_key"] == f"fireworks-ai::{model}"
