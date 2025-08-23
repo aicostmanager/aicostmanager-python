@@ -143,6 +143,8 @@ def test_track_multiple_events_with_errors(aicm_api_key, aicm_api_base, tmp_path
 
 def test_deliver_now_single_event_success(aicm_api_key, aicm_api_base):
     ini = IniManager("ini")
+    # Disable limits for this test since it's not testing limits functionality
+    ini.set_option("tracker", "AICM_LIMITS_ENABLED", "false")
     dconfig = DeliveryConfig(
         ini_manager=ini,
         aicm_api_key=aicm_api_key,
@@ -165,6 +167,8 @@ def test_deliver_now_single_event_success(aicm_api_key, aicm_api_base):
 
 def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
     ini = IniManager("ini")
+    # Disable limits for this test since it's not testing limits functionality
+    ini.set_option("tracker", "AICM_LIMITS_ENABLED", "false")
     dconfig = DeliveryConfig(
         ini_manager=ini,
         aicm_api_key=aicm_api_key,

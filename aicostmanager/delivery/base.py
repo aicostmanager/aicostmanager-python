@@ -17,7 +17,6 @@ from tenacity import (
 )
 
 from ..client.exceptions import UsageLimitExceeded
-from ..client.sync_client import CostManagerClient
 from ..config_manager import ConfigManager
 from ..ini_manager import IniManager
 from ..logger import create_logger
@@ -109,18 +108,8 @@ class Delivery(ABC):
         Uses a client-backed ConfigManager to ensure we can refresh and decode
         triggered limits when the server omits the public key from inline responses.
         """
-        # Prefer a client-backed ConfigManager so we can fetch public key if needed
-        try:
-            client = CostManagerClient(
-                aicm_api_key=self.api_key,
-                aicm_api_base=self.api_base,
-                aicm_api_url=self.api_url,
-                aicm_ini_path=self.ini_manager.ini_path,
-            )
-            cfg = ConfigManager(client)
-        except Exception:
-            # Fallback: use file-backed only
-            cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=False)
+        # Use file-backed ConfigManager to avoid incidental GETs that could stale/clear state
+        cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=False)
         service_key = payload.get("service_key")
         vendor = service_id = None
         if service_key and "::" in service_key:
@@ -173,7 +162,9 @@ class Delivery(ABC):
         if isinstance(self, QueueDelivery):
             result = self._enqueue(payload)
             if self._limits_enabled():
-                self._check_triggered_limits(payload)
+                self._check_triggered_limits(
+                    payload
+                )  # This check happens AFTER enqueue
             return result
 
         result = self._enqueue(payload)
@@ -249,7 +240,8 @@ class QueueDelivery(Delivery, QueueWorker):
             if self._limits_enabled() and isinstance(data, dict):
                 tl_data = data.get("triggered_limits")
                 if tl_data:
-                    cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=False)
+                    # Use a ConfigManager that preserves existing INI settings
+                    cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=True)
                     try:
                         cfg.write_triggered_limits(tl_data)
                     except Exception as exc:  # pragma: no cover - network failures

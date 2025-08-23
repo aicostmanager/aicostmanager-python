@@ -21,7 +21,8 @@ class ImmediateDelivery(Delivery):
             data = self._post_with_retry(body, max_attempts=3)
             tl_data = data.get("triggered_limits", {}) if isinstance(data, dict) else {}
             if tl_data:
-                cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=False)
+                # Use a ConfigManager that preserves existing INI settings
+                cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=True)
                 try:
                     cfg.write_triggered_limits(tl_data)
                 except Exception as exc:  # pragma: no cover
@@ -37,10 +38,10 @@ class ImmediateDelivery(Delivery):
             if not cost_events:
                 raise NoCostsTrackedException()
             # Proactively raise on this call if the server indicates a limit was triggered
-            if isinstance(tl_data, dict):
-                cfg_limits = ConfigManager(
-                    ini_path=self.ini_manager.ini_path, load=False
-                )
+            # and limits are enabled
+            if self._limits_enabled() and isinstance(tl_data, dict):
+                # Use the same ConfigManager instance that we wrote to
+                cfg_limits = cfg
                 request_service_key = payload.get("service_key")
                 client_customer_key = payload.get("client_customer_key")
                 vendor = service_id = None
