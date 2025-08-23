@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 import threading
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -18,6 +17,7 @@ from tenacity import (
 )
 
 from ..client.exceptions import UsageLimitExceeded
+from ..client.sync_client import CostManagerClient
 from ..config_manager import ConfigManager
 from ..ini_manager import IniManager
 from ..logger import create_logger
@@ -79,9 +79,7 @@ class Delivery(ABC):
 
     def _limits_enabled(self) -> bool:
         """Return ``True`` when triggered limits should be enforced."""
-        val = self.ini_manager.get_option(
-            "tracker", "AICM_LIMITS_ENABLED", "false"
-        )
+        val = self.ini_manager.get_option("tracker", "AICM_LIMITS_ENABLED", "false")
         return str(val).lower() in {"1", "true", "yes", "on"}
 
     def _post_with_retry(
@@ -106,8 +104,23 @@ class Delivery(ABC):
         raise RuntimeError("unreachable")
 
     def _check_triggered_limits(self, payload: Dict[str, Any]) -> None:
-        """Raise ``UsageLimitExceeded`` if ``payload`` matches a triggered limit."""
-        cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=False)
+        """Raise ``UsageLimitExceeded`` if ``payload`` matches a triggered limit.
+
+        Uses a client-backed ConfigManager to ensure we can refresh and decode
+        triggered limits when the server omits the public key from inline responses.
+        """
+        # Prefer a client-backed ConfigManager so we can fetch public key if needed
+        try:
+            client = CostManagerClient(
+                aicm_api_key=self.api_key,
+                aicm_api_base=self.api_base,
+                aicm_api_url=self.api_url,
+                aicm_ini_path=self.ini_manager.ini_path,
+            )
+            cfg = ConfigManager(client)
+        except Exception:
+            # Fallback: use file-backed only
+            cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=False)
         service_key = payload.get("service_key")
         vendor = service_id = None
         if service_key and "::" in service_key:
@@ -137,7 +150,6 @@ class Delivery(ABC):
             limits = [l for l in limits if l.api_key_id == api_key_id]
         if limits:
             # Recompute with latest state (limits may have been updated by recent track)
-            cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=False)
             limits = cfg.get_triggered_limits(
                 service_id=service_id,
                 service_vendor=vendor,

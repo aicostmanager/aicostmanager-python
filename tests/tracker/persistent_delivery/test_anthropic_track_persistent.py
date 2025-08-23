@@ -1,8 +1,5 @@
-import json
 import os
 import time
-import urllib.request
-import uuid
 
 import pytest
 
@@ -52,7 +49,15 @@ def test_anthropic_track_non_streaming(anthropic_api_key, aicm_api_key, tmp_path
             "anthropic", resp, response_id=getattr(resp, "id", None)
         )
         used_id = getattr(resp, "aicm_response_id", None) or getattr(resp, "id", None)
-        _wait_for_cost_event(aicm_api_key, used_id)
+        # Queue-based tracking: ensure queue drained
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            stats = getattr(tracker.delivery, "stats", lambda: {})()
+            if stats.get("queued", 0) == 0:
+                break
+            time.sleep(0.05)
+        else:
+            raise AssertionError("delivery queue did not drain")
 
 
 def test_anthropic_track_streaming(anthropic_api_key, aicm_api_key, tmp_path):

@@ -121,7 +121,9 @@ def test_tracker_persistent_queue_delivery(tmp_path):
         db_path=str(db_path),
         poll_interval=0.1,
     )
-    tracker = Tracker(aicm_api_key="test", ini_path=str(tmp_path / "ini"), delivery=delivery)
+    tracker = Tracker(
+        aicm_api_key="test", ini_path=str(tmp_path / "ini"), delivery=delivery
+    )
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     for _ in range(20):
         if received:

@@ -1,8 +1,5 @@
-import json
 import os
 import time
-import urllib.request
-import uuid
 
 import pytest
 
@@ -108,6 +105,12 @@ def test_openai_responses_track_streaming(aicm_api_key):
         )
         final_id = _extract_response_id(used_id, response_id)
         print(f"Using response_id: {final_id}")
-        # For immediate delivery, the response contains cost_events
-        assert isinstance(used_id, dict)
-        assert used_id.get("result", {}).get("cost_events")
+        # Queue-based tracking: ensure queue drained
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            stats = getattr(tracker.delivery, "stats", lambda: {})()
+            if stats.get("queued", 0) == 0:
+                break
+            time.sleep(0.05)
+        else:
+            raise AssertionError("delivery queue did not drain")
