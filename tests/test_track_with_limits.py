@@ -44,6 +44,45 @@ def _wait_for_empty(delivery, timeout: float = 10.0) -> None:
     raise AssertionError("delivery queue did not drain")
 
 
+def _debug_print_decrypted_triggered_limits(
+    tag: str, ini_path: str, tl_data: dict | None = None
+):
+    """Print decrypted triggered_limits for debugging.
+
+    If ``tl_data`` is provided (e.g., from an immediate /track response), decode and print it.
+    Otherwise, read the stored payload from AICM.ini and decode.
+    """
+    try:
+        from aicostmanager.config_manager import ConfigManager
+
+        cfg = ConfigManager(ini_path=str(ini_path), load=False)
+        raw = tl_data if isinstance(tl_data, dict) else None
+        if raw is None:
+            try:
+                raw = cfg.read_triggered_limits()
+            except Exception:
+                raw = None
+        if not isinstance(raw, dict):
+            print(f"{tag} triggered_limits: <none>")
+            return
+        token = raw.get("encrypted_payload")
+        public_key = raw.get("public_key")
+        if token and public_key:
+            payload = cfg._decode(token, public_key)  # type: ignore[attr-defined]
+            print(
+                f"{tag} decrypted triggered_limits:", json.dumps(payload, default=str)
+            )
+        else:
+            print(f"{tag} triggered_limits (raw):", json.dumps(raw, default=str))
+    except Exception as exc:
+        try:
+            print(
+                f"{tag} triggered_limits decode error: {exc}; raw={json.dumps(tl_data, default=str) if tl_data else '<none>'}"
+            )
+        except Exception:
+            print(f"{tag} triggered_limits decode error: {exc}")
+
+
 @pytest.mark.skipif(
     os.environ.get("RUN_NETWORK_TESTS") != "1",
     reason="requires network access",
@@ -89,6 +128,7 @@ def test_track_with_limits_immediate(
             usage_payload,
             response_id=response_id,
         )
+        _debug_print_decrypted_triggered_limits("after-initial-track", ini)
 
     cm_client = CostManagerClient(
         aicm_api_key=aicm_api_key,
@@ -127,6 +167,7 @@ def test_track_with_limits_immediate(
                 usage_payload,
                 response_id=response_id,
             )
+        _debug_print_decrypted_triggered_limits("after-trigger-track", ini)
 
         resp = client.responses.create(model=MODEL, input="should fail")
         response_id = getattr(resp, "id", None)
@@ -140,6 +181,7 @@ def test_track_with_limits_immediate(
                 usage_payload,
                 response_id=response_id,
             )
+        _debug_print_decrypted_triggered_limits("after-should-fail", ini)
 
         with Tracker(aicm_api_key=aicm_api_key, ini_path=str(ini)) as t2:
             resp_other = client.responses.create(model=OTHER_MODEL, input="other")
@@ -154,6 +196,7 @@ def test_track_with_limits_immediate(
                 other_usage,
                 response_id=other_response_id,
             )
+            _debug_print_decrypted_triggered_limits("after-other-model-track", ini)
 
         upd_payload = {
             "threshold_type": "limit",
@@ -164,6 +207,7 @@ def test_track_with_limits_immediate(
         }
         print("updating usage limit:", json.dumps(upd_payload))
         ul_mgr.update_usage_limit(limit.uuid, upd_payload)
+        _debug_print_decrypted_triggered_limits("after-limit-update-track", ini)
 
         # Allow server time to process the limit update and clear triggered limits
         time.sleep(2)
@@ -197,8 +241,10 @@ def test_track_with_limits_immediate(
             )
         except UsageLimitExceeded:
             pass
+        _debug_print_decrypted_triggered_limits("after-raise-again", ini)
 
         ul_mgr.delete_usage_limit(limit.uuid)
+        _debug_print_decrypted_triggered_limits("after-delete-limit-track", ini)
 
         resp = client.responses.create(model=MODEL, input="after delete")
         response_id = getattr(resp, "id", None)
@@ -285,6 +331,7 @@ def test_track_with_limits_queue(
             print("queue first usage payload:", json.dumps(up, default=str))
             tracker.track("openai_responses", SERVICE_KEY, up, response_id=rid)
             _wait_for_empty(tracker.delivery)
+            _debug_print_decrypted_triggered_limits("queue-after-first", ini)
 
             resp = client.responses.create(model=MODEL, input="trigger")
             rid = getattr(resp, "id", None)
@@ -298,6 +345,7 @@ def test_track_with_limits_queue(
             except UsageLimitExceeded:
                 raised = True
             _wait_for_empty(tracker.delivery)
+            _debug_print_decrypted_triggered_limits("queue-after-trigger", ini)
 
             resp = client.responses.create(model=MODEL, input="should fail")
             rid = getattr(resp, "id", None)
@@ -314,6 +362,7 @@ def test_track_with_limits_queue(
                 with pytest.raises(UsageLimitExceeded):
                     tracker.track("openai_responses", SERVICE_KEY, up, response_id=rid)
             _wait_for_empty(tracker.delivery)
+            _debug_print_decrypted_triggered_limits("queue-after-should-fail", ini)
 
             with Tracker(
                 aicm_api_key=aicm_api_key,
@@ -328,6 +377,7 @@ def test_track_with_limits_queue(
                 print("queue other usage payload:", json.dumps(up2, default=str))
                 t2.track("openai_responses", other_service_key, up2, response_id=rid2)
                 _wait_for_empty(t2.delivery)
+                _debug_print_decrypted_triggered_limits("queue-after-other-model", ini)
 
             upd_payload = {
                 "threshold_type": "limit",
@@ -338,6 +388,7 @@ def test_track_with_limits_queue(
             }
             print("updating usage limit:", json.dumps(upd_payload))
             ul_mgr.update_usage_limit(limit.uuid, upd_payload)
+            _debug_print_decrypted_triggered_limits("queue-after-limit-update", ini)
 
             resp = client.responses.create(model=MODEL, input="after raise")
             rid = getattr(resp, "id", None)
@@ -358,6 +409,7 @@ def test_track_with_limits_queue(
             except UsageLimitExceeded:
                 pass
             _wait_for_empty(tracker.delivery)
+            _debug_print_decrypted_triggered_limits("queue-after-raise-again", ini)
 
             ul_mgr.delete_usage_limit(limit.uuid)
 
@@ -368,6 +420,7 @@ def test_track_with_limits_queue(
             print("queue after-delete usage payload:", json.dumps(up, default=str))
             tracker.track("openai_responses", SERVICE_KEY, up, response_id=rid)
             _wait_for_empty(tracker.delivery)
+            _debug_print_decrypted_triggered_limits("queue-after-delete", ini)
     finally:
         try:
             if limit_uuid:
@@ -430,6 +483,7 @@ def test_track_with_limits_customer(
                     response_id=rid,
                     client_customer_key=customer,
                 )
+            _debug_print_decrypted_triggered_limits("cust-after-first", ini)
 
             resp = client.responses.create(model=MODEL, input="should fail")
             rid = getattr(resp, "id", None)
@@ -444,6 +498,7 @@ def test_track_with_limits_customer(
                     response_id=rid,
                     client_customer_key=customer,
                 )
+            _debug_print_decrypted_triggered_limits("cust-after-should-fail", ini)
 
             ul_mgr.delete_usage_limit(limit.uuid)
 
@@ -459,6 +514,7 @@ def test_track_with_limits_customer(
                 response_id=rid,
                 client_customer_key=customer,
             )
+            _debug_print_decrypted_triggered_limits("cust-after-delete", ini)
 
         pass
     finally:
