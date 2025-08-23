@@ -40,7 +40,7 @@ resp = wrapper.chat.completions.create(
 )
 print(resp.choices[0].message.content)
 
-wrapper.close()  # flush any queued tracking data
+wrapper.close()  # required only for queued delivery
 ```
 
 The wrapper proxies every attribute on the client, so existing code typically
@@ -120,5 +120,6 @@ bed_wrapper = BedrockWrapper(bed_client)
 bed_wrapper.invoke_model(modelId="anthropic.claude-v2", body={"prompt": "hi"})
 ```
 
-The wrapper's ``close`` method should be invoked during application shutdown to
-ensure any buffered tracking data is delivered.
+Call ``wrapper.close()`` during shutdown when using queue-based delivery
+(``MEM_QUEUE`` or ``PERSISTENT_QUEUE``) to flush buffered tracking data. With
+the default immediate delivery, ``close`` is optional.

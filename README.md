@@ -63,7 +63,8 @@ resp = wrapper.chat.completions.create(
 )
 print(resp.choices[0].message.content)
 
-wrapper.close()  # flush any queued tracking data
+
+wrapper.close()  # optional for immediate delivery; required for queued delivery
 ```
 
 See [LLM wrappers](docs/llm_wrappers.md) for the full list of supported

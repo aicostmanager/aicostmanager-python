@@ -69,7 +69,8 @@ resp = wrapper.chat.completions.create(
     messages=[{"role": "user", "content": "Hello"}],
 )
 print(resp.choices[0].message.content)
-wrapper.close()
+
+wrapper.close()  # required only for queued delivery
 ```
 
 See [LLM Wrappers](llm_wrappers.md) for the full list of supported providers.
