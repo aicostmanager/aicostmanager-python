@@ -15,7 +15,27 @@ def test_tracker_default_immediate_delivery():
         if request.method == "GET":
             return httpx.Response(200, json={})
         received.append(json.loads(request.read().decode()))
-        return httpx.Response(200, json={"ok": True})
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "response_id": "evt1",
+                        "cost_events": [
+                            {
+                                "vendor_id": "openai",
+                                "service_id": "gpt-5-mini",
+                                "cost_unit_id": "token",
+                                "quantity": "1",
+                                "cost_per_unit": "0.0000020",
+                                "cost": "0.000002",
+                            }
+                        ],
+                    }
+                ],
+                "triggered_limits": {},
+            },
+        )
 
     transport = httpx.MockTransport(handler)
     ini = IniManager("ini")
@@ -34,7 +54,27 @@ def test_tracker_mem_queue_delivery():
         if request.method == "GET":
             return httpx.Response(200, json={})
         received.append(json.loads(request.read().decode()))
-        return httpx.Response(200, json={"ok": True})
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "response_id": "evt1",
+                        "cost_events": [
+                            {
+                                "vendor_id": "openai",
+                                "service_id": "gpt-5-mini",
+                                "cost_unit_id": "token",
+                                "quantity": "1",
+                                "cost_per_unit": "0.0000020",
+                                "cost": "0.000002",
+                            }
+                        ],
+                    }
+                ],
+                "triggered_limits": {},
+            },
+        )
 
     transport = httpx.MockTransport(handler)
     ini = IniManager("ini")
@@ -100,7 +140,27 @@ def test_immediate_delivery_retries():
         attempts["count"] += 1
         if attempts["count"] < 3:
             return httpx.Response(500, json={"ok": False})
-        return httpx.Response(200, json={"ok": True})
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "response_id": "evt1",
+                        "cost_events": [
+                            {
+                                "vendor_id": "openai",
+                                "service_id": "gpt-5-mini",
+                                "cost_unit_id": "token",
+                                "quantity": "1",
+                                "cost_per_unit": "0.0000020",
+                                "cost": "0.000002",
+                            }
+                        ],
+                    }
+                ],
+                "triggered_limits": {},
+            },
+        )
 
     transport = httpx.MockTransport(handler)
     ini = IniManager("ini")

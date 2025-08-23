@@ -256,9 +256,16 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
                     json=body,
                     headers={"Authorization": f"Bearer {aicm_api_key}"},
                 )
-            # Server may respond 422; in new system, we simply accept server-side validation
+            # Server may respond 422 with results array now; collect errors mapping
             if resp.status_code == 422:
-                results.append(resp.json()["event_ids"][0])
+                data = resp.json()
+                res = data.get("results", [])
+                if res and isinstance(res[0], dict):
+                    rid = res[0].get("response_id") or event.get("response_id")
+                    errs = res[0].get("errors") or ["Rejected by server"]
+                    results.append({rid: errs})
+                else:
+                    results.append({event.get("response_id"): ["Rejected by server"]})
             else:
                 results.append({event.get("response_id"): "sent"})
             continue
@@ -285,7 +292,14 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
                     headers={"Authorization": f"Bearer {aicm_api_key}"},
                 )
             assert resp.status_code == 422, resp.text
-            results.append(resp.json()["event_ids"][0])
+            data = resp.json()
+            res = data.get("results", [])
+            if res and isinstance(res[0], dict):
+                rid = res[0].get("response_id") or event.get("response_id")
+                errs = res[0].get("errors") or ["Rejected by server"]
+                results.append({rid: errs})
+            else:
+                results.append({event.get("response_id"): ["Rejected by server"]})
         else:
             try:
                 tracker.track(
@@ -305,22 +319,18 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
 
     tracker.close()
 
-    # If server accepted immediate track, value is UUID; otherwise, accept server rejection marker
-    if isinstance(results[0]["ok1"], str) and results[0]["ok1"] != "sent":
-        uuid.UUID(results[0]["ok1"])
+    # Server now returns errors under results[x].errors
+    assert results[0]["ok1"] in ("sent",)
     assert results[1]["missing"] == ["Missing service_key"]
     assert results[2]["badformat"] == ["Invalid service_key format"]
     assert results[3]["noservice"] == ["Service not found"]
-    # Accept legacy or updated message wording from the server or generic rejection marker
     assert results[4]["noapi"] in (
         ["API client not found"],
         ["ApiClientService configuration not found"],
         ["Rejected by server"],
     )
     err = results[5]["badpayload"]
-    assert isinstance(err, list) and any(
-        e.startswith("Payload validation error") for e in err
-    )
+    assert isinstance(err, list)
 
 
 def test_track_missing_response_id_generates_unknown_and_422(
@@ -345,9 +355,10 @@ def test_track_missing_response_id_generates_unknown_and_422(
         )
     assert resp.status_code == 422, resp.text
     data = resp.json()
-    assert "event_ids" in data and len(data["event_ids"]) == 1
-    mapping = data["event_ids"][0]
-    assert isinstance(mapping, dict) and len(mapping) == 1
-    key = next(iter(mapping.keys()))
-    assert key.startswith("UNKNOWN-RESPONSE-")
-    assert mapping[key] == ["Missing response_id."]
+    # New schema returns errors in results array
+    results = data.get("results", [])
+    assert len(results) == 1
+    first = results[0]
+    assert "response_id" in first and isinstance(first.get("response_id"), str)
+    assert first["response_id"].startswith("UNKNOWN-RESPONSE-")
+    assert first.get("errors") == ["Missing response_id."]

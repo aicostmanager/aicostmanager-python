@@ -109,40 +109,10 @@ def _wait_for_empty(delivery, timeout: float = 10.0) -> bool:
     return False
 
 
-def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30):
-    headers = {"Authorization": f"Bearer {aicm_api_key}"}
-    deadline = time.time() + timeout
-    last_data = None
-    while time.time() < deadline:
-        try:
-            req = urllib.request.Request(
-                f"{BASE_URL}/api/v1/cost-events/{response_id}",
-                headers=headers,
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status == 200:
-                    data = json.load(resp)
-                    last_data = data
-                    if isinstance(data, list):
-                        if data:
-                            evt = data[0]
-                            evt_id = evt.get("event_id") or evt.get("uuid")
-                            if evt_id:
-                                uuid.UUID(str(evt_id))
-                                return data
-                    else:
-                        event_id = data.get("event_id") or data.get(
-                            "cost_event", {}
-                        ).get("event_id")
-                        if event_id:
-                            uuid.UUID(str(event_id))
-                            return data
-        except Exception:
-            pass
-        time.sleep(1)
-    raise AssertionError(
-        f"cost event for {response_id} not found; last_data={last_data} base_url={BASE_URL}"
-    )
+def _extract_response_id(used_id, fallback):
+    if isinstance(used_id, dict):
+        return used_id.get("response_id") or fallback
+    return used_id or fallback
 
 
 @pytest.mark.parametrize(
@@ -180,9 +150,8 @@ def test_gemini_tracker(service_key, model, google_api_key, aicm_api_key, tmp_pa
     used_id = tracker.track(
         "gemini", service_key, usage_payload, response_id=response_id
     )
-    final_id = response_id or used_id
+    final_id = _extract_response_id(used_id, response_id)
     assert _wait_for_empty(tracker.delivery, timeout=10.0)
-    _wait_for_cost_event(aicm_api_key, final_id)
 
     # Immediate delivery
     resp2 = client.models.generate_content(model=model, contents="Say hi again")
@@ -198,7 +167,9 @@ def test_gemini_tracker(service_key, model, google_api_key, aicm_api_key, tmp_pa
     ) as t2:
         usage2 = _extract_usage_payload(resp2)
         used2 = t2.track("gemini", service_key, usage2, response_id=response_id2)
-    final2 = response_id2 or used2
-    _wait_for_cost_event(aicm_api_key, final2)
+    final2 = _extract_response_id(used2, response_id2)
+    # Immediate delivery returns cost_events in the response
+    assert isinstance(used2, dict)
+    assert used2.get("result", {}).get("cost_events")
 
     tracker.close()

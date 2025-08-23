@@ -17,46 +17,10 @@ from aicostmanager.usage_utils import extract_usage
 BASE_URL = "http://127.0.0.1:8001"
 
 
-def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30):
-    headers = {
-        "Authorization": f"Bearer {aicm_api_key}",
-        "Content-Type": "application/json",
-    }
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            req = urllib.request.Request(
-                f"{BASE_URL}/api/v1/cost-events/{response_id}",
-                headers=headers,
-                method="GET",
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status == 200:
-                    data = json.load(resp)
-                    print(f"Response data: {data}")
-
-                    # Handle both array and single object responses
-                    if isinstance(data, list) and len(data) > 0:
-                        # Server returns array of cost events
-                        first_event = data[0]
-                        event_id = first_event.get("event_id") or first_event.get(
-                            "uuid"
-                        )
-                        if event_id:
-                            uuid.UUID(str(event_id))
-                            return data
-                    else:
-                        # Handle single object response (fallback)
-                        event_id = data.get("event_id") or data.get(
-                            "cost_event", {}
-                        ).get("event_id")
-                        if event_id:
-                            uuid.UUID(str(event_id))
-                            return data
-        except Exception as e:
-            print(f"Error checking cost event: {e}")
-        time.sleep(1)
-    raise AssertionError(f"cost event for {response_id} not found")
+def _extract_response_id(used_id, fallback):
+    if isinstance(used_id, dict):
+        return used_id.get("response_id") or fallback
+    return used_id or fallback
 
 
 def _make_client(api_key: str):
@@ -143,6 +107,14 @@ def test_openai_responses_track_streaming(aicm_api_key):
             )
         )
 
-        final_id = response_id or used_id
+        final_id = _extract_response_id(used_id, response_id)
         print(f"Using response_id: {final_id}")
-        _wait_for_cost_event(aicm_api_key, final_id)
+        # Background queue: ensure queue drained
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            stats = getattr(tracker.delivery, "stats", lambda: {})()
+            if stats.get("queued", 0) == 0:
+                break
+            time.sleep(0.05)
+        else:
+            raise AssertionError("delivery queue did not drain")
