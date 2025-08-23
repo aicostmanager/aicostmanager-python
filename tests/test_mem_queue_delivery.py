@@ -11,10 +11,19 @@ def test_mem_queue_delivery_sends_and_tracks_stats(tmp_path):
     sent = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "GET":
-            return httpx.Response(200, json={})
         sent.append(json.loads(request.read().decode()))
-        return httpx.Response(200, json={"ok": True})
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "response_id": "r1",
+                        "cost_events": [{"vendor_id": "v", "service_id": "s"}],
+                    }
+                ],
+                "triggered_limits": {},
+            },
+        )
 
     transport = httpx.MockTransport(handler)
     cfg = DeliveryConfig(

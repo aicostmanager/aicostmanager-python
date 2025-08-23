@@ -168,11 +168,7 @@ def test_track_with_limits_immediate(
         # Allow server time to process the limit update and clear triggered limits
         time.sleep(2)
 
-        # Force refresh of triggered limits to clear the cache
-        try:
-            tracker.delivery._refresh_triggered_limits()
-        except Exception:
-            pass
+        # Triggered limits will be refreshed automatically on next track call
 
         resp = client.responses.create(model=MODEL, input="after raise")
         response_id = getattr(resp, "id", None)

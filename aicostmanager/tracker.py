@@ -148,11 +148,12 @@ class Tracker:
         timestamp: str | datetime | None = None,
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """Enqueue a usage record for background delivery.
+    ) -> Any:
+        """Track usage data.
 
-        Returns the ``response_id`` that will be used for this record. If none was
-        provided, a new UUID4 hex value is generated and returned.
+        For immediate delivery, returns a dict with ``result`` and
+        ``triggered_limits`` keys. For queued delivery, returns a dict
+        ``{"queued": <count>}`` indicating the queue length.
         """
         record = self._build_record(
             api_id,
@@ -163,8 +164,10 @@ class Tracker:
             client_customer_key=client_customer_key,
             context=context,
         )
-        self.delivery.enqueue(record)
-        return record["response_id"]
+        result = self.delivery.enqueue(record)
+        if isinstance(result, int):
+            return {"queued": result, "response_id": record["response_id"]}
+        return result
 
     async def track_async(
         self,
@@ -176,7 +179,7 @@ class Tracker:
         timestamp: str | datetime | None = None,
         client_customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
-    ) -> str:
+    ) -> Any:
         return await asyncio.to_thread(
             self.track,
             api_id,
@@ -220,7 +223,7 @@ class Tracker:
             system_key = (
                 f"{vendor_prefix}::{model}" if vendor_prefix and model else model
             )
-            used_response_id = self.track(
+            track_result = self.track(
                 api_id,
                 system_key,
                 usage,
@@ -230,8 +233,12 @@ class Tracker:
                 context=context,
             )
             try:
-                # Attach for caller convenience
-                setattr(response, "aicm_response_id", used_response_id)
+                setattr(
+                    response,
+                    "aicm_response_id",
+                    track_result.get("result", {}).get("response_id"),
+                )
+                setattr(response, "aicm_track_result", track_result)
             except Exception:
                 pass
         return response
