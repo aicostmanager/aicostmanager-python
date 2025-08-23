@@ -42,3 +42,10 @@ class UsageLimitExceeded(AICMError):
             [f"limit {tl.limit_id} ({tl.threshold_type})" for tl in triggered_limits]
         )
         super().__init__(f"Usage limit exceeded: {limit_info}")
+
+
+class NoCostsTrackedException(AICMError):
+    """Raised when /track returns no cost events for immediate delivery."""
+
+    def __init__(self) -> None:
+        super().__init__("No cost events were recorded for the tracked payload")

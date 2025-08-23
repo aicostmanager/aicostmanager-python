@@ -64,9 +64,6 @@ def test_mem_queue_enforce_triggered_limit(tmp_path):
     # Stop background worker to prevent race conditions
     delivery.stop()
 
-    # Mock the refresh method to avoid API call failures
-    delivery._refresh_triggered_limits = lambda: None
-
     payload = {
         "api_id": "openai",
         "service_key": event["service_key"],
@@ -89,9 +86,9 @@ def test_immediate_enforce_triggered_limit(tmp_path):
 
     def fake_post(body, max_attempts):
         called["called"] = True
+        return {"results": [{"response_id": "r1", "cost_events": [{"x": 1}]}], "triggered_limits": {}}
 
     delivery._post_with_retry = fake_post
-    delivery._refresh_triggered_limits = lambda: None
 
     payload = {
         "api_id": "openai",
@@ -111,8 +108,11 @@ def test_triggered_limits_cached_in_memory(tmp_path, monkeypatch):
         ini_manager=IniManager(str(ini)), aicm_api_key=event["api_key_id"]
     )
     delivery = ImmediateDelivery(config)
-    delivery._post_with_retry = lambda body, max_attempts: None
-    delivery._refresh_triggered_limits = lambda: None
+
+    def fake_post(body, max_attempts):
+        return {"results": [{"response_id": "r1", "cost_events": [{"x": 1}]}], "triggered_limits": {}}
+
+    delivery._post_with_retry = fake_post
     payload = {
         "api_id": "openai",
         "service_key": event["service_key"],

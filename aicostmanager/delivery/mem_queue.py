@@ -28,12 +28,13 @@ class MemQueueDelivery(QueueDelivery):
             config, max_attempts=max_attempts, max_retries=max_attempts, **kwargs
         )
 
-    def _enqueue(self, payload: Dict[str, Any]) -> None:
+    def _enqueue(self, payload: Dict[str, Any]) -> int:
         try:
             self._queue.put_nowait(payload)
         except queue.Full:
             self.logger.warning("Delivery queue full")
             self._total_failed += 1
+        return self.queued()
 
     def get_batch(self, max_batch_size: int, *, block: bool = True) -> List[QueueItem]:
         batch: List[QueueItem] = []

@@ -2,8 +2,6 @@ import json
 import os
 import time
 import urllib.request
-import uuid
-
 import pytest
 
 openai = pytest.importorskip("openai")
@@ -13,44 +11,6 @@ from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_usage_from_response
 
 BASE_URL = os.environ.get("AICM_API_BASE", "http://localhost:8001")
-
-
-def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30):
-    """Wait 2s then try a few fetches for a cost event."""
-    headers = {"Authorization": f"Bearer {aicm_api_key}"}
-    time.sleep(2)
-    attempts = 3
-    last_data = None
-    for _ in range(attempts):
-        try:
-            req = urllib.request.Request(
-                f"{BASE_URL}/api/v1/cost-events/{response_id}",
-                headers=headers,
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status == 200:
-                    data = json.load(resp)
-                    last_data = data
-                    if isinstance(data, list):
-                        if data:
-                            evt = data[0]
-                            evt_id = evt.get("event_id") or evt.get("uuid")
-                            if evt_id:
-                                uuid.UUID(str(evt_id))
-                                return data
-                    else:
-                        event_id = data.get("event_id") or data.get(
-                            "cost_event", {}
-                        ).get("event_id")
-                        if event_id:
-                            uuid.UUID(str(event_id))
-                            return data
-        except Exception:
-            pass
-        time.sleep(1)
-    raise AssertionError(
-        f"cost event for {response_id} not found; last_data={last_data} base_url={BASE_URL}"
-    )
 
 
 def _make_openai_client(api_key: str):
@@ -107,10 +67,10 @@ def test_openai_chat_tracker(
         )
         response_id = getattr(resp, "id", None)
         usage_payload = get_usage_from_response(resp, "openai_chat")
-        tracker.track(
+        result = tracker.track(
             "openai_chat", service_key, usage_payload, response_id=response_id
         )
-    _wait_for_cost_event(aicm_api_key, response_id)
+        assert result["result"]["cost_events"]
 
     # Immediate delivery
     resp2 = client.chat.completions.create(
@@ -130,7 +90,7 @@ def test_openai_chat_tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:
         usage2 = get_usage_from_response(resp2, "openai_chat")
-        t2.track("openai_chat", service_key, usage2, response_id=response_id2)
-    _wait_for_cost_event(aicm_api_key, response_id2)
+        result2 = t2.track("openai_chat", service_key, usage2, response_id=response_id2)
+        assert result2["result"]["cost_events"]
 
     # No explicit close needed; context managers handled shutdown

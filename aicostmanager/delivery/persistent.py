@@ -70,14 +70,12 @@ class PersistentDelivery(QueueDelivery):
         now = time.time()
         data = json.dumps(payload)
         with self._lock:
-            cur = self.conn.execute(
+            self.conn.execute(
                 "INSERT INTO queue (payload, status, retry_count, scheduled_at, created_at, updated_at) VALUES (?, 'queued', 0, ?, ?, ?)",
                 (data, now, now, now),
             )
             self.conn.commit()
-            msg_id = cur.lastrowid
-        self.logger.debug("Enqueued message id=%s", msg_id)
-        return msg_id
+        return self.queued()
 
     def get_batch(self, max_batch_size: int, *, block: bool = True) -> List[QueueItem]:
         deadline = time.time() + self.batch_interval if block else time.time()

@@ -12,10 +12,19 @@ def test_tracker_builds_record():
     received = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "GET":
-            return httpx.Response(200, json={})
         received.append(json.loads(request.read().decode()))
-        return httpx.Response(200, json={"ok": True})
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "response_id": "r1",
+                        "cost_events": [{"vendor_id": "v", "service_id": "s"}],
+                    }
+                ],
+                "triggered_limits": {},
+            },
+        )
 
     transport = httpx.MockTransport(handler)
     ini = IniManager("ini")
@@ -35,10 +44,19 @@ def test_tracker_track_async():
     received = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "GET":
-            return httpx.Response(200, json={})
         received.append(json.loads(request.read().decode()))
-        return httpx.Response(200, json={"ok": True})
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "response_id": "r1",
+                        "cost_events": [{"vendor_id": "v", "service_id": "s"}],
+                    }
+                ],
+                "triggered_limits": {},
+            },
+        )
 
     transport = httpx.MockTransport(handler)
     ini = IniManager("ini")

@@ -101,15 +101,46 @@ class ConfigManager:
         self._config["triggered_limits"]["payload"] = json.dumps(data or {})
 
     def write_triggered_limits(self, data: dict) -> None:
-        """Persist ``triggered_limits`` payload to ``AICM.ini``."""
+        """Persist ``triggered_limits`` payload to ``AICM.ini`` if changed."""
+        existing = triggered_limits_cache.get_raw()
+        if existing is None:
+            try:
+                existing = self.read_triggered_limits()
+            except Exception:
+                existing = None
+
+        # Reuse stored public key when new data omits it
+        if data and not data.get("public_key") and existing:
+            pk = existing.get("public_key")
+            if pk:
+                data["public_key"] = pk
+
+        if data == existing:
+            token = data.get("encrypted_payload") if data else None
+            public_key = data.get("public_key") if data else None
+            if token and public_key:
+                payload = self._decode(token, public_key)
+                if payload:
+                    triggered_limits_cache.set(
+                        payload.get("triggered_limits", []), data
+                    )
+                else:
+                    triggered_limits_cache.clear()
+            else:
+                triggered_limits_cache.clear()
+            return
+
         self._set_triggered_limits(data)
         self._write()
+
         token = data.get("encrypted_payload")
         public_key = data.get("public_key")
         if token and public_key:
             payload = self._decode(token, public_key)
             if payload:
-                triggered_limits_cache.set(payload.get("triggered_limits", []))
+                triggered_limits_cache.set(
+                    payload.get("triggered_limits", []), data
+                )
             else:
                 triggered_limits_cache.clear()
         else:

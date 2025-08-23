@@ -153,13 +153,15 @@ def test_deliver_now_single_event_success(aicm_api_key, aicm_api_base):
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path="ini", delivery=delivery
     ) as tracker:
-        tracker.track(
+        result = tracker.track(
             "openai_chat",
             "openai::gpt-5-mini",
             VALID_PAYLOAD,
             response_id="evt1",
             timestamp="2025-01-01T00:00:00Z",
         )
+        assert result["result"]["cost_events"]
+        assert "triggered_limits" in result
 
 
 def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
