@@ -20,17 +20,17 @@ class ImmediateDelivery(Delivery):
         try:
             data = self._post_with_retry(body, max_attempts=3)
             tl_data = data.get("triggered_limits", {}) if isinstance(data, dict) else {}
-            
+
             # Always create a ConfigManager for potential limit checking
             cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=True)
-            
+
             if tl_data:
                 # Write triggered limits to INI if we received any
                 try:
                     cfg.write_triggered_limits(tl_data)
                 except Exception as exc:  # pragma: no cover
                     self.logger.error("Failed to persist triggered limits: %s", exc)
-            
+
             result = {}
             if isinstance(data, dict):
                 results = data.get("results") or []
@@ -41,7 +41,7 @@ class ImmediateDelivery(Delivery):
             )
             if not cost_events:
                 raise NoCostsTrackedException()
-            
+
             # Proactively raise on this call if the server indicates a limit was triggered
             # and limits are enabled
             if self._limits_enabled() and isinstance(tl_data, dict):
