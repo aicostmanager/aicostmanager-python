@@ -70,11 +70,18 @@ class PersistentDelivery(QueueDelivery):
 
         # Create default db_path if none provided
         if db_path is None:
+            # Precedence: INI setting > environment variable > default path
             # Check if db_path was provided in config's INI file
             if hasattr(config, "ini_manager"):
                 ini_db_path = config.ini_manager.get_option("tracker", "AICM_DB_PATH")
                 if ini_db_path:
                     db_path = ini_db_path
+
+            # Fall back to environment variable
+            if db_path is None:
+                env_db_path = os.getenv("AICM_DB_PATH")
+                if env_db_path:
+                    db_path = env_db_path
 
             # If still None, use default cache directory
             if db_path is None:

@@ -31,3 +31,18 @@ def test_persistent_ini_over_env(tmp_path, monkeypatch):
     finally:
         delivery.stop()
 
+
+def test_env_db_path_over_default(tmp_path, monkeypatch):
+    custom_db = tmp_path / "custom_queue.db"
+    monkeypatch.setenv("AICM_DB_PATH", str(custom_db))
+    monkeypatch.setenv("AICM_INI_PATH", str(tmp_path / "AICM.INI"))
+
+    delivery = PersistentDelivery()
+    try:
+        assert delivery.db_path == str(custom_db)
+        from pathlib import Path
+        default_db = Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"
+        assert delivery.db_path != str(default_db)
+    finally:
+        delivery.stop()
+
