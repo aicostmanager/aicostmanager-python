@@ -54,6 +54,25 @@ class PersistentDelivery(QueueDelivery):
                 )
                 """
             )
+        # Reset any in-flight messages and surface existing failures
+        with self.conn:
+            now = time.time()
+            self.conn.execute(
+                "UPDATE queue SET status='queued', scheduled_at=?, updated_at=? WHERE status='processing'",
+                (now, now),
+            )
+            cur = self.conn.execute(
+                "SELECT COUNT(*) FROM queue WHERE status='failed'"
+            )
+            (failed_count,) = cur.fetchone()
+            if failed_count:
+                self.logger.warning(
+                    "%d failed items present in persistent queue. "
+                    "Use PersistentQueueManager('%s') to inspect or requeue. "
+                    "See docs/persistent_queue_manager.md for details.",
+                    failed_count,
+                    self.db_path,
+                )
         self._lock = threading.Lock()
 
         # Start background worker after we are fully initialized

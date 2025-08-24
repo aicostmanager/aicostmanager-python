@@ -24,7 +24,6 @@ from ..logger import create_logger
 
 class DeliveryType(str, Enum):
     IMMEDIATE = "immediate"
-    MEM_QUEUE = "mem_queue"
     PERSISTENT_QUEUE = "persistent_queue"
 
 

@@ -54,7 +54,6 @@ class Tracker:
         )
         max_attempts = int(_get("AICM_MAX_ATTEMPTS", "3"))
         max_retries = int(_get("AICM_MAX_RETRIES", "5"))
-        queue_size = int(_get("AICM_QUEUE_SIZE", "10000"))
         max_batch_size = int(_get("AICM_MAX_BATCH_SIZE", "1000"))
         log_bodies = _get("AICM_LOG_BODIES", "false").lower() in {
             "1",
@@ -95,7 +94,6 @@ class Tracker:
                 batch_interval=batch_interval,
                 max_attempts=max_attempts,
                 max_retries=max_retries,
-                queue_size=queue_size,
                 max_batch_size=max_batch_size,
                 log_bodies=log_bodies,
             )

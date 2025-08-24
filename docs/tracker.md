@@ -26,8 +26,8 @@ The tracker supports multiple delivery strategies selected via `DeliveryType`.
 Set ``AICM_DELIVERY_TYPE`` in ``AICM.INI`` or construct a delivery manually and
 pass it to ``Tracker``. The default ``IMMEDIATE`` mode sends each record
 synchronously with up to three retries for transient errors. Use
-``MEM_QUEUE`` for an in-memory background queue or ``PERSISTENT_QUEUE`` for a
-durable SQLite-backed queue.
+``PERSISTENT_QUEUE`` for a durable SQLite-backed queue with background
+delivery.
 
 Logs will contain entries for enqueued items, attempted deliveries and
 failures, allowing you to verify behaviour during tests or development.

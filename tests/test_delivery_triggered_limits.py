@@ -1,4 +1,5 @@
 import pathlib
+import pathlib
 import time
 
 import jwt
@@ -8,7 +9,6 @@ from aicostmanager.client.exceptions import UsageLimitExceeded
 from aicostmanager.config_manager import ConfigManager
 from aicostmanager.delivery import DeliveryConfig
 from aicostmanager.delivery.immediate import ImmediateDelivery
-from aicostmanager.delivery.mem_queue import MemQueueDelivery
 from aicostmanager.ini_manager import IniManager
 
 PRIVATE_KEY = (pathlib.Path(__file__).parent / "threshold_private_key.pem").read_text()
@@ -51,28 +51,6 @@ def _setup_triggered_limits(ini_path):
     cfg.write_triggered_limits(item)
     IniManager(str(ini_path)).set_option("tracker", "AICM_LIMITS_ENABLED", "true")
     return event
-
-
-def test_mem_queue_enforce_triggered_limit(tmp_path):
-    ini = tmp_path / "AICM.ini"
-    event = _setup_triggered_limits(ini)
-    config = DeliveryConfig(
-        ini_manager=IniManager(str(ini)), aicm_api_key=event["api_key_id"]
-    )
-    delivery = MemQueueDelivery(config)
-
-    # Stop background worker to prevent race conditions
-    delivery.stop()
-
-    payload = {
-        "api_id": "openai",
-        "service_key": event["service_key"],
-        "client_customer_key": event["client_customer_key"],
-        "payload": {},
-    }
-    with pytest.raises(UsageLimitExceeded):
-        delivery.enqueue(payload)
-    assert delivery.queued() == 1
 
 
 def test_immediate_enforce_triggered_limit(tmp_path):
