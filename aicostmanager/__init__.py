@@ -30,6 +30,7 @@ from .wrappers import (
     GeminiWrapper,
     BedrockWrapper,
 )
+from .costs import CostQueryManager
 
 __all__ = [
     "AICMError",
@@ -56,5 +57,6 @@ __all__ = [
     "AnthropicWrapper",
     "GeminiWrapper",
     "BedrockWrapper",
+    "CostQueryManager",
     "__version__",
 ]
