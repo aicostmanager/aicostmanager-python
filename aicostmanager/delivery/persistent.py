@@ -20,8 +20,8 @@ class PersistentDelivery(QueueDelivery):
     def __init__(
         self,
         *,
-        config: DeliveryConfig,
-        db_path: str,
+        config: DeliveryConfig | None = None,
+        db_path: str | None = None,
         poll_interval: float = 0.1,
         batch_interval: float = 0.5,
         max_attempts: int = 3,
@@ -30,6 +30,24 @@ class PersistentDelivery(QueueDelivery):
         max_batch_size: int = 1000,
         logger: logging.Logger | None = None,
     ) -> None:
+        # Create default config if none provided
+        if config is None:
+            from ..ini_manager import IniManager
+
+            ini_manager = IniManager(IniManager.resolve_path(None))
+            config = DeliveryConfig(
+                ini_manager=ini_manager,
+                aicm_api_key=os.getenv("AICM_API_KEY"),
+            )
+
+        # Create default db_path if none provided
+        if db_path is None:
+            from pathlib import Path
+
+            db_path = str(
+                Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"
+            )
+
         # Initialize logger first so we can use it during database setup
         self.logger = logger or create_logger(
             self.__class__.__name__, config.log_file, config.log_level

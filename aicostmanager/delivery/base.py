@@ -86,6 +86,9 @@ class Delivery(ABC):
         def _retryable(exc: Exception) -> bool:
             if isinstance(exc, httpx.HTTPStatusError):
                 return exc.response is None or exc.response.status_code >= 500
+            # Don't retry if client is closed - it won't recover
+            if isinstance(exc, RuntimeError) and "client has been closed" in str(exc):
+                return False
             return True
 
         for attempt in Retrying(
@@ -94,6 +97,11 @@ class Delivery(ABC):
             retry=retry_if_exception(_retryable),
         ):
             with attempt:
+                # Check if client is closed before attempting request
+                if self._client.is_closed:
+                    raise RuntimeError(
+                        "HTTP client has been closed - cannot send request"
+                    )
                 resp = self._client.post(
                     self._endpoint, json=body, headers=self._headers
                 )

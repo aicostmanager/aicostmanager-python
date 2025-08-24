@@ -11,44 +11,91 @@ uv pip install aicostmanager
 pip install aicostmanager
 ```
 
-## Configuration file
+## Environment Configuration
 
-Create an `AICM.INI` file in your project directory:
-
-```ini
-[aicostmanager]
-AICM_API_KEY = sk-api01-...
-# Optional overrides
-AICM_DELIVERY_TYPE = PERSISTENT_QUEUE
-AICM_DB_PATH = ./aicm.db
-```
-
-Expose the path through an environment variable or settings class:
+Set your API key as an environment variable:
 
 ```bash
-export AICM_INI_PATH=/path/to/AICM.INI
+export AICM_API_KEY=sk-api01-...
 ```
 
 ## Application startup and shutdown
 
-Initialise the tracker during startup so configuration loading does not block
-individual requests and close the tracker on shutdown:
+Use FastAPI's lifespan context manager for proper tracker lifecycle management.
+For reliable delivery in web applications, we recommend using `PersistentDelivery`:
 
 ```python
+from contextlib import asynccontextmanager
+import logging
 from fastapi import FastAPI
-from aicostmanager import Tracker
-import os
+from aicostmanager import Tracker, PersistentDelivery
 
-app = FastAPI()
+logger = logging.getLogger(__name__)
 
-@app.on_event("startup")
-async def startup() -> None:
-    ini_path = os.getenv("AICM_INI_PATH")
-    app.state.tracker = Tracker(ini_path=ini_path)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting up AICM tracker...")
+    try:
+        # Create persistent delivery with intelligent defaults
+        # - API key from AICM_API_KEY environment variable
+        # - Database path: ~/.cache/aicostmanager/delivery_queue.db
+        # - All other settings use sensible defaults
+        persistent_delivery = PersistentDelivery()
+        
+        # Create tracker with persistent delivery
+        app.state.tracker = Tracker(delivery=persistent_delivery)
+        logger.info("AICM tracker initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize AICM tracker: {e}")
+        app.state.tracker = None
 
-@app.on_event("shutdown")
-def shutdown() -> None:
-    app.state.tracker.close()
+    yield
+
+    # Shutdown
+    if hasattr(app.state, "tracker") and app.state.tracker:
+        logger.info("Shutting down AICM tracker...")
+        try:
+            app.state.tracker.close()
+            logger.info("AICM tracker closed successfully")
+        except Exception as e:
+            logger.error(f"Error closing AICM tracker: {e}")
+
+# Create FastAPI app with lifespan
+app = FastAPI(lifespan=lifespan)
+```
+
+### Alternative: Simple immediate delivery
+
+For basic use cases where you don't need persistent queuing:
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting up AICM tracker...")
+    try:
+        # Simple tracker with immediate delivery
+        # API key from AICM_API_KEY environment variable
+        app.state.tracker = Tracker()
+        logger.info("AICM tracker initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize AICM tracker: {e}")
+        app.state.tracker = None
+
+    yield
+
+    # Shutdown
+    if hasattr(app.state, "tracker") and app.state.tracker:
+        logger.info("Shutting down AICM tracker...")
+        try:
+            app.state.tracker.close()
+            logger.info("AICM tracker closed successfully")
+        except Exception as e:
+            logger.error(f"Error closing AICM tracker: {e}")
+
+app = FastAPI(lifespan=lifespan)
 ```
 
 ## Recording usage

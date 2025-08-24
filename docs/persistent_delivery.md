@@ -31,8 +31,38 @@ from aicostmanager import PersistentDelivery
 
 payload = {"api_id": "openai", "service_key": "gpt", "payload": {"tokens": 1}}
 
-delivery = PersistentDelivery(aicm_api_key="sk-test", batch_interval=0.5)
+# Simple initialization with defaults
+# - API key from AICM_API_KEY environment variable
+# - Database path: ~/.cache/aicostmanager/delivery_queue.db
+# - Standard configuration defaults
+delivery = PersistentDelivery()
 delivery.enqueue(payload)             # queue for background delivery
+```
+
+### Custom Configuration
+
+You can override defaults as needed:
+
+```python
+# Custom database path
+delivery = PersistentDelivery(db_path="/custom/path/queue.db")
+
+# Custom batch interval and other settings
+delivery = PersistentDelivery(
+    batch_interval=1.0,
+    max_batch_size=500
+)
+
+# Full custom configuration
+from aicostmanager import DeliveryConfig
+from aicostmanager.ini_manager import IniManager
+
+config = DeliveryConfig(
+    ini_manager=IniManager(IniManager.resolve_path(None)),
+    aicm_api_key="sk-custom-key",
+    aicm_api_base="https://custom.endpoint.com"
+)
+delivery = PersistentDelivery(config=config, db_path="/custom/queue.db")
 ```
 
 The queue can be inspected for runtime statistics:

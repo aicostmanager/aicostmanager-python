@@ -22,12 +22,32 @@ Configuration values are read from an ``AICM.INI`` file. See
 
 ## Choosing a delivery manager
 
-The tracker supports multiple delivery strategies selected via `DeliveryType`.
-Set ``AICM_DELIVERY_TYPE`` in ``AICM.INI`` or construct a delivery manually and
-pass it to ``Tracker``. The default ``IMMEDIATE`` mode sends each record
+The tracker supports multiple delivery strategies. The default ``IMMEDIATE`` mode sends each record
 synchronously with up to three retries for transient errors. Use
 ``PERSISTENT_QUEUE`` for a durable SQLite-backed queue with background
 delivery.
+
+### Method 1: Environment variable (simplest)
+```python
+import os
+os.environ['AICM_DELIVERY_TYPE'] = 'PERSISTENT_QUEUE'
+tracker = Tracker()
+```
+
+### Method 2: Direct delivery instance (recommended for web apps)
+```python
+from aicostmanager import PersistentDelivery
+# Simple initialization with intelligent defaults
+persistent_delivery = PersistentDelivery()
+tracker = Tracker(delivery=persistent_delivery)
+```
+
+### Method 3: INI file configuration
+Set ``AICM_DELIVERY_TYPE`` in ``AICM.INI``:
+```ini
+[tracker]
+AICM_DELIVERY_TYPE=PERSISTENT_QUEUE
+```
 
 Logs will contain entries for enqueued items, attempted deliveries and
 failures, allowing you to verify behaviour during tests or development.
@@ -80,19 +100,24 @@ await tracker.track_async("openai", "gpt-5-mini", usage)
 Example FastAPI integration:
 
 ```python
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from aicostmanager import Tracker
+from aicostmanager import Tracker, PersistentDelivery
 
-app = FastAPI()
-tracker = Tracker()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup - use persistent delivery for reliability
+    persistent_delivery = PersistentDelivery()
+    app.state.tracker = Tracker(delivery=persistent_delivery)
+    yield
+    # Shutdown
+    app.state.tracker.close()
 
-@app.on_event("shutdown")
-def shutdown() -> None:
-    tracker.close()
+app = FastAPI(lifespan=lifespan)
 
 @app.post("/track")
 async def track(payload: dict) -> dict:
-    await tracker.track_async("openai", "gpt-5-mini", payload)
+    await app.state.tracker.track_async("openai", "gpt-5-mini", payload)
     return {"status": "queued"}
 ```
 

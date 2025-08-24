@@ -91,9 +91,7 @@ Process sessions one by one with immediate cost tracking:
 
 ```python
 import os
-from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
-from aicostmanager.ini_manager import IniManager
-from aicostmanager.tracker import Tracker
+from aicostmanager import Tracker
 
 def track_heygen_immediate():
     """Track HeyGen sessions using immediate delivery."""
@@ -110,13 +108,9 @@ def track_heygen_immediate():
     sessions = fetch_heygen_sessions(heygen_api_key, limit=50)
     print(f"Found {len(sessions)} closed sessions")
     
-    # Step 2: Configure immediate delivery
-    ini = IniManager("heygen_immediate")
-    dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key=aicm_api_key)
-    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
-    
-    # Step 3: Track each session immediately
-    with Tracker(aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery) as tracker:
+    # Step 2: Track each session immediately
+    # Simple tracker with immediate delivery and API key from environment
+    with Tracker() as tracker:
         for session in sessions:
             result = tracker.track(
                 "heygen",                                      # api_id
@@ -158,19 +152,16 @@ def track_heygen_persistent():
     sessions = fetch_heygen_sessions(heygen_api_key, limit=100)
     print(f"Found {len(sessions)} closed sessions")
     
-    # Step 2: Configure persistent queue delivery
-    ini = IniManager("heygen_persistent")
-    dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key=aicm_api_key)
-    delivery = create_delivery(
-        DeliveryType.PERSISTENT_QUEUE,
-        dconfig,
-        db_path="heygen_queue.db",      # SQLite database for queue
+    # Step 2: Configure persistent queue delivery with custom settings
+    from aicostmanager import PersistentDelivery
+    delivery = PersistentDelivery(
+        db_path="heygen_queue.db",      # SQLite database for queue  
         poll_interval=0.5,              # Check queue every 500ms
         batch_interval=2.0,             # Send batches every 2 seconds
     )
     
     # Step 3: Queue all sessions for background delivery
-    with Tracker(aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery) as tracker:
+    with Tracker(delivery=delivery) as tracker:
         print("Queueing sessions for delivery...")
         
         for session in sessions:
