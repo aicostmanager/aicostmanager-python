@@ -20,7 +20,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://aicostmanager.com"
-Source = "https://github.com/aicostmanager/aicostmanager"
+Source = "https://github.com/aicostmanager/aicostmanager-python"
 
 [tool.setuptools.packages.find]
 where = ["."]
