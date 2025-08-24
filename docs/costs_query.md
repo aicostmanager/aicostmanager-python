@@ -60,6 +60,29 @@ methods for the ``/costs`` API.
    data = manager.list_costs(filters)
    ```
 
+## Using curl
+
+Call the `/costs` endpoint directly with `curl` if you prefer raw HTTP:
+
+```bash
+curl https://api.aicostmanager.com/costs \
+  -H "Authorization: Bearer $AICM_API_KEY" \
+  -G \
+  --data-urlencode "service_key=openai::gpt-4o" \
+  --data-urlencode "limit=50"
+```
+
+Add context filters or date ranges as needed:
+
+```bash
+curl https://api.aicostmanager.com/costs \
+  -H "Authorization: Bearer $AICM_API_KEY" \
+  -G \
+  --data-urlencode "context.project=alpha" \
+  --data-urlencode "start_date=2025-01-01" \
+  --data-urlencode "end_date=2025-01-31"
+```
+
 ## Response data
 
 The API returns a paginated object with the following structure:
