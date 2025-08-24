@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.24] - 2025-01-27
+### Enhanced
+- **HeyGen Integration**: Comprehensive step-by-step documentation (`docs/heygen.md`) covering complete API integration workflow from session retrieval to cost tracking
+- **HeyGen Testing**: Improved test coverage with separate session sets for immediate vs persistent delivery methods to prevent duplicate tracking
+- **Deepgram Support**: Enhanced documentation and testing for websocket transcription and streaming text-to-speech services
+- **Persistent Delivery**: Improved queue management leveraging automatic context manager flushing, reducing manual drainage wait logic while maintaining reliability
+
+### Added
+- Complete HeyGen API integration examples with both immediate and persistent delivery methods
+- Production-ready HeyGen sync functions suitable for cron jobs and scheduled tasks
+- Enhanced error handling and troubleshooting guidance for HeyGen API integration
+- Improved test isolation ensuring each session is tracked only once across delivery types
+
+### Fixed
+- Simplified persistent queue drainage by better utilizing the automatic `stop()`/`close()` behavior in context managers
+- Reduced unnecessary manual timeout logic while maintaining test reliability
+- Updated import organization and code formatting consistency
+
 ## [0.1.23] - 2025-01-27
 ### Fixed
 - `PersistentDelivery` logger initialization issue that caused `AttributeError: 'PersistentDelivery' object has no attribute 'logger'` when accessing the logger during database setup before parent class initialization
