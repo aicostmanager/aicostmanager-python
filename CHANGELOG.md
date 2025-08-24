@@ -2,12 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.1.23] - 2025-01-27
+### Fixed
+- `PersistentDelivery` logger initialization issue that caused `AttributeError: 'PersistentDelivery' object has no attribute 'logger'` when accessing the logger during database setup before parent class initialization
+- Initialize logger early in `PersistentDelivery.__init__()` to ensure it's available for database operations and warning messages about failed queue items
+
 ### Added
 - `track_llm_usage` and `track_llm_usage_async` methods for automatic usage
   extraction from LLM responses, with streaming helpers.
 - `AICM_LIMITS_ENABLED` configuration to toggle triggered limit enforcement in
   delivery components.
+
 
 ## [0.1.18] - 2025-08-11
 ### Added
