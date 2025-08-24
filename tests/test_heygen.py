@@ -126,10 +126,4 @@ def test_heygen_track_persistent(heygen_events, aicm_api_key, aicm_api_base, tmp
                 response_id=event["response_id"],
                 timestamp=event["timestamp"],
             )
-    # Although stop() should be synchronous, add a brief wait to handle any race conditions
-    deadline = time.time() + 5
-    while time.time() < deadline:
-        if delivery.stats().get("queued", 0) == 0:
-            break
-        time.sleep(0.1)
     assert delivery.stats().get("queued", 0) == 0
