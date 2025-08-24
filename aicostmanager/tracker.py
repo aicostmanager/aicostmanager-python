@@ -68,7 +68,6 @@ class Tracker:
         if delivery is not None:
             self.delivery = delivery
             delivery_type = getattr(delivery, "type", None)
-            self._owns_delivery = False
         else:
             if delivery_name:
                 delivery_type = DeliveryType(delivery_name.lower())
@@ -97,7 +96,6 @@ class Tracker:
                 max_batch_size=max_batch_size,
                 log_bodies=log_bodies,
             )
-            self._owns_delivery = True
         if delivery_type is not None:
             self.ini_manager.set_option(
                 "tracker", "AICM_DELIVERY_TYPE", delivery_type.value.upper()
@@ -344,7 +342,20 @@ class Tracker:
         self.close()
 
     def close(self) -> None:
-        # Only stop the delivery if we created/own it. Callers may pass in a
-        # shared delivery instance that they will manage independently.
-        if getattr(self, "_owns_delivery", True):
+        """Release any resources associated with the tracker.
+
+        A ``Tracker`` may be constructed with an explicitly provided delivery
+        instance.  Historically such deliveries were treated as externally
+        managed and were not stopped when the tracker was closed.  This led to
+        surprising behaviour where queued deliveries (like
+        :class:`PersistentDelivery`) could continue running after the tracker
+        context exited, leaving callers unsure when the queue had fully drained.
+
+        To provide predictable shutdown semantics, ``close()`` now always stops
+        the associated delivery instance.  Callers that wish to reuse a single
+        delivery across multiple trackers should manage the delivery lifecycle
+        separately instead of relying on the tracker's context manager.
+        """
+
+        if getattr(self, "delivery", None) is not None:
             self.delivery.stop()

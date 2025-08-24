@@ -39,6 +39,8 @@ class PersistentDelivery(QueueDelivery):
         self.db_path = db_path
         self.poll_interval = poll_interval
         self.log_bodies = log_bodies
+        self._closed = False
+        self._final_stats: Dict[str, Any] | None = None
 
         db_dir = os.path.dirname(self.db_path)
         if db_dir:
@@ -181,5 +183,15 @@ class PersistentDelivery(QueueDelivery):
         return int(count)
 
     def stop(self) -> None:
+        if self._closed:
+            return
         super().stop()
+        # Capture final statistics before closing the underlying database
+        self._final_stats = super().stats()
         self.conn.close()
+        self._closed = True
+
+    def stats(self) -> Dict[str, Any]:
+        if self._closed and self._final_stats is not None:
+            return self._final_stats
+        return super().stats()

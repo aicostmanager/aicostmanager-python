@@ -226,9 +226,4 @@ def test_deepgram_track_persistent(events, aicm_api_key, aicm_api_base, tmp_path
                 response_id=event["response_id"],
                 timestamp=event["timestamp"],
             )
-        deadline = time.time() + 5
-        while time.time() < deadline:
-            if delivery.stats().get("queued", 0) == 0:
-                break
-            time.sleep(0.1)
-        assert delivery.stats().get("queued", 0) == 0
+    assert delivery.stats().get("queued", 0) == 0
