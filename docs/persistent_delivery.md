@@ -21,8 +21,21 @@ Values can be supplied directly or through environment variables and the
 - `AICM_LOG_FILE`
 - `AICM_LOG_LEVEL`
 - `AICM_LOG_BODIES`
+- `AICM_TIMEOUT`
+- `AICM_POLL_INTERVAL`
+- `AICM_BATCH_INTERVAL`
+- `AICM_IMMEDIATE_PAUSE_SECONDS`
+- `AICM_MAX_ATTEMPTS`
+- `AICM_MAX_RETRIES`
+- `AICM_MAX_BATCH_SIZE`
 
-The same options may be placed in a `[delivery]` section inside the INI file.
+The same options may be placed in a `[tracker]` section inside the INI file.
+Standard precedence is:
+
+1. Arguments passed to `PersistentDelivery`
+2. `[tracker]` section in `AICM.INI`
+3. Environment variables
+4. Built-in defaults
 
 ## Basic Usage
 
