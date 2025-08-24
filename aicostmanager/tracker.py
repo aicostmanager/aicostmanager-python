@@ -35,13 +35,13 @@ class Tracker:
         self.aicm_api_key = aicm_api_key or os.getenv("AICM_API_KEY")
 
         def _get(option: str, default: str | None = None) -> str | None:
-            return self.ini_manager.get_option("tracker", option, default)
+            val = self.ini_manager.get_option("tracker", option)
+            if val is not None:
+                return val
+            return os.getenv(option, default)
 
-        # Prefer environment variables if present (tests set AICM_API_BASE)
-        api_base = os.getenv("AICM_API_BASE") or _get(
-            "AICM_API_BASE", "https://aicostmanager.com"
-        )
-        api_url = os.getenv("AICM_API_URL") or _get("AICM_API_URL", "/api/v1")
+        api_base = _get("AICM_API_BASE", "https://aicostmanager.com")
+        api_url = _get("AICM_API_URL", "/api/v1")
         db_path = _get("AICM_DB_PATH")
         log_file = _get("AICM_LOG_FILE")
         log_level = _get("AICM_LOG_LEVEL")
@@ -49,8 +49,7 @@ class Tracker:
         poll_interval = float(_get("AICM_POLL_INTERVAL", "0.1"))
         batch_interval = float(_get("AICM_BATCH_INTERVAL", "0.5"))
         immediate_pause_seconds = float(
-            os.getenv("AICM_IMMEDIATE_PAUSE_SECONDS")
-            or _get("AICM_IMMEDIATE_PAUSE_SECONDS", "5.0")
+            _get("AICM_IMMEDIATE_PAUSE_SECONDS", "5.0")
         )
         max_attempts = int(_get("AICM_MAX_ATTEMPTS", "3"))
         max_retries = int(_get("AICM_MAX_RETRIES", "5"))
