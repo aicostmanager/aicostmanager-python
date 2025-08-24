@@ -8,6 +8,7 @@ import threading
 import time
 from typing import Any, Dict, List
 
+from ..logger import create_logger
 from .base import DeliveryConfig, DeliveryType, QueueDelivery, QueueItem
 
 
@@ -29,6 +30,11 @@ class PersistentDelivery(QueueDelivery):
         max_batch_size: int = 1000,
         logger: logging.Logger | None = None,
     ) -> None:
+        # Initialize logger first so we can use it during database setup
+        self.logger = logger or create_logger(
+            self.__class__.__name__, config.log_file, config.log_level
+        )
+
         # Initialize DB-related attributes and locking BEFORE starting worker thread
         self.db_path = db_path
         self.poll_interval = poll_interval
@@ -61,9 +67,7 @@ class PersistentDelivery(QueueDelivery):
                 "UPDATE queue SET status='queued', scheduled_at=?, updated_at=? WHERE status='processing'",
                 (now, now),
             )
-            cur = self.conn.execute(
-                "SELECT COUNT(*) FROM queue WHERE status='failed'"
-            )
+            cur = self.conn.execute("SELECT COUNT(*) FROM queue WHERE status='failed'")
             (failed_count,) = cur.fetchone()
             if failed_count:
                 self.logger.warning(
@@ -82,7 +86,7 @@ class PersistentDelivery(QueueDelivery):
             max_batch_size=max_batch_size,
             max_attempts=max_attempts,
             max_retries=max_retries,
-            logger=logger,
+            logger=self.logger,  # Pass the logger we already created
         )
 
     def _enqueue(self, payload: Dict[str, Any]) -> int:
