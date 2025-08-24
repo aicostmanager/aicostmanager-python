@@ -76,14 +76,11 @@ providers and advanced usage.
 
 - **Immediate** – send each record synchronously. Ideal for simple scripts or
   tests.
-- **In-memory queue** (`DeliveryType.MEM_QUEUE`) – buffer records in memory and
-  deliver them in the background.
 - **Persistent queue** (`DeliveryType.PERSISTENT_QUEUE`) – durable SQLite-backed
   queue for reliability across restarts.
 
 Use the persistent queue for long-running services where losing usage data is
-unacceptable, the in-memory queue for short-lived apps, and immediate delivery
-when every call can block on the API. See
+unacceptable and immediate delivery when every call can block on the API. See
 [Persistent Delivery](docs/persistent_delivery.md) and the
 [Tracker guide](docs/tracker.md#choosing-a-delivery-manager) for details.
 

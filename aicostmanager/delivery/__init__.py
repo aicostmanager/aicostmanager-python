@@ -1,8 +1,8 @@
 from .base import Delivery, DeliveryConfig, DeliveryType, QueueDelivery
 from .factory import create_delivery
 from .immediate import ImmediateDelivery
-from .mem_queue import MemQueueDelivery
 from .persistent import PersistentDelivery
+from .persistent_queue_manager import PersistentQueueManager
 
 __all__ = [
     "Delivery",
@@ -10,7 +10,7 @@ __all__ = [
     "DeliveryType",
     "create_delivery",
     "ImmediateDelivery",
-    "MemQueueDelivery",
     "PersistentDelivery",
+    "PersistentQueueManager",
     "QueueDelivery",
 ]

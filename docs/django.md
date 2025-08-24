@@ -19,7 +19,7 @@ pip install aicostmanager
 [aicostmanager]
 AICM_API_KEY = sk-api01-...
 # Optional overrides
-AICM_DELIVERY_TYPE = MEM_QUEUE
+AICM_DELIVERY_TYPE = PERSISTENT_QUEUE
 AICM_LOG_FILE = aicm.log
 ```
 

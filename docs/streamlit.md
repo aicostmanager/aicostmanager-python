@@ -18,7 +18,7 @@ Create an `AICM.INI` file next to your Streamlit script:
 [aicostmanager]
 AICM_API_KEY = sk-api01-...
 # Optional overrides
-AICM_DELIVERY_TYPE = MEM_QUEUE
+AICM_DELIVERY_TYPE = PERSISTENT_QUEUE
 ```
 
 Store the path in `.streamlit/secrets.toml` so it is available at runtime:

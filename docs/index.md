@@ -14,6 +14,7 @@ pass it directly to the client or tracker.
 - [Django](django.md) - Integrate with Django projects
 - [FastAPI](fastapi.md) - Integrate with FastAPI applications
 - [Streamlit](streamlit.md) - Track usage from Streamlit apps
+- [Persistent Queue Manager](persistent_queue_manager.md) - Inspect or repair persistent queues
 
 ## Development
 

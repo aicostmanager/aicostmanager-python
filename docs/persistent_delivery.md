@@ -53,3 +53,18 @@ common sensitive fields redacted) by passing `log_bodies=True` when creating
 `AICM_LOG_BODIES`.
 
 See [PersistentDelivery Logging](persistent_delivery_logging.md) for a detailed guide to log configuration and troubleshooting.
+
+## Maintenance
+
+Use `PersistentQueueManager` to inspect queue statistics, examine failures, or
+requeue problematic items:
+
+```python
+from aicostmanager.delivery import PersistentQueueManager
+
+mgr = PersistentQueueManager("/path/to/queue.db")
+print(mgr.stats())
+```
+
+`PersistentDelivery` logs a warning on startup if failed items are present and
+refers to this tool for remediation.

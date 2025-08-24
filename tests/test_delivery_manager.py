@@ -1,4 +1,5 @@
 import json
+import json
 import time
 
 import httpx
@@ -45,57 +46,6 @@ def test_tracker_default_immediate_delivery():
     tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
     assert received and received[0]["tracked"][0]["api_id"] == "openai"
     tracker.close()
-
-
-def test_tracker_mem_queue_delivery():
-    received = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "GET":
-            return httpx.Response(200, json={})
-        received.append(json.loads(request.read().decode()))
-        return httpx.Response(
-            200,
-            json={
-                "results": [
-                    {
-                        "response_id": "evt1",
-                        "cost_events": [
-                            {
-                                "vendor_id": "openai",
-                                "service_id": "gpt-5-mini",
-                                "cost_unit_id": "token",
-                                "quantity": "1",
-                                "cost_per_unit": "0.0000020",
-                                "cost": "0.000002",
-                            }
-                        ],
-                    }
-                ],
-                "triggered_limits": {},
-            },
-        )
-
-    transport = httpx.MockTransport(handler)
-    ini = IniManager("ini")
-    dconfig = DeliveryConfig(
-        ini_manager=ini,
-        aicm_api_key="test",
-        transport=transport,
-    )
-    delivery = create_delivery(
-        DeliveryType.MEM_QUEUE,
-        dconfig,
-        batch_interval=0.1,
-    )
-    tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
-    tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
-    for _ in range(20):
-        if received:
-            break
-        time.sleep(0.1)
-    tracker.close()
-    assert received
 
 
 def test_tracker_persistent_queue_delivery(tmp_path):

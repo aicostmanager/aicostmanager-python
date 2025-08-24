@@ -17,8 +17,8 @@ from .delivery import (
     DeliveryConfig,
     DeliveryType,
     ImmediateDelivery,
-    MemQueueDelivery,
     PersistentDelivery,
+    PersistentQueueManager,
     create_delivery,
 )
 from .limits import BaseLimitManager, TriggeredLimitManager, UsageLimitManager
@@ -45,8 +45,8 @@ __all__ = [
     "create_delivery",
     "DeliveryConfig",
     "ImmediateDelivery",
-    "MemQueueDelivery",
     "PersistentDelivery",
+    "PersistentQueueManager",
     "Tracker",
     "BaseLimitManager",
     "TriggeredLimitManager",

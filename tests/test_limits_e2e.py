@@ -232,9 +232,7 @@ def test_limits_immediate_end_to_end(
     os.environ.get("RUN_NETWORK_TESTS") != "1", reason="requires network access"
 )
 @pytest.mark.usefixtures("clear_triggered_limits")
-@pytest.mark.parametrize(
-    "delivery_type", [DeliveryType.MEM_QUEUE, DeliveryType.PERSISTENT_QUEUE]
-)
+@pytest.mark.parametrize("delivery_type", [DeliveryType.PERSISTENT_QUEUE])
 def test_limits_queue_end_to_end(
     delivery_type, openai_api_key, aicm_api_key, aicm_api_base, tmp_path
 ):
