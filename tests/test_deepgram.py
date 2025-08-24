@@ -1,5 +1,7 @@
 import os
 import time
+from datetime import datetime, timezone
+
 import pytest
 
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
@@ -22,7 +24,9 @@ _SCENARIOS = [
                     "duration": 120,
                     "keywords": [],
                 },
-                "timestamp": "2025-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             }
         ],
     ),
@@ -38,7 +42,9 @@ _SCENARIOS = [
                     "duration": 90,
                     "keywords": ["brand", "product"],
                 },
-                "timestamp": "2025-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             }
         ],
     ),
@@ -53,7 +59,9 @@ _SCENARIOS = [
                     "language": "multi",
                     "duration": 45,
                 },
-                "timestamp": "2025-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             }
         ],
     ),
@@ -68,7 +76,9 @@ _SCENARIOS = [
                     "language": "en",
                     "duration": 30,
                 },
-                "timestamp": "2025-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             }
         ],
     ),
@@ -82,7 +92,9 @@ _SCENARIOS = [
                     "model": "aura-1",
                     "char_count": 500,
                 },
-                "timestamp": "2025-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             }
         ],
     ),
@@ -96,7 +108,9 @@ _SCENARIOS = [
                     "model": "aura-1",
                     "char_count": 2500,
                 },
-                "timestamp": "2025-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             }
         ],
     ),
@@ -110,7 +124,9 @@ _SCENARIOS = [
                     "model": "aura-2",
                     "char_count": 1000,
                 },
-                "timestamp": "2025-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             }
         ],
     ),
@@ -124,7 +140,9 @@ _SCENARIOS = [
                     "model": "aura-2",
                     "char_count": 750,
                 },
-                "timestamp": "2025-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             }
         ],
     ),
@@ -139,7 +157,9 @@ _SCENARIOS = [
                     "language": "en",
                     "duration": 120,
                 },
-                "timestamp": "2025-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             },
             {
                 "response_id": "dg-batch-tts",
@@ -148,14 +168,18 @@ _SCENARIOS = [
                     "model": "aura-1",
                     "char_count": 1500,
                 },
-                "timestamp": "2025-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             },
         ],
     ),
 ]
 
 
-@pytest.mark.parametrize("events", [s[1] for s in _SCENARIOS], ids=[s[0] for s in _SCENARIOS])
+@pytest.mark.parametrize(
+    "events", [s[1] for s in _SCENARIOS], ids=[s[0] for s in _SCENARIOS]
+)
 def test_deepgram_track_immediate(events, aicm_api_key, aicm_api_base, tmp_path):
     ini = IniManager(str(tmp_path / "ini_immediate"))
     dconfig = DeliveryConfig(
@@ -176,7 +200,9 @@ def test_deepgram_track_immediate(events, aicm_api_key, aicm_api_base, tmp_path)
             assert result["result"]["cost_events"]
 
 
-@pytest.mark.parametrize("events", [s[1] for s in _SCENARIOS], ids=[s[0] for s in _SCENARIOS])
+@pytest.mark.parametrize(
+    "events", [s[1] for s in _SCENARIOS], ids=[s[0] for s in _SCENARIOS]
+)
 def test_deepgram_track_persistent(events, aicm_api_key, aicm_api_base, tmp_path):
     ini = IniManager(str(tmp_path / "ini_persistent"))
     dconfig = DeliveryConfig(
