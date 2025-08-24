@@ -71,15 +71,21 @@ def _make_client(region: str):
         ("amazon-bedrock::us.amazon.nova-pro-v1:0", "us.amazon.nova-pro-v1:0"),
     ],
 )
-def test_bedrock_track_non_streaming(service_key, model, aws_region, aicm_api_key):
+def test_bedrock_track_non_streaming(
+    service_key, model, aws_region, aicm_api_key, tmp_path
+):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    ini = IniManager("ini")
+    ini = IniManager(str(tmp_path / "ini"))
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
     )
     delivery = create_delivery(
-        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
+        db_path=str(tmp_path / "bedrock_queue.db"),
+        poll_interval=0.1,
+        batch_interval=0.1,
     )
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
@@ -109,15 +115,21 @@ def test_bedrock_track_non_streaming(service_key, model, aws_region, aicm_api_ke
         ("amazon-bedrock::us.amazon.nova-pro-v1:0", "us.amazon.nova-pro-v1:0"),
     ],
 )
-def test_bedrock_track_streaming(service_key, model, aws_region, aicm_api_key):
+def test_bedrock_track_streaming(
+    service_key, model, aws_region, aicm_api_key, tmp_path
+):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    ini = IniManager("ini2")
+    ini = IniManager(str(tmp_path / "ini2"))
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
     )
     delivery = create_delivery(
-        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
+        db_path=str(tmp_path / "bedrock_streaming_queue.db"),
+        poll_interval=0.1,
+        batch_interval=0.1,
     )
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery

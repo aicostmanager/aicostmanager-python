@@ -23,16 +23,20 @@ def _make_client(api_key: str):
     return openai.OpenAI(api_key=api_key)
 
 
-def test_openai_responses_track_non_streaming(aicm_api_key):
+def test_openai_responses_track_non_streaming(aicm_api_key, tmp_path):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
-    ini = IniManager("ini")
+    ini = IniManager(str(tmp_path / "ini"))
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
     )
     delivery = create_delivery(
-        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
+        db_path=str(tmp_path / "openai_responses_queue.db"),
+        poll_interval=0.1,
+        batch_interval=0.1,
     )
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
@@ -56,16 +60,20 @@ def test_openai_responses_track_non_streaming(aicm_api_key):
             raise AssertionError("delivery queue did not drain")
 
 
-def test_openai_responses_track_streaming(aicm_api_key):
+def test_openai_responses_track_streaming(aicm_api_key, tmp_path):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
-    ini = IniManager("ini2")
+    ini = IniManager(str(tmp_path / "ini2"))
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
     )
     delivery = create_delivery(
-        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
+        db_path=str(tmp_path / "openai_responses_streaming_queue.db"),
+        poll_interval=0.1,
+        batch_interval=0.1,
     )
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery

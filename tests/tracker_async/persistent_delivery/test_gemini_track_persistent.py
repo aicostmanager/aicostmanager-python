@@ -59,15 +59,19 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
     raise AssertionError(f"cost event for {response_id} not found")
 
 
-def test_gemini_track_non_streaming(google_api_key, aicm_api_key):
+def test_gemini_track_non_streaming(google_api_key, aicm_api_key, tmp_path):
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
-    ini = IniManager("ini")
+    ini = IniManager(str(tmp_path / "ini"))
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
     )
     delivery = create_delivery(
-        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
+        db_path=str(tmp_path / "gemini_queue.db"),
+        poll_interval=0.1,
+        batch_interval=0.1,
     )
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
@@ -99,15 +103,19 @@ def test_gemini_track_non_streaming(google_api_key, aicm_api_key):
         _wait_for_cost_event(aicm_api_key, response_id)
 
 
-def test_gemini_track_streaming(google_api_key, aicm_api_key):
+def test_gemini_track_streaming(google_api_key, aicm_api_key, tmp_path):
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
-    ini = IniManager("ini2")
+    ini = IniManager(str(tmp_path / "ini2"))
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
     )
     delivery = create_delivery(
-        DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
+        DeliveryType.PERSISTENT_QUEUE,
+        dconfig,
+        db_path=str(tmp_path / "gemini_streaming_queue.db"),
+        poll_interval=0.1,
+        batch_interval=0.1,
     )
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
