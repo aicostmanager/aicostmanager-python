@@ -1,7 +1,7 @@
 import datetime
 import os
 import time
-from typing import List, Dict
+from typing import Dict, List
 
 import pytest
 import requests
@@ -17,7 +17,7 @@ if os.environ.get("RUN_NETWORK_TESTS") != "1":
     pytestmark = pytest.mark.skip(reason="requires network access")
 
 
-def _fetch_sessions(api_key: str, limit: int = 5) -> List[Dict[str, object]]:
+def _fetch_sessions(api_key: str, limit: int = 10) -> List[Dict[str, object]]:
     """Fetch closed streaming sessions and convert them to track events."""
     start = datetime.datetime(2025, 6, 1, tzinfo=datetime.timezone.utc)
     end = datetime.datetime.now(datetime.timezone.utc)
@@ -70,10 +70,17 @@ def heygen_events():
         pytest.skip(f"HeyGen API call failed: {exc}")
     if not events:
         pytest.skip("No HeyGen sessions found for date range")
+    if len(events) < 10:
+        pytest.skip(
+            f"Need at least 10 HeyGen sessions for testing, found {len(events)}"
+        )
     return events
 
 
 def test_heygen_track_immediate(heygen_events, aicm_api_key, aicm_api_base, tmp_path):
+    # Use first 5 sessions for immediate delivery test
+    immediate_events = heygen_events[:5]
+
     ini = IniManager(str(tmp_path / "heygen_immediate"))
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=aicm_api_base
@@ -82,7 +89,7 @@ def test_heygen_track_immediate(heygen_events, aicm_api_key, aicm_api_base, tmp_
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
-        for event in heygen_events:
+        for event in immediate_events:
             result = tracker.track(
                 "heygen",
                 SERVICE_KEY,
@@ -94,6 +101,9 @@ def test_heygen_track_immediate(heygen_events, aicm_api_key, aicm_api_base, tmp_
 
 
 def test_heygen_track_persistent(heygen_events, aicm_api_key, aicm_api_base, tmp_path):
+    # Use last 5 sessions for persistent delivery test
+    persistent_events = heygen_events[5:10]
+
     ini = IniManager(str(tmp_path / "heygen_persistent"))
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=aicm_api_base
@@ -108,7 +118,7 @@ def test_heygen_track_persistent(heygen_events, aicm_api_key, aicm_api_base, tmp
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
-        for event in heygen_events:
+        for event in persistent_events:
             tracker.track(
                 "heygen",
                 SERVICE_KEY,
@@ -116,9 +126,10 @@ def test_heygen_track_persistent(heygen_events, aicm_api_key, aicm_api_base, tmp
                 response_id=event["response_id"],
                 timestamp=event["timestamp"],
             )
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            if delivery.stats().get("queued", 0) == 0:
-                break
-            time.sleep(0.1)
-        assert delivery.stats().get("queued", 0) == 0
+    # Although stop() should be synchronous, add a brief wait to handle any race conditions
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if delivery.stats().get("queued", 0) == 0:
+            break
+        time.sleep(0.1)
+    assert delivery.stats().get("queued", 0) == 0
