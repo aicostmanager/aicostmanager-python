@@ -8,6 +8,7 @@ from typing import Callable, Dict, List, Optional
 import jwt
 
 from .client import AICMError, CostManagerClient
+from .ini_manager import IniManager
 from .triggered_limits_cache import triggered_limits_cache
 from .utils.ini_utils import atomic_write, file_lock, safe_read_config
 
@@ -59,7 +60,9 @@ class ConfigManager:
             self._get_triggered_limits: Callable[[], dict] = client.get_triggered_limits
         else:
             if ini_path is None:
-                raise ValueError("ini_path must be provided if client is not given")
+                ini_path = IniManager.resolve_path()
+            if not ini_path:
+                raise ValueError("ini_path could not be resolved")
             self.ini_path = ini_path
             self._get_triggered_limits = get_triggered_limits or (lambda: {})
         if load:
