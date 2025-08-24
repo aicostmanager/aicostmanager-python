@@ -28,11 +28,29 @@ pip install aicostmanager
 
 ## Quick start
 
+### Identify the API and service
+
+Every usage event is tied to two identifiers:
+
+- **api_id** – the API being called (for example, the OpenAI Chat API)
+- **service_key** – the specific model or service within that API
+
+1. Visit the [service lookup page](https://aicostmanager.com/services/lookup/) and
+   open the **APIs** tab. Copy the `api_id` for the API you are using, e.g.
+   `openai_chat`.
+2. Switch to the **Services** tab on the same page and copy the full
+   `service_key` for your model, e.g. `openai::gpt-5-mini`.
+
+### Track usage
+
 ```python
 from aicostmanager import Tracker
 
+api_id = "openai_chat"          # copied from the APIs tab
+service_key = "openai::gpt-5-mini"  # copied from the Services tab
+
 with Tracker() as tracker:
-    tracker.track("openai", "gpt-4o-mini", {
+    tracker.track(api_id, service_key, {
         "input_tokens": 10,
         "output_tokens": 20,
     })
