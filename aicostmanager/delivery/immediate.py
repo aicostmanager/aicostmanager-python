@@ -24,18 +24,22 @@ class ImmediateDelivery(Delivery):
             def _get(option: str, default: str | None = None) -> str | None:
                 return ini_manager.get_option("tracker", option, default)
 
-            # Read configuration from environment variables and INI file
-            # Prefer environment variables if present (tests set AICM_API_BASE)
-            api_base = os.getenv("AICM_API_BASE") or _get(
-                "AICM_API_BASE", "https://aicostmanager.com"
+            # Read configuration from INI file, then environment variables, then defaults
+            api_base = (
+                _get("AICM_API_BASE")
+                or os.getenv("AICM_API_BASE")
+                or "https://aicostmanager.com"
             )
-            api_url = os.getenv("AICM_API_URL") or _get("AICM_API_URL", "/api/v1")
-            log_file = _get("AICM_LOG_FILE")
-            log_level = _get("AICM_LOG_LEVEL")
-            timeout = float(_get("AICM_TIMEOUT", "10.0"))
+            api_url = _get("AICM_API_URL") or os.getenv("AICM_API_URL") or "/api/v1"
+            log_file = _get("AICM_LOG_FILE") or os.getenv("AICM_LOG_FILE")
+            log_level = _get("AICM_LOG_LEVEL") or os.getenv("AICM_LOG_LEVEL")
+            timeout = float(
+                _get("AICM_TIMEOUT") or os.getenv("AICM_TIMEOUT") or "10.0"
+            )
             immediate_pause_seconds = float(
-                os.getenv("AICM_IMMEDIATE_PAUSE_SECONDS")
-                or _get("AICM_IMMEDIATE_PAUSE_SECONDS", "5.0")
+                _get("AICM_IMMEDIATE_PAUSE_SECONDS")
+                or os.getenv("AICM_IMMEDIATE_PAUSE_SECONDS")
+                or "5.0"
             )
 
             config = DeliveryConfig(
