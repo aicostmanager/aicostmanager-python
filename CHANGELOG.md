@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.26] - 2025-01-27
+### Enhanced
+- **PersistentDelivery Simplified Initialization**: Major improvement to `PersistentDelivery` constructor making it much easier to use with intelligent defaults
+- **Configuration Management**: Enhanced INI file integration - `PersistentDelivery()` now automatically reads configuration overrides from `AICM.INI` including `AICM_API_BASE`, `AICM_DB_PATH`, timeouts, and logging settings
+- **HTTP Client Error Handling**: Improved error handling in delivery base class to detect and handle closed HTTP clients gracefully, preventing unnecessary retry attempts
+- **FastAPI Integration**: Streamlined FastAPI documentation focusing on modern lifespan context manager patterns with simplified tracker initialization
+
+### Added
+- **Intelligent Defaults**: `PersistentDelivery()` can now be instantiated with zero parameters - automatically uses `AICM_API_KEY` from environment, default database path `~/.cache/aicostmanager/delivery_queue.db`, and reads configuration overrides from INI files
+- **Configuration Priority System**: Clear precedence order - environment variables (highest), INI file settings, hardcoded defaults (fallback)
+- **One-line FastAPI Setup**: Simplified from complex configuration to `PersistentDelivery()` + `Tracker(delivery=persistent_delivery)` pattern
+
+### Changed
+- **Breaking**: FastAPI documentation now focuses only on lifespan context manager (removed deprecated startup/shutdown events since no one is using them yet)
+- **Simplified Examples**: Updated all documentation examples to use new simplified initialization patterns
+- **Better Error Messages**: HTTP client closure errors now provide clearer messages and don't attempt futile retries
+
+### Fixed
+- **Race Condition**: Resolved HTTP client closure issue that occurred when tracker was closed while async operations were still pending
+- **Documentation Consistency**: Updated HeyGen, tracker, and persistent delivery documentation to use new simplified patterns
+
 ## [0.1.24] - 2025-01-27
 ### Enhanced
 - **HeyGen Integration**: Comprehensive step-by-step documentation (`docs/heygen.md`) covering complete API integration workflow from session retrieval to cost tracking

@@ -35,18 +35,50 @@ class PersistentDelivery(QueueDelivery):
             from ..ini_manager import IniManager
 
             ini_manager = IniManager(IniManager.resolve_path(None))
+
+            def _get(option: str, default: str | None = None) -> str | None:
+                return ini_manager.get_option("tracker", option, default)
+
+            # Read configuration from environment variables and INI file
+            # Prefer environment variables if present (tests set AICM_API_BASE)
+            api_base = os.getenv("AICM_API_BASE") or _get(
+                "AICM_API_BASE", "https://aicostmanager.com"
+            )
+            api_url = os.getenv("AICM_API_URL") or _get("AICM_API_URL", "/api/v1")
+            log_file = _get("AICM_LOG_FILE")
+            log_level = _get("AICM_LOG_LEVEL")
+            timeout = float(_get("AICM_TIMEOUT", "10.0"))
+            immediate_pause_seconds = float(
+                os.getenv("AICM_IMMEDIATE_PAUSE_SECONDS")
+                or _get("AICM_IMMEDIATE_PAUSE_SECONDS", "5.0")
+            )
+
             config = DeliveryConfig(
                 ini_manager=ini_manager,
                 aicm_api_key=os.getenv("AICM_API_KEY"),
+                aicm_api_base=api_base,
+                aicm_api_url=api_url,
+                timeout=timeout,
+                log_file=log_file,
+                log_level=log_level,
+                immediate_pause_seconds=immediate_pause_seconds,
             )
 
         # Create default db_path if none provided
         if db_path is None:
-            from pathlib import Path
+            # Check if db_path was provided in config's INI file
+            if hasattr(config, "ini_manager"):
+                ini_db_path = config.ini_manager.get_option("tracker", "AICM_DB_PATH")
+                if ini_db_path:
+                    db_path = ini_db_path
 
-            db_path = str(
-                Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"
-            )
+            # If still None, use default cache directory
+            if db_path is None:
+                from pathlib import Path
+
+                db_path = str(
+                    Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"
+                )
 
         # Initialize logger first so we can use it during database setup
         self.logger = logger or create_logger(
