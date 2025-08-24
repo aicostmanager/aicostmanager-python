@@ -1,6 +1,6 @@
 """Python SDK for the AICostManager API."""
 
-__version__ = "0.1.24"
+__version__ = "0.1.25"
 
 from .client import (
     AICMError,
