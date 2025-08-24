@@ -12,7 +12,43 @@ class ImmediateDelivery(Delivery):
 
     type = DeliveryType.IMMEDIATE
 
-    def __init__(self, config: DeliveryConfig) -> None:
+    def __init__(self, config: DeliveryConfig | None = None) -> None:
+        # Create default config if none provided
+        if config is None:
+            import os
+
+            from ..ini_manager import IniManager
+
+            ini_manager = IniManager(IniManager.resolve_path(None))
+
+            def _get(option: str, default: str | None = None) -> str | None:
+                return ini_manager.get_option("tracker", option, default)
+
+            # Read configuration from environment variables and INI file
+            # Prefer environment variables if present (tests set AICM_API_BASE)
+            api_base = os.getenv("AICM_API_BASE") or _get(
+                "AICM_API_BASE", "https://aicostmanager.com"
+            )
+            api_url = os.getenv("AICM_API_URL") or _get("AICM_API_URL", "/api/v1")
+            log_file = _get("AICM_LOG_FILE")
+            log_level = _get("AICM_LOG_LEVEL")
+            timeout = float(_get("AICM_TIMEOUT", "10.0"))
+            immediate_pause_seconds = float(
+                os.getenv("AICM_IMMEDIATE_PAUSE_SECONDS")
+                or _get("AICM_IMMEDIATE_PAUSE_SECONDS", "5.0")
+            )
+
+            config = DeliveryConfig(
+                ini_manager=ini_manager,
+                aicm_api_key=os.getenv("AICM_API_KEY"),
+                aicm_api_base=api_base,
+                aicm_api_url=api_url,
+                timeout=timeout,
+                log_file=log_file,
+                log_level=log_level,
+                immediate_pause_seconds=immediate_pause_seconds,
+            )
+
         super().__init__(config)
 
     def _enqueue(self, payload: Dict[str, Any]) -> Dict[str, Any]:

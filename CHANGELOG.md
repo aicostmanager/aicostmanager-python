@@ -4,15 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.26] - 2025-01-27
 ### Enhanced
-- **PersistentDelivery Simplified Initialization**: Major improvement to `PersistentDelivery` constructor making it much easier to use with intelligent defaults
-- **Configuration Management**: Enhanced INI file integration - `PersistentDelivery()` now automatically reads configuration overrides from `AICM.INI` including `AICM_API_BASE`, `AICM_DB_PATH`, timeouts, and logging settings
+- **Delivery Classes Simplified Initialization**: Major improvement to both `PersistentDelivery` and `ImmediateDelivery` constructors making them much easier to use with intelligent defaults
+- **Configuration Management**: Enhanced INI file integration - both delivery classes now automatically read configuration overrides from `AICM.INI` including `AICM_API_BASE`, `AICM_DB_PATH`, timeouts, and logging settings
 - **HTTP Client Error Handling**: Improved error handling in delivery base class to detect and handle closed HTTP clients gracefully, preventing unnecessary retry attempts
 - **FastAPI Integration**: Streamlined FastAPI documentation focusing on modern lifespan context manager patterns with simplified tracker initialization
 
 ### Added
-- **Intelligent Defaults**: `PersistentDelivery()` can now be instantiated with zero parameters - automatically uses `AICM_API_KEY` from environment, default database path `~/.cache/aicostmanager/delivery_queue.db`, and reads configuration overrides from INI files
+- **Intelligent Defaults**: Both `PersistentDelivery()` and `ImmediateDelivery()` can now be instantiated with zero parameters - automatically use `AICM_API_KEY` from environment and read configuration overrides from INI files
+- **Consistent API**: Both delivery classes now have identical initialization patterns for easy switching between delivery types
 - **Configuration Priority System**: Clear precedence order - environment variables (highest), INI file settings, hardcoded defaults (fallback)
-- **One-line FastAPI Setup**: Simplified from complex configuration to `PersistentDelivery()` + `Tracker(delivery=persistent_delivery)` pattern
+- **One-line Setup**: Simplified from complex configuration to `DeliveryClass()` + `Tracker(delivery=delivery)` pattern for both delivery types
 
 ### Changed
 - **Breaking**: FastAPI documentation now focuses only on lifespan context manager (removed deprecated startup/shutdown events since no one is using them yet)
