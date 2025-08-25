@@ -12,7 +12,9 @@ class ImmediateDelivery(Delivery):
 
     type = DeliveryType.IMMEDIATE
 
-    def __init__(self, config: DeliveryConfig | None = None) -> None:
+    def __init__(
+        self, config: DeliveryConfig | None = None, *, log_bodies: bool = False
+    ) -> None:
         # Create default config if none provided
         if config is None:
             import os
@@ -33,9 +35,7 @@ class ImmediateDelivery(Delivery):
             api_url = _get("AICM_API_URL") or os.getenv("AICM_API_URL") or "/api/v1"
             log_file = _get("AICM_LOG_FILE") or os.getenv("AICM_LOG_FILE")
             log_level = _get("AICM_LOG_LEVEL") or os.getenv("AICM_LOG_LEVEL")
-            timeout = float(
-                _get("AICM_TIMEOUT") or os.getenv("AICM_TIMEOUT") or "10.0"
-            )
+            timeout = float(_get("AICM_TIMEOUT") or os.getenv("AICM_TIMEOUT") or "10.0")
             immediate_pause_seconds = float(
                 _get("AICM_IMMEDIATE_PAUSE_SECONDS")
                 or os.getenv("AICM_IMMEDIATE_PAUSE_SECONDS")
@@ -54,6 +54,7 @@ class ImmediateDelivery(Delivery):
             )
 
         super().__init__(config)
+        self.log_bodies = log_bodies
 
     def _enqueue(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         body = {self._body_key: [payload]}
