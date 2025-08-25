@@ -68,7 +68,7 @@ def _make_client(region: str):
 def test_bedrock_deliver_now_streaming(service_key, model, aws_region, aicm_api_key):
     if not aws_region:
         pytest.skip("AWS_DEFAULT_REGION not set in .env file")
-    os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    os.environ["AICM_LOG_BODIES"] = "true"
     ini = IniManager("ini")
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
@@ -76,6 +76,8 @@ def test_bedrock_deliver_now_streaming(service_key, model, aws_region, aicm_api_
     delivery = create_delivery(
         DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
     )
+
+    assert delivery.log_bodies
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
@@ -138,6 +140,8 @@ def test_bedrock_deliver_now_streaming(service_key, model, aws_region, aicm_api_
             ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
         )
         delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
+
+        assert delivery2.log_bodies
         with Tracker(
             aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
         ) as t2:

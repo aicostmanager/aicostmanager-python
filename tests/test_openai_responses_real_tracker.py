@@ -35,7 +35,7 @@ def test_openai_responses_tracker(
     if not openai_api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
     # Ensure PersistentDelivery logs request/response bodies from the server
-    os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    os.environ["AICM_LOG_BODIES"] = "true"
     ini = IniManager(str(tmp_path / "ini"))
     dconfig = DeliveryConfig(
         ini_manager=ini,
@@ -48,8 +48,9 @@ def test_openai_responses_tracker(
         db_path=str(tmp_path / "openai_responses_queue.db"),
         poll_interval=0.1,
         batch_interval=0.1,
-        log_bodies=True,
     )
+
+    assert delivery.log_bodies
     tracker = Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     )
@@ -74,6 +75,8 @@ def test_openai_responses_tracker(
         aicm_api_base=BASE_URL,
     )
     delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
+
+    assert delivery2.log_bodies
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:

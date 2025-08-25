@@ -63,12 +63,14 @@ def test_openai_chat_deliver_now_only(service_key, model, key_env, maker, aicm_a
     api_key = os.environ.get(key_env)
     if not api_key:
         pytest.skip(f"{key_env} not set in .env file")
-    os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    os.environ["AICM_LOG_BODIES"] = "true"
     ini = IniManager("ini")
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
     )
     delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+
+    assert delivery.log_bodies
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
