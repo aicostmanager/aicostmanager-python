@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.27] - 2025-01-27
+### Fixed
+- **Critical Test Compatibility**: Fixed missing `log_bodies` attribute in `ImmediateDelivery` class that was causing 35 test failures with `AttributeError: 'ImmediateDelivery' object has no attribute 'log_bodies'`
+- **Delivery Consistency**: Both `ImmediateDelivery` and `PersistentDelivery` now consistently support the `log_bodies` parameter for debugging and troubleshooting
+- **Factory Function**: Updated `create_delivery` factory to properly handle `log_bodies` parameter for immediate delivery, reading from kwargs, environment variables (`AICM_LOG_BODIES` or `AICM_DELIVERY_LOG_BODIES`), with fallback to `False`
+
+### Enhanced
+- **Parameter Compatibility**: `ImmediateDelivery` constructor now accepts `log_bodies: bool = False` parameter for consistency with `PersistentDelivery`
+- **Environment Variable Support**: Both delivery types now respect `AICM_LOG_BODIES` environment variable for enabling request/response body logging
+
 ## [0.1.26] - 2025-01-27
 ### Enhanced
 - **Delivery Classes Simplified Initialization**: Major improvement to both `PersistentDelivery` and `ImmediateDelivery` constructors making them much easier to use with intelligent defaults
