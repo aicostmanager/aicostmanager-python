@@ -60,7 +60,7 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str):
 def test_gemini_deliver_now_streaming(service_key, model, google_api_key, aicm_api_key):
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
-    os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    os.environ["AICM_LOG_BODIES"] = "true"
     ini = IniManager("ini")
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
@@ -68,6 +68,8 @@ def test_gemini_deliver_now_streaming(service_key, model, google_api_key, aicm_a
     delivery = create_delivery(
         DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
     )
+
+    assert delivery.log_bodies
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
@@ -127,6 +129,8 @@ def test_gemini_deliver_now_streaming(service_key, model, google_api_key, aicm_a
                 ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
             )
             delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
+
+            assert delivery2.log_bodies
             with Tracker(
                 aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
             ) as t2:

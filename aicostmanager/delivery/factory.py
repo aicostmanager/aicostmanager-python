@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import os
 
 from .base import Delivery, DeliveryConfig, DeliveryType
 from .immediate import ImmediateDelivery
@@ -31,7 +32,14 @@ def create_delivery(delivery_type: DeliveryType, config: DeliveryConfig, **kwarg
         db_path = kwargs.get("db_path") or str(
             Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"
         )
-        log_bodies = kwargs.get("log_bodies", False)
+        log_bodies = kwargs.get("log_bodies")
+        if log_bodies is None:
+            env_val = os.getenv("AICM_LOG_BODIES") or os.getenv(
+                "AICM_DELIVERY_LOG_BODIES"
+            )
+            log_bodies = str(env_val).lower() in {"1", "true", "yes", "on"}
+        else:
+            log_bodies = bool(log_bodies)
         params = {
             "db_path": db_path,
             "poll_interval": kwargs.get("poll_interval", 0.1),

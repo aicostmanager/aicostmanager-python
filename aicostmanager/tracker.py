@@ -54,7 +54,13 @@ class Tracker:
         max_attempts = int(_get("AICM_MAX_ATTEMPTS", "3"))
         max_retries = int(_get("AICM_MAX_RETRIES", "5"))
         max_batch_size = int(_get("AICM_MAX_BATCH_SIZE", "1000"))
-        log_bodies = _get("AICM_LOG_BODIES", "false").lower() in {
+        # ``AICM_DELIVERY_LOG_BODIES`` was the legacy environment variable name.
+        # Prefer the new ``AICM_LOG_BODIES`` but fall back to the old name for
+        # backward compatibility.
+        log_bodies_val = _get("AICM_LOG_BODIES") or _get(
+            "AICM_DELIVERY_LOG_BODIES", "false"
+        )
+        log_bodies = str(log_bodies_val).lower() in {
             "1",
             "true",
             "yes",

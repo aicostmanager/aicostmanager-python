@@ -46,7 +46,7 @@ def test_openai_chat_tracker(
     api_key = os.environ.get(key_env)
     if not api_key:
         pytest.skip(f"{key_env} not set in .env file")
-    os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    os.environ["AICM_LOG_BODIES"] = "true"
     ini = IniManager(str(tmp_path / "ini"))
     dconfig = DeliveryConfig(
         ini_manager=ini,
@@ -54,6 +54,8 @@ def test_openai_chat_tracker(
         aicm_api_base=BASE_URL,
     )
     delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+
+    assert delivery.log_bodies
     client = maker(api_key)
 
     # Immediate delivery using context manager
@@ -86,6 +88,8 @@ def test_openai_chat_tracker(
         aicm_api_base=BASE_URL,
     )
     delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
+
+    assert delivery2.log_bodies
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:

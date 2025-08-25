@@ -63,7 +63,7 @@ def test_openai_responses_deliver_now_streaming(
 ):
     if not openai_api_key:
         pytest.skip("OPENAI_API_KEY not set in .env file")
-    os.environ["AICM_DELIVERY_LOG_BODIES"] = "true"
+    os.environ["AICM_LOG_BODIES"] = "true"
     ini = IniManager("ini")
     dconfig = DeliveryConfig(
         ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
@@ -71,6 +71,8 @@ def test_openai_responses_deliver_now_streaming(
     delivery = create_delivery(
         DeliveryType.PERSISTENT_QUEUE, dconfig, poll_interval=0.1, batch_interval=0.1
     )
+
+    assert delivery.log_bodies
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery
     ) as tracker:
@@ -107,6 +109,8 @@ def test_openai_responses_deliver_now_streaming(
             ini_manager=ini, aicm_api_key=aicm_api_key, aicm_api_base=BASE_URL
         )
         delivery2 = create_delivery(DeliveryType.IMMEDIATE, dconfig2)
+
+        assert delivery2.log_bodies
         with Tracker(
             aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
         ) as t2:
