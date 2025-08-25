@@ -17,8 +17,37 @@ with Tracker() as tracker:
     ...  # call track() as needed
 ```
 
-Configuration values are read from an ``AICM.INI`` file. See
-[`config.md`](config.md) for the full list of options.
+Configuration values are read from an ``AICM.INI`` file.
+
+### Configuration resolution order
+
+Tracker settings can come from several places. When a value is defined in
+multiple locations, the resolution order is:
+
+1. Arguments passed directly to :class:`Tracker` or a delivery class
+2. Environment variables (``AICM_*``)
+3. Values in ``AICM.INI``
+4. Built-in defaults
+
+For example, an environment variable can override a value stored in the INI
+file:
+
+```ini
+# AICM.INI
+[tracker]
+AICM_TIMEOUT=10.0
+```
+
+```bash
+export AICM_TIMEOUT=5.0
+```
+
+```python
+from aicostmanager import Tracker
+tracker = Tracker()  # Uses a 5 second timeout
+```
+
+See [`config.md`](config.md) for the full list of settings.
 
 ## Choosing a delivery manager
 
