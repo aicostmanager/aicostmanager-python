@@ -102,6 +102,13 @@ unacceptable and immediate delivery when every call can block on the API. See
 [Persistent Delivery](docs/persistent_delivery.md) and the
 [Tracker guide](docs/tracker.md#choosing-a-delivery-manager) for details.
 
+For real-time insight into the persistent queue, run the `queue-monitor`
+command against the SQLite database created by `PersistentDelivery`:
+
+```
+uv run queue-monitor ~/.cache/aicostmanager/delivery_queue.db
+```
+
 ## Tracking in different environments
 
 ### Python scripts

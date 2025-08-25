@@ -22,6 +22,9 @@ dependencies = [
 Homepage = "https://aicostmanager.com"
 Source = "https://github.com/aicostmanager/aicostmanager-python"
 
+[project.scripts]
+queue-monitor = "aicostmanager.queue_monitor:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 exclude = ["tests*", "scripts*", "docs*", "dist*", "build*"]

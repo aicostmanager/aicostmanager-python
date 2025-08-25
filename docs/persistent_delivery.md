@@ -111,3 +111,11 @@ print(mgr.stats())
 
 `PersistentDelivery` logs a warning on startup if failed items are present and
 refers to this tool for remediation.
+
+For real-time monitoring during development, the package includes a small
+`queue-monitor` CLI that continuously prints queue statistics and recent
+failures:
+
+```
+uv run queue-monitor /path/to/queue.db
+```

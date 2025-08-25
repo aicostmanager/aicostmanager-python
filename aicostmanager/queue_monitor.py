@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
-"""Monitor a persistent delivery queue.
+"""Console script for monitoring a persistent delivery queue.
 
-This script polls the SQLite database used by
-:class:`aicostmanager.delivery.PersistentDelivery` and displays
-queue statistics along with recent failures. It is intended for
-manual monitoring in a separate terminal during development.
+This module exposes a :func:`main` function used by the
+``queue-monitor`` entry point. It polls the SQLite database used by
+:class:`aicostmanager.delivery.PersistentDelivery` and displays queue
+statistics along with recent failures. It is intended for manual
+monitoring in a separate terminal during development.
 """
 
 import argparse
