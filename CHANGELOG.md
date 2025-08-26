@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.28] - 2025-01-27
+### Fixed
+- **Critical MagicMock Compatibility**: Resolved infinite recursion issue in usage tracking when using MagicMock objects in tests
+- **Test Stability**: Fixed hanging test `test_openai_chat_wrapper_magicmock_non_streaming` that was causing test timeouts
+- **Usage Serialization**: Enhanced `_to_serializable_dict()` function to safely handle Mock/MagicMock objects without triggering dynamic attribute creation
+
+### Enhanced
+- **Mock Object Detection**: Added early detection of Mock, MagicMock, and AsyncMock objects in usage extraction pipeline
+- **Test Safety**: Improved `_is_unsafe_object()` function to classify mock objects as unsafe for JSON serialization
+- **Developer Experience**: Better testing compatibility for developers using unittest.mock in their LLM wrapper tests
+
+### Added
+- **Comprehensive Mock Testing**: Enhanced test suite with 7 MagicMock compatibility tests covering attribute access, streaming, deep nesting, and callable objects
+- **Safe Mock Handling**: Mock objects now return empty usage dictionaries instead of causing infinite loops during serialization
+
 ## [0.1.27] - 2025-01-27
 ### Fixed
 - **Critical Test Compatibility**: Fixed missing `log_bodies` attribute in `ImmediateDelivery` class that was causing 35 test failures with `AttributeError: 'ImmediateDelivery' object has no attribute 'log_bodies'`
