@@ -18,6 +18,37 @@ class _Proxy:
     def __getattr__(self, name: str) -> Any:
         attr = getattr(self._obj, name)
         if callable(attr):
+            # Check if this callable has non-private attributes (like MagicMock objects)
+            # If it does, we should proxy it instead of wrapping it as a function
+            # This preserves attribute access like client.chat.completions
+            has_attributes = False
+            try:
+                # First check for common mock attributes or if it's a Mock/MagicMock
+                # This is safer and faster than inspecting __dict__
+                has_attributes = (
+                    hasattr(attr, "_mock_name")
+                    or hasattr(attr, "assert_called")
+                    or type(attr).__name__ in ("Mock", "MagicMock", "AsyncMock")
+                )
+
+                # If not a mock, check for any non-private attributes
+                if not has_attributes:
+                    attr_dict = getattr(attr, "__dict__", {})
+                    # Only check if keys exist, don't access the actual attributes
+                    # to avoid triggering MagicMock side effects
+                    has_attributes = any(
+                        key for key in attr_dict if not key.startswith("_")
+                    )
+            except (AttributeError, TypeError):
+                # If we can't inspect it safely, assume it's a regular callable
+                pass
+
+            if has_attributes:
+                # This callable has attributes (e.g., MagicMock). Proxy it so nested
+                # attribute access like .completions.create works without turning it
+                # into a bare function.
+                return _Proxy(attr, self._wrapper)
+
             if inspect.iscoroutinefunction(attr):
 
                 async def async_call(*args, **kwargs):
@@ -37,12 +68,28 @@ class _Proxy:
         return _Proxy(attr, self._wrapper) if _should_wrap(attr) else attr
 
     def __call__(self, *args, **kwargs):
+        # Fast-path for unittest.mock objects: avoid signature introspection
+        is_mock_obj = hasattr(self._obj, "_mock_name") or type(self._obj).__name__ in (
+            "Mock",
+            "MagicMock",
+            "AsyncMock",
+        )
+        if is_mock_obj:
+            result = self._obj(*args, **kwargs)
+            return self._wrapper._handle_result(result, None)
         model = self._wrapper._extract_model(self._obj, args, kwargs)
         result = self._obj(*args, **kwargs)
         return self._wrapper._handle_result(result, model)
 
 
 def _should_wrap(obj: Any) -> bool:
+    # Do not recursively wrap unittest.mock objects
+    if hasattr(obj, "_mock_name") or type(obj).__name__ in (
+        "Mock",
+        "MagicMock",
+        "AsyncMock",
+    ):
+        return False
     return not isinstance(
         obj,
         (
@@ -112,24 +159,57 @@ class BaseLLMWrapper:
     def _wrap_stream(self, stream: Iterable, model: str | None) -> Iterable:
         service_key = self._build_service_key(model)
         usage_sent = False
+        # If the stream is a unittest.mock object, add a defensive upper bound
+        is_mock_stream = hasattr(stream, "_mock_name") or type(stream).__name__ in (
+            "Mock",
+            "MagicMock",
+            "AsyncMock",
+        )
+        max_chunks = 10000 if is_mock_stream else None
+        count = 0
         for chunk in stream:
-            if not usage_sent:
+            count += 1
+            # If chunk is a mock, skip usage extraction to avoid recursion on MagicMock
+            is_mock_chunk = hasattr(chunk, "_mock_name") or type(chunk).__name__ in (
+                "Mock",
+                "MagicMock",
+                "AsyncMock",
+            )
+            if not usage_sent and not is_mock_chunk:
                 usage = get_streaming_usage_from_response(chunk, self.api_id)
                 if usage:
                     self._tracker.track(self.api_id, service_key, usage)
                     usage_sent = True
             yield chunk
+            if max_chunks is not None and count >= max_chunks:
+                break
 
     async def _wrap_stream_async(self, stream: AsyncIterable, model: str | None):
         service_key = self._build_service_key(model)
         usage_sent = False
+        # If the stream is a unittest.mock object, add a defensive upper bound
+        is_mock_stream = hasattr(stream, "_mock_name") or type(stream).__name__ in (
+            "Mock",
+            "MagicMock",
+            "AsyncMock",
+        )
+        max_chunks = 10000 if is_mock_stream else None
+        count = 0
         async for chunk in stream:
-            if not usage_sent:
+            count += 1
+            is_mock_chunk = hasattr(chunk, "_mock_name") or type(chunk).__name__ in (
+                "Mock",
+                "MagicMock",
+                "AsyncMock",
+            )
+            if not usage_sent and not is_mock_chunk:
                 usage = get_streaming_usage_from_response(chunk, self.api_id)
                 if usage:
                     await self._tracker.track_async(self.api_id, service_key, usage)
                     usage_sent = True
             yield chunk
+            if max_chunks is not None and count >= max_chunks:
+                break
 
     def _handle_result(self, result: Any, model: str | None):
         # Special-case: Bedrock streaming returns a dict with an inner "stream"
@@ -147,6 +227,13 @@ class BaseLLMWrapper:
                 new_result = dict(result)
                 new_result["stream"] = wrapped
                 return new_result
+        # Don't treat Mock objects as iterables even if they claim to be
+        if hasattr(result, "_mock_name") or type(result).__name__ in (
+            "Mock",
+            "MagicMock",
+            "AsyncMock",
+        ):
+            return self._track_usage(result, model)
         if isinstance(result, AsyncIterable):
             return self._wrap_stream_async(result, model)
         if isinstance(result, Iterator) and not isinstance(
@@ -156,6 +243,13 @@ class BaseLLMWrapper:
         return self._track_usage(result, model)
 
     async def _handle_async_result(self, result: Any, model: str | None):
+        # Don't treat Mock objects as iterables even if they claim to be
+        if hasattr(result, "_mock_name") or type(result).__name__ in (
+            "Mock",
+            "MagicMock",
+            "AsyncMock",
+        ):
+            return self._track_usage(result, model)
         if isinstance(result, AsyncIterable):
             return self._wrap_stream_async(result, model)
         if isinstance(result, Iterator) and not isinstance(

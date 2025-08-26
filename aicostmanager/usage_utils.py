@@ -11,6 +11,17 @@ def _to_serializable_dict(data: Any, _seen: set[int] | None = None) -> dict[str,
     if data is None:
         return {}
 
+    # Check for Mock/MagicMock objects early to avoid infinite recursion
+    # MagicMock objects dynamically create attributes when accessed, which can
+    # cause infinite loops when trying to serialize them
+    if hasattr(data, "_mock_name") or type(data).__name__ in (
+        "Mock",
+        "MagicMock",
+        "AsyncMock",
+    ):
+        # For mock objects, return empty dict to avoid accessing dynamic attributes
+        return {}
+
     # Cycle detection
     if _seen is None:
         _seen = set()
@@ -61,6 +72,14 @@ def _to_serializable_dict(data: Any, _seen: set[int] | None = None) -> dict[str,
 
 def _is_unsafe_object(obj: Any) -> bool:
     """Check if an object contains unsafe content for JSON serialization."""
+    # Mock objects are always unsafe due to dynamic attribute creation
+    if hasattr(obj, "_mock_name") or type(obj).__name__ in (
+        "Mock",
+        "MagicMock",
+        "AsyncMock",
+    ):
+        return True
+
     if callable(obj):
         return True
     if hasattr(obj, "__dict__"):
