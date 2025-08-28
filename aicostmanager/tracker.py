@@ -64,6 +64,9 @@ class Tracker:
         )
         log_bodies = str(log_bodies_val).lower() in {"1", "true", "yes", "on"}
 
+        raise_on_error_val = _get("AICM_RAISE_ON_ERROR", "true")
+        raise_on_error = str(raise_on_error_val).lower() in {"1", "true", "yes", "on"}
+
         db_path = _get("AICM_DB_PATH", str(ini_dir / "queue.db"))
         delivery_name_cfg = _get("AICM_DELIVERY_TYPE")
 
@@ -107,6 +110,7 @@ class Tracker:
                 max_retries=max_retries,
                 max_batch_size=max_batch_size,
                 log_bodies=log_bodies,
+                raise_on_error=raise_on_error,
             )
         if resolved_type is not None:
             self.ini_manager.set_option(

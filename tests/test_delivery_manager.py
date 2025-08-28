@@ -3,6 +3,7 @@ import json
 import time
 
 import httpx
+import pytest
 
 from aicostmanager import Tracker
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
@@ -144,3 +145,37 @@ def test_immediate_delivery_does_not_retry_client_error():
         pass
     tracker.close()
     assert attempts["count"] == 1
+
+
+def test_immediate_delivery_raises_on_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json={})
+        return httpx.Response(500, json={})
+
+    transport = httpx.MockTransport(handler)
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig, raise_on_error=True)
+    try:
+        with pytest.raises(httpx.HTTPStatusError):
+            delivery.enqueue({"api_id": "openai"})
+    finally:
+        delivery.stop()
+
+
+def test_immediate_delivery_continues_on_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json={})
+        return httpx.Response(500, json={})
+
+    transport = httpx.MockTransport(handler)
+    ini = IniManager("ini")
+    dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
+    delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig, raise_on_error=False)
+    try:
+        result = delivery.enqueue({"api_id": "openai"})
+        assert "error" in result
+    finally:
+        delivery.stop()

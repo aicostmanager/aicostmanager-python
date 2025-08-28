@@ -14,7 +14,11 @@ class ImmediateDelivery(Delivery):
     type = DeliveryType.IMMEDIATE
 
     def __init__(
-        self, config: DeliveryConfig | None = None, *, log_bodies: bool = False
+        self,
+        config: DeliveryConfig | None = None,
+        *,
+        log_bodies: bool = False,
+        raise_on_error: bool | None = None,
     ) -> None:
         # Create default config if none provided
         if config is None:
@@ -49,6 +53,14 @@ class ImmediateDelivery(Delivery):
                 or os.getenv("AICM_IMMEDIATE_PAUSE_SECONDS")
                 or "5.0"
             )
+            raise_on_error_val = (
+                _get("AICM_RAISE_ON_ERROR")
+                or os.getenv("AICM_RAISE_ON_ERROR")
+                or "true"
+            )
+            raise_on_error = (
+                str(raise_on_error_val).lower() in {"1", "true", "yes", "on"}
+            )
 
             config = DeliveryConfig(
                 ini_manager=ini_manager,
@@ -60,9 +72,22 @@ class ImmediateDelivery(Delivery):
                 log_level=log_level,
                 immediate_pause_seconds=immediate_pause_seconds,
             )
+        else:
+            if raise_on_error is None:
+                import os
+
+                val = (
+                    config.ini_manager.get_option("tracker", "AICM_RAISE_ON_ERROR")
+                    if hasattr(config, "ini_manager")
+                    else None
+                )
+                if val is None:
+                    val = os.getenv("AICM_RAISE_ON_ERROR", "true")
+                raise_on_error = str(val).lower() in {"1", "true", "yes", "on"}
 
         super().__init__(config)
         self.log_bodies = log_bodies
+        self.raise_on_error = bool(raise_on_error)
 
     def _enqueue(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         body = {self._body_key: [payload]}
@@ -126,7 +151,9 @@ class ImmediateDelivery(Delivery):
             return {"result": result, "triggered_limits": tl_data}
         except Exception as exc:
             self.logger.exception("Immediate delivery failed: %s", exc)
-            raise
+            if self.raise_on_error:
+                raise
+            return {"result": None, "triggered_limits": {}, "error": str(exc)}
 
     def stop(self) -> None:  # pragma: no cover - nothing to cleanup
         self._client.close()
