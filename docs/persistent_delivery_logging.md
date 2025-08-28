@@ -20,7 +20,7 @@ export AICM_LOG_LEVEL=DEBUG
 
 ### Log Destination
 
-By default logs are written to ``stdout`` via a ``StreamHandler``.  Provide ``log_file`` (or ``AICM_LOG_FILE``) to write to a file instead.  The parent directory is created automatically.
+By default logs are written to ``~/.config/aicostmanager/aicm.log``.  Provide ``log_file`` (or ``AICM_LOG_FILE``) to change the destination.  The parent directory is created automatically.
 
 ```python
 delivery = PersistentDelivery(log_file="/var/log/aicm/delivery.log")

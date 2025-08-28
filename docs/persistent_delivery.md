@@ -17,8 +17,8 @@ Values can be supplied directly or through environment variables and the
 - `AICM_API_KEY`
 - `AICM_API_BASE` (default: `https://aicostmanager.com`)
 - `AICM_API_URL` (default: `/api/v1`)
-- `AICM_DB_PATH`
-- `AICM_LOG_FILE`
+- `AICM_DB_PATH` (default: `~/.config/aicostmanager/queue.db`)
+- `AICM_LOG_FILE` (default: `~/.config/aicostmanager/aicm.log`)
 - `AICM_LOG_LEVEL`
 - `AICM_LOG_BODIES`
 - `AICM_TIMEOUT`

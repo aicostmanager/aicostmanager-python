@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict
+from pathlib import Path
 
 from ..client.exceptions import NoCostsTrackedException, UsageLimitExceeded
 from ..config_manager import ConfigManager
@@ -22,6 +23,7 @@ class ImmediateDelivery(Delivery):
             from ..ini_manager import IniManager
 
             ini_manager = IniManager(IniManager.resolve_path(None))
+            ini_dir = Path(ini_manager.ini_path).resolve().parent
 
             def _get(option: str, default: str | None = None) -> str | None:
                 return ini_manager.get_option("tracker", option, default)
@@ -33,9 +35,15 @@ class ImmediateDelivery(Delivery):
                 or "https://aicostmanager.com"
             )
             api_url = _get("AICM_API_URL") or os.getenv("AICM_API_URL") or "/api/v1"
-            log_file = _get("AICM_LOG_FILE") or os.getenv("AICM_LOG_FILE")
+            log_file = (
+                _get("AICM_LOG_FILE")
+                or os.getenv("AICM_LOG_FILE")
+                or str(ini_dir / "aicm.log")
+            )
             log_level = _get("AICM_LOG_LEVEL") or os.getenv("AICM_LOG_LEVEL")
-            timeout = float(_get("AICM_TIMEOUT") or os.getenv("AICM_TIMEOUT") or "10.0")
+            timeout = float(
+                _get("AICM_TIMEOUT") or os.getenv("AICM_TIMEOUT") or "10.0"
+            )
             immediate_pause_seconds = float(
                 _get("AICM_IMMEDIATE_PAUSE_SECONDS")
                 or os.getenv("AICM_IMMEDIATE_PAUSE_SECONDS")

@@ -56,14 +56,19 @@ synchronously with up to three retries for transient errors. Use
 ``PERSISTENT_QUEUE`` for a durable SQLite-backed queue with background
 delivery.
 
-### Method 1: Environment variable (simplest)
+### Method 1: Constructor argument (highest precedence)
+```python
+tracker = Tracker(delivery_type="PERSISTENT_QUEUE")
+```
+
+### Method 2: Environment variable (simplest)
 ```python
 import os
 os.environ['AICM_DELIVERY_TYPE'] = 'PERSISTENT_QUEUE'
 tracker = Tracker()
 ```
 
-### Method 2: Direct delivery instance (recommended for web apps)
+### Method 3: Direct delivery instance (recommended for web apps)
 ```python
 from aicostmanager import PersistentDelivery
 # Simple initialization with intelligent defaults
@@ -71,7 +76,7 @@ persistent_delivery = PersistentDelivery()
 tracker = Tracker(delivery=persistent_delivery)
 ```
 
-### Method 3: INI file configuration
+### Method 4: INI file configuration
 Set ``AICM_DELIVERY_TYPE`` in ``AICM.INI``:
 ```ini
 [tracker]
