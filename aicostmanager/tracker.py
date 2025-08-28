@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -29,10 +30,12 @@ class Tracker:
         aicm_api_key: str | None = None,
         ini_path: str | None = None,
         delivery: Delivery | None = None,
+        delivery_type: DeliveryType | str | None = None,
     ) -> None:
         self.ini_manager = IniManager(IniManager.resolve_path(ini_path))
         self.ini_path = self.ini_manager.ini_path
         self.aicm_api_key = aicm_api_key or os.getenv("AICM_API_KEY")
+        ini_dir = Path(self.ini_path).resolve().parent
 
         def _get(option: str, default: str | None = None) -> str | None:
             val = self.ini_manager.get_option("tracker", option)
@@ -42,8 +45,7 @@ class Tracker:
 
         api_base = _get("AICM_API_BASE", "https://aicostmanager.com")
         api_url = _get("AICM_API_URL", "/api/v1")
-        db_path = _get("AICM_DB_PATH")
-        log_file = _get("AICM_LOG_FILE")
+        log_file = _get("AICM_LOG_FILE", str(ini_dir / "aicm.log"))
         log_level = _get("AICM_LOG_LEVEL")
         timeout = float(_get("AICM_TIMEOUT", "10.0"))
         poll_interval = float(_get("AICM_POLL_INTERVAL", "0.1"))
@@ -60,26 +62,31 @@ class Tracker:
         log_bodies_val = _get("AICM_LOG_BODIES") or _get(
             "AICM_DELIVERY_LOG_BODIES", "false"
         )
-        log_bodies = str(log_bodies_val).lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-        delivery_name = _get("AICM_DELIVERY_TYPE")
+        log_bodies = str(log_bodies_val).lower() in {"1", "true", "yes", "on"}
+
+        db_path = _get("AICM_DB_PATH", str(ini_dir / "queue.db"))
+        delivery_name_cfg = _get("AICM_DELIVERY_TYPE")
 
         self.logger = create_logger(__name__, log_file, log_level)
 
         if delivery is not None:
             self.delivery = delivery
-            delivery_type = getattr(delivery, "type", None)
+            resolved_type = getattr(delivery, "type", None)
         else:
-            if delivery_name:
-                delivery_type = DeliveryType(delivery_name.lower())
-            elif db_path:
-                delivery_type = DeliveryType.PERSISTENT_QUEUE
+            delivery_name_arg = (
+                delivery_type.value
+                if isinstance(delivery_type, DeliveryType)
+                else delivery_type
+            )
+            if delivery_name_arg is not None:
+                resolved_type = DeliveryType(str(delivery_name_arg).lower())
+            elif delivery_name_cfg:
+                resolved_type = DeliveryType(delivery_name_cfg.lower())
             else:
-                delivery_type = DeliveryType.IMMEDIATE
+                resolved_type = DeliveryType.IMMEDIATE
+
+            final_db_path = db_path if resolved_type == DeliveryType.PERSISTENT_QUEUE else None
+
             dconfig = DeliveryConfig(
                 ini_manager=self.ini_manager,
                 aicm_api_key=self.aicm_api_key,
@@ -91,9 +98,9 @@ class Tracker:
                 immediate_pause_seconds=immediate_pause_seconds,
             )
             self.delivery = create_delivery(
-                delivery_type,
+                resolved_type,
                 dconfig,
-                db_path=db_path,
+                db_path=final_db_path,
                 poll_interval=poll_interval,
                 batch_interval=batch_interval,
                 max_attempts=max_attempts,
@@ -101,9 +108,9 @@ class Tracker:
                 max_batch_size=max_batch_size,
                 log_bodies=log_bodies,
             )
-        if delivery_type is not None:
+        if resolved_type is not None:
             self.ini_manager.set_option(
-                "tracker", "AICM_DELIVERY_TYPE", delivery_type.value.upper()
+                "tracker", "AICM_DELIVERY_TYPE", resolved_type.value.upper()
             )
 
     # ------------------------------------------------------------------

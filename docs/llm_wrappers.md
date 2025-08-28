@@ -45,8 +45,14 @@ wrapper.close()  # required only for queued delivery
 
 The wrapper proxies every attribute on the client, so existing code typically
 requires only one extra line to instantiate the wrapper.  A tracker is created
-internally using the ``AICM_API_KEY`` environment variable.  Pass ``aicm_api_key``
-or ``tracker`` to the wrapper constructor to override this behaviour.
+internally using the ``AICM_API_KEY`` environment variable.  Pass ``aicm_api_key``,
+``delivery_type`` or ``tracker`` to the wrapper constructor to override this
+behaviour.
+
+```python
+# Use a queue-based delivery strategy
+wrapper = OpenAIChatWrapper(client, delivery_type="PERSISTENT_QUEUE")
+```
 
 ## Streaming responses
 

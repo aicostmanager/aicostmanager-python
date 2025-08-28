@@ -6,6 +6,7 @@ import os
 import sqlite3
 import threading
 import time
+from pathlib import Path
 from typing import Any, Dict, List
 
 from ..logger import create_logger
@@ -35,6 +36,7 @@ class PersistentDelivery(QueueDelivery):
             from ..ini_manager import IniManager
 
             ini_manager = IniManager(IniManager.resolve_path(None))
+            ini_dir = Path(ini_manager.ini_path).resolve().parent
 
             def _get(option: str, default: str | None = None) -> str | None:
                 return ini_manager.get_option("tracker", option, default)
@@ -46,7 +48,11 @@ class PersistentDelivery(QueueDelivery):
                 or "https://aicostmanager.com"
             )
             api_url = _get("AICM_API_URL") or os.getenv("AICM_API_URL") or "/api/v1"
-            log_file = _get("AICM_LOG_FILE") or os.getenv("AICM_LOG_FILE")
+            log_file = (
+                _get("AICM_LOG_FILE")
+                or os.getenv("AICM_LOG_FILE")
+                or str(ini_dir / "aicm.log")
+            )
             log_level = _get("AICM_LOG_LEVEL") or os.getenv("AICM_LOG_LEVEL")
             timeout = float(
                 _get("AICM_TIMEOUT") or os.getenv("AICM_TIMEOUT") or "10.0"
@@ -83,13 +89,10 @@ class PersistentDelivery(QueueDelivery):
                 if env_db_path:
                     db_path = env_db_path
 
-            # If still None, use default cache directory
-            if db_path is None:
-                from pathlib import Path
-
-                db_path = str(
-                    Path.home() / ".cache" / "aicostmanager" / "delivery_queue.db"
-                )
+            # If still None, use default path alongside the INI file
+            if db_path is None and hasattr(config, "ini_manager"):
+                ini_dir = Path(config.ini_manager.ini_path).resolve().parent
+                db_path = str(ini_dir / "queue.db")
 
         # Initialize logger first so we can use it during database setup
         self.logger = logger or create_logger(

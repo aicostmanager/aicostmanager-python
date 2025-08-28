@@ -4,6 +4,7 @@ import inspect
 from collections.abc import AsyncIterable, Iterable, Iterator
 from typing import Any
 
+from .delivery import DeliveryType
 from .tracker import Tracker
 from .usage_utils import get_streaming_usage_from_response, get_usage_from_response
 
@@ -118,9 +119,12 @@ class BaseLLMWrapper:
         tracker: Tracker | None = None,
         client_customer_key: str | None = None,
         context: dict[str, Any] | None = None,
+        delivery_type: DeliveryType | str | None = None,
     ) -> None:
         self._client = client
-        self._tracker = tracker or Tracker(aicm_api_key=aicm_api_key)
+        self._tracker = tracker or Tracker(
+            aicm_api_key=aicm_api_key, delivery_type=delivery_type
+        )
         self._proxy = _Proxy(client, self)
         self.client_customer_key = client_customer_key
         self.context = context
