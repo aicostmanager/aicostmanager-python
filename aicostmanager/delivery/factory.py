@@ -61,4 +61,11 @@ def create_delivery(
     else:
         log_bodies = bool(log_bodies)
 
-    return ImmediateDelivery(config, log_bodies=log_bodies)
+    raise_on_error = kwargs.get("raise_on_error")
+    if raise_on_error is None:
+        env_val = os.getenv("AICM_RAISE_ON_ERROR", "true")
+        raise_on_error = str(env_val).lower() in {"1", "true", "yes", "on"}
+    else:
+        raise_on_error = bool(raise_on_error)
+
+    return ImmediateDelivery(config, log_bodies=log_bodies, raise_on_error=raise_on_error)
