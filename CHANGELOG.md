@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.29] - 2025-01-27
+### Added
+- LLM wrappers now accept ``client_customer_key`` and ``context`` at
+  initialization and allow updating them between inferences for tracking.
+- Expanded real wrapper tests to verify per-inference updates across
+  streaming and non-streaming calls.
+
 ## [0.1.28] - 2025-01-27
 ### Fixed
 - **Critical MagicMock Compatibility**: Resolved infinite recursion issue in usage tracking when using MagicMock objects in tests

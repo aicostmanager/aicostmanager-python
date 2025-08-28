@@ -116,10 +116,23 @@ class BaseLLMWrapper:
         *,
         aicm_api_key: str | None = None,
         tracker: Tracker | None = None,
+        client_customer_key: str | None = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         self._client = client
         self._tracker = tracker or Tracker(aicm_api_key=aicm_api_key)
         self._proxy = _Proxy(client, self)
+        self.client_customer_key = client_customer_key
+        self.context = context
+
+    # ------------------------------------------------------------------
+    def set_client_customer_key(self, key: str | None) -> None:
+        """Update the ``client_customer_key`` used for tracking."""
+        self.client_customer_key = key
+
+    def set_context(self, context: dict[str, Any] | None) -> None:
+        """Update the ``context`` dictionary used for tracking."""
+        self.context = context
 
     # ------------------------------------------------------------------
     def _extract_model(self, method: Any, args: tuple, kwargs: dict) -> str | None:
@@ -153,6 +166,8 @@ class BaseLLMWrapper:
                 self._build_service_key(model),
                 usage,
                 response_id=response_id,
+                client_customer_key=self.client_customer_key,
+                context=self.context,
             )
         return response
 
@@ -178,7 +193,13 @@ class BaseLLMWrapper:
             if not usage_sent and not is_mock_chunk:
                 usage = get_streaming_usage_from_response(chunk, self.api_id)
                 if usage:
-                    self._tracker.track(self.api_id, service_key, usage)
+                    self._tracker.track(
+                        self.api_id,
+                        service_key,
+                        usage,
+                        client_customer_key=self.client_customer_key,
+                        context=self.context,
+                    )
                     usage_sent = True
             yield chunk
             if max_chunks is not None and count >= max_chunks:
@@ -205,7 +226,13 @@ class BaseLLMWrapper:
             if not usage_sent and not is_mock_chunk:
                 usage = get_streaming_usage_from_response(chunk, self.api_id)
                 if usage:
-                    await self._tracker.track_async(self.api_id, service_key, usage)
+                    await self._tracker.track_async(
+                        self.api_id,
+                        service_key,
+                        usage,
+                        client_customer_key=self.client_customer_key,
+                        context=self.context,
+                    )
                     usage_sent = True
             yield chunk
             if max_chunks is not None and count >= max_chunks:
