@@ -124,7 +124,6 @@ All notable changes to this project will be documented in this file.
 - Async factory method `Tracker.create_async()` for non-blocking tracker initialization in async applications
 - `Tracker.close()` method for graceful shutdown of background delivery workers
 - Enhanced delivery queue with overflow metrics and configurable discard callbacks
-- Support for `AICM_DELIVERY_ON_FULL` environment variable to control queue overflow behavior globally
 
 ### Enhanced
 - **Manual usage tracking capabilities** with schema-based validation for custom usage scenarios
