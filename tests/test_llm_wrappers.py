@@ -183,7 +183,7 @@ def make_bedrock_client():
     return Client()
 
 
-def test_wrappers_track_usage_non_streaming():
+def test_wrappers_track_non_streaming():
     tracker = DummyTracker()
     cases = [
         (

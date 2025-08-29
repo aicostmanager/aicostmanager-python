@@ -1,39 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from .common import Granularity
-
-
-class ApiUsageRecord(BaseModel):
-    """Individual usage record for /track-usage"""
-
-    config_id: str
-    service_id: str
-    timestamp: str
-    response_id: str
-    usage: Dict[str, Any]
-    base_url: Optional[str] = None
-    client_customer_key: Optional[str] = None
-    context: Optional[Dict[str, Any]] = None
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class ApiUsageRequest(BaseModel):
-    """Request body for /track-usage"""
-
-    usage_records: List[ApiUsageRecord]
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class ApiUsageResponse(BaseModel):
-    event_ids: List[Dict[str, str]]
-    triggered_limits: Dict[str, str]
 
 
 class UsageEvent(BaseModel):

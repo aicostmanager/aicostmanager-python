@@ -106,7 +106,7 @@ Inside route handlers, use the tracker to send usage data:
 from fastapi import Request
 
 @app.post("/track")
-async def track_usage(request: Request) -> dict:
+async def track(request: Request) -> dict:
     payload = await request.json()
     app.state.tracker.track("openai", "gpt-4o-mini", payload)
     return {"status": "queued"}

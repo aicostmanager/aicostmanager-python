@@ -6,8 +6,6 @@ import os
 import requests
 
 from ..models import (
-    ApiUsageRequest,
-    ApiUsageResponse,
     CostUnitOut,
     CustomerFilters,
     CustomerIn,
@@ -124,16 +122,6 @@ class CostManagerClient(BaseClient):
     def get_triggered_limits(self) -> Dict[str, Any]:
         """Fetch triggered limit information from the API."""
         return self._request("GET", "/triggered-limits")
-
-    def track_usage(self, data: ApiUsageRequest | Dict[str, Any]) -> ApiUsageResponse:
-        payload = (
-            data.model_dump(mode="json") if isinstance(data, ApiUsageRequest) else data
-        )
-        resp = self._request("POST", "/track-usage", json=payload)
-        result = ApiUsageResponse.model_validate(resp)
-        # Always update triggered_limits, even if empty - server may have cleared previous limits
-        self._store_triggered_limits(result.triggered_limits or {})
-        return result
 
     def list_usage_events(
         self,

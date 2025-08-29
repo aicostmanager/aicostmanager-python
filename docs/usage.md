@@ -102,7 +102,7 @@ def shutdown() -> None:
 
 
 @app.post("/track")
-async def track_usage(payload: dict) -> dict:
+async def track(payload: dict) -> dict:
     app.state.tracker.track(payload)
     return {"status": "ok"}
 ```
