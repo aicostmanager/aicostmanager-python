@@ -114,9 +114,12 @@ tracker.track(
 ### Triggered limit enforcement
 
 Every delivery mechanism refreshes triggered limit data from the API after
-successfully sending a batch. The decrypted limits are cached in memory and
-persisted to ``AICM.ini`` as a fallback. Enqueued payloads are compared against
-this in-memory cache and
+successfully sending a batch. Triggered limits are matched by API key ID and
+optionally by ``client_customer_key`` and ``service_key``. The service key is
+treated as an opaque value and is **not** split into vendor and service
+components. The decrypted limits are cached in memory and persisted to
+``AICM.ini`` as a fallback. Enqueued payloads are compared against this
+in-memory cache and
 :class:`~aicostmanager.client.exceptions.UsageLimitExceeded` is raised if the
 payload matches a triggered limit. The check occurs *after* the enqueue or
 delivery action so tracking data is never discarded even when a limit has been

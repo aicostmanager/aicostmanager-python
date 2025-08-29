@@ -34,9 +34,8 @@ class TriggeredLimit:
     threshold_type: str
     amount: float
     period: str
-    config_id_list: Optional[List[str]]
-    hostname: Optional[str]
-    service_id: Optional[str]
+    limit_context: Optional[str]
+    limit_message: Optional[str]
     service_key: Optional[str]
     client_customer_key: Optional[str]
     api_key_id: str
@@ -266,8 +265,7 @@ class ConfigManager:
 
     def get_triggered_limits(
         self,
-        service_id: Optional[str] = None,
-        service_vendor: Optional[str] = None,
+        service_key: Optional[str] = None,
         client_customer_key: Optional[str] = None,
     ) -> List[TriggeredLimit]:
         """Return triggered limits for the given parameters."""
@@ -300,34 +298,9 @@ class ConfigManager:
             return []
         results: List[TriggeredLimit] = []
         for event in events:
-            vendor_info = event.get("vendor") or {}
-            vendor_name = vendor_info.get("name")
-            config_ids = vendor_info.get("config_ids")
-            hostname = vendor_info.get("hostname")
-            # Support legacy service_key field in addition to service_id/vendor
-            legacy_service_key = event.get("service_key")
-            legacy_vendor = legacy_service_id = None
-            if isinstance(legacy_service_key, str) and "::" in legacy_service_key:
-                legacy_vendor, legacy_service_id = legacy_service_key.split("::", 1)
-
             matches_service = (
-                (
-                    (
-                        service_id
-                        and (
-                            event.get("service_id") == service_id
-                            or legacy_service_id == service_id
-                        )
-                    )
-                    or (
-                        service_vendor
-                        and (
-                            vendor_name == service_vendor
-                            or legacy_vendor == service_vendor
-                        )
-                    )
-                )
-                if (service_id or service_vendor)
+                (service_key and event.get("service_key") == service_key)
+                if service_key
                 else True
             )
 
@@ -341,13 +314,6 @@ class ConfigManager:
             )
 
             if matches_service and matches_client:
-                # Prefer explicit service_key from event if provided. Fallback
-                # to composing from vendor name and service_id for matching.
-                sk = event.get("service_key")
-                if not sk:
-                    sid_for_key = event.get("service_id") or legacy_service_id
-                    if vendor_name and sid_for_key:
-                        sk = f"{vendor_name}::{sid_for_key}"
                 results.append(
                     TriggeredLimit(
                         event_id=event.get("event_id"),
@@ -355,10 +321,9 @@ class ConfigManager:
                         threshold_type=event.get("threshold_type"),
                         amount=float(event.get("amount", 0)),
                         period=event.get("period"),
-                        config_id_list=config_ids,
-                        hostname=hostname,
-                        service_id=event.get("service_id") or legacy_service_id,
-                        service_key=sk,
+                        limit_context=event.get("limit_context"),
+                        limit_message=event.get("limit_message"),
+                        service_key=event.get("service_key"),
                         client_customer_key=event.get("client_customer_key"),
                         api_key_id=event.get("api_key_id"),
                         triggered_at=event.get("triggered_at"),

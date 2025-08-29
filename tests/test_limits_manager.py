@@ -61,6 +61,9 @@ def test_update_and_check(monkeypatch, tmp_path):
     stored = cfg_mgr.read_triggered_limits()
     assert stored.get("encrypted_payload") == item["encrypted_payload"]
 
+    cfg_matches = cfg_mgr.get_triggered_limits(service_key=event["service_key"])
+    assert len(cfg_matches) == 1
+
     matches = tl_mgr.check_triggered_limits(
         api_key_id=event["api_key_id"], service_key=event["service_key"]
     )
