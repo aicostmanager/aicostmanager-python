@@ -118,22 +118,11 @@ class Delivery(ABC):
         # Use file-backed ConfigManager to avoid incidental GETs that could stale/clear state
         cfg = ConfigManager(ini_path=self.ini_manager.ini_path, load=False)
         service_key = payload.get("service_key")
-        vendor = service_id = None
-        if service_key and "::" in service_key:
-            vendor, service_id = service_key.split("::", 1)
-        elif service_key:
-            service_id = service_key
         client_customer_key = payload.get("client_customer_key")
-        # Prefer matching on full service_key; fall back to service_id/vendor filtering
         limits = cfg.get_triggered_limits(
-            service_id=service_id,
-            service_vendor=vendor,
+            service_key=service_key,
             client_customer_key=client_customer_key,
         )
-        if service_key:
-            limits = [
-                l for l in limits if getattr(l, "service_key", None) == service_key
-            ]
         # Match against the API key ID used by the server (typically the UUID
         # suffix of the API key string "....<uuid>"). Fallback to the full
         # key if no dot is present for compatibility with older formats.
@@ -147,14 +136,9 @@ class Delivery(ABC):
         if limits:
             # Recompute with latest state (limits may have been updated by recent track)
             limits = cfg.get_triggered_limits(
-                service_id=service_id,
-                service_vendor=vendor,
+                service_key=service_key,
                 client_customer_key=client_customer_key,
             )
-            if service_key:
-                limits = [
-                    l for l in limits if getattr(l, "service_key", None) == service_key
-                ]
             if api_key_id:
                 limits = [l for l in limits if l.api_key_id == api_key_id]
             if limits:

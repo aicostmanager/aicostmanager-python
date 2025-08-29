@@ -123,22 +123,10 @@ class ImmediateDelivery(Delivery):
                 cfg_limits = cfg
                 request_service_key = payload.get("service_key")
                 client_customer_key = payload.get("client_customer_key")
-                vendor = service_id = None
-                if isinstance(request_service_key, str) and "::" in request_service_key:
-                    vendor, service_id = request_service_key.split("::", 1)
-                elif isinstance(request_service_key, str):
-                    service_id = request_service_key
                 limits = cfg_limits.get_triggered_limits(
-                    service_id=service_id,
-                    service_vendor=vendor,
+                    service_key=request_service_key,
                     client_customer_key=client_customer_key,
                 )
-                if request_service_key:
-                    limits = [
-                        l
-                        for l in limits
-                        if getattr(l, "service_key", None) == request_service_key
-                    ]
                 api_key_id = (
                     self.api_key.split(".")[-1]
                     if self.api_key and "." in self.api_key
