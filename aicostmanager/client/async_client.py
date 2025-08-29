@@ -5,8 +5,6 @@ from typing import Any, AsyncIterator, Dict, Iterable, Optional
 import httpx
 
 from ..models import (
-    ApiUsageRequest,
-    ApiUsageResponse,
     CostUnitOut,
     CustomerFilters,
     CustomerIn,
@@ -100,18 +98,6 @@ class AsyncCostManagerClient(BaseClient):
     async def get_triggered_limits(self) -> Dict[str, Any]:
         """Asynchronously fetch triggered limit information."""
         return await self._request("GET", "/triggered-limits")
-
-    async def track_usage(
-        self, data: ApiUsageRequest | Dict[str, Any]
-    ) -> ApiUsageResponse:
-        payload = (
-            data.model_dump(mode="json") if isinstance(data, ApiUsageRequest) else data
-        )
-        resp = await self._request("POST", "/track-usage", json=payload)
-        result = ApiUsageResponse.model_validate(resp)
-        # Always update triggered_limits, even if empty - server may have cleared previous limits
-        self._store_triggered_limits(result.triggered_limits or {})
-        return result
 
     async def list_usage_events(
         self,

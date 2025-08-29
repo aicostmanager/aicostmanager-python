@@ -9,9 +9,6 @@ from .common import (
     ValidationError,
 )
 from .usage import (
-    ApiUsageRecord,
-    ApiUsageRequest,
-    ApiUsageResponse,
     RollupFilters,
     UsageEvent,
     UsageEventFilters,
@@ -30,9 +27,6 @@ __all__ = [
     "Period",
     "ThresholdType",
     "ValidationError",
-    "ApiUsageRecord",
-    "ApiUsageRequest",
-    "ApiUsageResponse",
     "RollupFilters",
     "UsageEvent",
     "UsageEventFilters",
