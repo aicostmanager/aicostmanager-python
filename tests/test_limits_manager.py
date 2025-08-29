@@ -17,7 +17,7 @@ PRIVATE_KEY = (pathlib.Path(__file__).parent / "threshold_private_key.pem").read
 PUBLIC_KEY = (pathlib.Path(__file__).parent / "threshold_public_key.pem").read_text()
 
 
-def _make_triggered_limits():
+def _make_triggered_limits(payload_user: str | None = None, event_user: str | None = None):
     now = int(time.time())
     event = {
         "event_id": "evt-api-key-limit",
@@ -33,6 +33,8 @@ def _make_triggered_limits():
         "triggered_at": "2024-12-31T18:00:00Z",
         "expires_at": "2025-01-01T18:00:00Z",
     }
+    if event_user:
+        event["user"] = event_user
     payload = {
         "iss": "aicm-api",
         "sub": "550e8400-e29b-41d4-a716-446655440000",
@@ -43,7 +45,14 @@ def _make_triggered_limits():
         "triggered_limits": [event],
     }
     token = jwt.encode(payload, PRIVATE_KEY, algorithm="RS256", headers={"kid": "test"})
-    item = {"version": "v1", "public_key": PUBLIC_KEY, "key_id": "test", "encrypted_payload": token}
+    item = {
+        "version": "v1",
+        "public_key": PUBLIC_KEY,
+        "key_id": "test",
+        "encrypted_payload": token,
+    }
+    if payload_user:
+        item["user"] = payload_user
     return item, event
 
 
@@ -77,6 +86,33 @@ def test_update_and_check(monkeypatch, tmp_path):
 
     wrong_api = tl_mgr.check_triggered_limits(api_key_id="different")
     assert wrong_api == []
+
+
+def test_triggered_limit_user_filter(monkeypatch, tmp_path):
+    ini = tmp_path / "AICM.ini"
+    client = CostManagerClient(aicm_api_key="sk-test", aicm_ini_path=str(ini))
+    cfg_mgr = ConfigManager(client)
+    tl_mgr = TriggeredLimitManager(client, cfg_mgr)
+
+    item, event = _make_triggered_limits(
+        payload_user="user@example.com", event_user="user@example.com"
+    )
+    monkeypatch.setattr(client, "get_triggered_limits", lambda: item)
+    tl_mgr.update_triggered_limits()
+    matches = tl_mgr.check_triggered_limits(
+        api_key_id=event["api_key_id"], service_key=event["service_key"]
+    )
+    assert len(matches) == 1
+
+    item, event = _make_triggered_limits(
+        payload_user="other@example.com", event_user="user@example.com"
+    )
+    monkeypatch.setattr(client, "get_triggered_limits", lambda: item)
+    tl_mgr.update_triggered_limits()
+    matches = tl_mgr.check_triggered_limits(
+        api_key_id=event["api_key_id"], service_key=event["service_key"]
+    )
+    assert matches == []
 
 
 def test_usage_limit_management(monkeypatch, tmp_path):
