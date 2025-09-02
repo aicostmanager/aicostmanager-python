@@ -95,6 +95,7 @@ class Delivery(ABC):
             stop=stop_after_attempt(max_attempts),
             wait=wait_exponential_jitter(),
             retry=retry_if_exception(_retryable),
+            reraise=True,
         ):
             with attempt:
                 # Check if client is closed before attempting request
