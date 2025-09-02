@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.30] - 2025-09-02
+### Added
+- User-specific triggered limits support for enhanced limit management
+- Configurable error handling for immediate delivery with `on_failure` parameter
+- Dynamic context and client customer key support for LLM wrappers
+- Service key-based triggered limits testing and validation
+
+### Enhanced
+- **Retry Logic**: Added `reraise=True` parameter to delivery retry mechanism for better error propagation
+- **Triggered Limits**: Enhanced triggered limits cache to handle user-specific limits alongside service-based limits
+- **Error Handling**: Immediate delivery now supports configurable failure handling (raise, log, or ignore)
+- **LLM Wrappers**: Expanded support for dynamic context updates between API calls
+- **Testing**: Comprehensive test coverage for service key-based triggered limits and delivery type forwarding
+
+### Removed
+- **Legacy Endpoints**: Removed deprecated track-usage endpoint and related models for cleaner API surface
+- **Outdated Configuration**: Cleaned up references to `AICM_DELIVERY_ON_FULL` environment variable
+
+### Fixed
+- **Delivery Configuration**: Improved delivery type forwarding and configuration precedence
+- **Test Coverage**: Enhanced wrapper delivery type forwarding tests
+
 ## [0.1.29] - 2025-01-27
 ### Added
 - LLM wrappers now accept ``client_customer_key`` and ``context`` at
