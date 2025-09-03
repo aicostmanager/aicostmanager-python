@@ -50,9 +50,7 @@ class Tracker:
         timeout = float(_get("AICM_TIMEOUT", "10.0"))
         poll_interval = float(_get("AICM_POLL_INTERVAL", "0.1"))
         batch_interval = float(_get("AICM_BATCH_INTERVAL", "0.5"))
-        immediate_pause_seconds = float(
-            _get("AICM_IMMEDIATE_PAUSE_SECONDS", "5.0")
-        )
+        immediate_pause_seconds = float(_get("AICM_IMMEDIATE_PAUSE_SECONDS", "5.0"))
         max_attempts = int(_get("AICM_MAX_ATTEMPTS", "3"))
         max_retries = int(_get("AICM_MAX_RETRIES", "5"))
         max_batch_size = int(_get("AICM_MAX_BATCH_SIZE", "1000"))
@@ -88,7 +86,9 @@ class Tracker:
             else:
                 resolved_type = DeliveryType.IMMEDIATE
 
-            final_db_path = db_path if resolved_type == DeliveryType.PERSISTENT_QUEUE else None
+            final_db_path = (
+                db_path if resolved_type == DeliveryType.PERSISTENT_QUEUE else None
+            )
 
             dconfig = DeliveryConfig(
                 ini_manager=self.ini_manager,
@@ -116,6 +116,19 @@ class Tracker:
             self.ini_manager.set_option(
                 "tracker", "AICM_DELIVERY_TYPE", resolved_type.value.upper()
             )
+
+        # Instance-level tracking metadata
+        self.client_customer_key: Optional[str] = None
+        self.context: Optional[Dict[str, Any]] = None
+
+    # ------------------------------------------------------------------
+    def set_client_customer_key(self, key: str | None) -> None:
+        """Update the ``client_customer_key`` used for tracking."""
+        self.client_customer_key = key
+
+    def set_context(self, context: Dict[str, Any] | None) -> None:
+        """Update the ``context`` dictionary used for tracking."""
+        self.context = context
 
     # ------------------------------------------------------------------
     def _build_record(
