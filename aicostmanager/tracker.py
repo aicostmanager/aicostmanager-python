@@ -180,6 +180,12 @@ class Tracker:
         ``triggered_limits`` keys. For queued delivery, returns a dict
         ``{"queued": <count>}`` indicating the queue length.
         """
+        # Use instance-level values as fallbacks if parameters are None
+        if client_customer_key is None:
+            client_customer_key = self.client_customer_key
+        if context is None:
+            context = self.context
+
         record = self._build_record(
             api_id,
             system_key,

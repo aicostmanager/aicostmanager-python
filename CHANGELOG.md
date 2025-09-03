@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.33] - 2025-01-27
+### Added
+- **Automatic Fallback Values**: `track()` and `track_async()` methods now automatically use instance-level `client_customer_key` and `context` values when no explicit parameters are provided, eliminating the need to pass these parameters on every call
+
+### Enhanced
+- **Parameter Override Support**: Explicit method parameters take precedence over instance-level values when provided
+- **Developer Experience**: Significantly simplified metadata management for users who want to set customer context once per tracker instance rather than per tracking call
+
 ## [0.1.32] - 2025-01-27
 ### Added
 - **Tracker Instance-Level Metadata**: Added `set_client_customer_key()` and `set_context()` methods to the base `Tracker` class for storing customer key and context information at the instance level
