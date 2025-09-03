@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.31] - 2025-09-03
+### Added
+- **Gemini 2.0 Flash Support**: Added comprehensive support for `gemini-2.0-flash` model across all Gemini tests and usage tracking
+- **Enhanced Gemini Usage Fields**: Added support for advanced Gemini usage fields including:
+  - `cachedContentTokenCount` - tokens served from cache
+  - `toolUsePromptTokenCount` - tokens used for tool/function calling
+  - `thoughtsTokenCount` - tokens used for model thinking/reasoning
+  - `promptTokensDetails` - per-modality token breakdown for prompts
+  - `candidatesTokensDetails` - per-modality token breakdown for responses
+  - `cacheTokensDetails` - detailed cache token usage
+- **Modality Token Count Serialization**: Added handling for `ModalityTokenCount` objects in Gemini API responses with proper JSON serialization
+
+### Enhanced
+- **Gemini Usage Normalization**: Improved `_normalize_gemini_usage()` function to handle both camelCase and snake_case field variants
+- **Response ID Extraction**: Enhanced response ID detection to try multiple field names (`id`, `response_id`, `responseId`) for better Google API correlation
+- **Streaming Usage Tracking**: Updated streaming usage extraction to use centralized normalization for consistency
+- **Test Coverage**: Expanded Gemini test suite from 10 to 19 tests covering both `gemini-2.5-flash` and `gemini-2.0-flash` models
+
+### Fixed
+- **JSON Serialization Error**: Resolved `TypeError: Object of type ModalityTokenCount is not JSON serializable` in Gemini usage tracking
+- **Usage Field Handling**: Fixed handling of complex Gemini API response objects in usage extraction pipeline
+
+### Documentation
+- **Gemini Usage Guide**: Added comprehensive documentation (`docs/gemini.md`) covering all supported usage fields, extraction methods, and integration details
+- **API Response Handling**: Documented handling of both streaming and non-streaming Gemini API responses
+
 ## [0.1.30] - 2025-09-02
 ### Added
 - User-specific triggered limits support for enhanced limit management
