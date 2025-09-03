@@ -54,7 +54,10 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str):
 
 @pytest.mark.parametrize(
     "service_key, model",
-    [("google::gemini-2.5-flash", "gemini-2.5-flash")],
+    [
+        ("google::gemini-2.5-flash", "gemini-2.5-flash"),
+        ("google::gemini-2.0-flash", "gemini-2.0-flash"),
+    ],
 )
 def test_gemini_deliver_now_streaming(service_key, model, google_api_key, aicm_api_key):
     if not google_api_key:

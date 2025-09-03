@@ -77,24 +77,6 @@ def _extract_usage_payload(resp) -> dict:
     return {}
 
 
-def _normalize_gemini_usage(usage: dict) -> dict:
-    if not isinstance(usage, dict):
-        return {}
-    key_map = {
-        "prompt_token_count": "promptTokenCount",
-        "candidates_token_count": "candidatesTokenCount",
-        "total_token_count": "totalTokenCount",
-    }
-    normalized: dict = {}
-    for k, v in usage.items():
-        if k in ("promptTokenCount", "candidatesTokenCount", "totalTokenCount"):
-            normalized[k] = v
-        elif k in key_map:
-            normalized[key_map[k]] = v
-    allowed = {"promptTokenCount", "candidatesTokenCount", "totalTokenCount"}
-    return {k: v for k, v in normalized.items() if k in allowed}
-
-
 def _wait_for_empty(delivery, timeout: float = 10.0) -> bool:
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -114,7 +96,10 @@ def _extract_response_id(used_id, fallback):
 
 @pytest.mark.parametrize(
     "service_key, model",
-    [("google::gemini-2.5-flash", "gemini-2.5-flash")],
+    [
+        ("google::gemini-2.5-flash", "gemini-2.5-flash"),
+        ("google::gemini-2.0-flash", "gemini-2.0-flash"),
+    ],
 )
 def test_gemini_tracker(service_key, model, google_api_key, aicm_api_key, tmp_path):
     if not google_api_key:

@@ -164,7 +164,19 @@ class BaseLLMWrapper:
     def _track_usage(self, response: Any, model: str | None) -> Any:
         usage = get_usage_from_response(response, self.api_id)
         if usage:
-            response_id = getattr(response, "id", None)
+            # Try multiple field names for response ID
+            response_id = (
+                getattr(response, "id", None)
+                or getattr(response, "response_id", None)
+                or getattr(response, "responseId", None)
+            )
+            # Also try dict access for some response formats
+            if response_id is None and isinstance(response, dict):
+                response_id = (
+                    response.get("response_id")
+                    or response.get("responseId")
+                    or response.get("id")
+                )
             self._tracker.track(
                 self.api_id,
                 self._build_service_key(model),

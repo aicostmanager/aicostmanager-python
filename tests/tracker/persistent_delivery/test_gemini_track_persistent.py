@@ -58,7 +58,11 @@ def _wait_for_cost_event(aicm_api_key: str, response_id: str, timeout: int = 30)
     raise AssertionError(f"cost event for {response_id} not found")
 
 
-def test_gemini_track_non_streaming(google_api_key, aicm_api_key):
+@pytest.mark.parametrize(
+    "model",
+    ["gemini-2.5-flash", "gemini-2.0-flash"],
+)
+def test_gemini_track_non_streaming(model, google_api_key, aicm_api_key):
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
     ini = IniManager("ini")
@@ -73,9 +77,7 @@ def test_gemini_track_non_streaming(google_api_key, aicm_api_key):
     ) as tracker:
         client = genai.Client(api_key=google_api_key)
 
-        resp = client.models.generate_content(
-            model="gemini-2.5-flash", contents="Say hi"
-        )
+        resp = client.models.generate_content(model=model, contents="Say hi")
         response_id = getattr(resp, "id", None) or getattr(resp, "response_id", None)
         if not response_id:
             # Gemini doesn't provide response IDs, generate our own for tracking
@@ -90,13 +92,15 @@ def test_gemini_track_non_streaming(google_api_key, aicm_api_key):
         usage = extract_usage(resp)
         print(f"Usage result: {usage}")
         print(f"Usage type: {type(usage)}")
-        tracker.track(
-            "gemini", "google::gemini-2.5-flash", usage, response_id=response_id
-        )
+        tracker.track("gemini", f"google::{model}", usage, response_id=response_id)
         _wait_for_cost_event(aicm_api_key, response_id)
 
 
-def test_gemini_track_streaming(google_api_key, aicm_api_key):
+@pytest.mark.parametrize(
+    "model",
+    ["gemini-2.5-flash", "gemini-2.0-flash"],
+)
+def test_gemini_track_streaming(model, google_api_key, aicm_api_key):
     if not google_api_key:
         pytest.skip("GOOGLE_API_KEY not set in .env file")
     ini = IniManager("ini2")
@@ -114,9 +118,7 @@ def test_gemini_track_streaming(google_api_key, aicm_api_key):
         response_id = None
         usage_payload = {}
 
-        stream = client.models.generate_content_stream(
-            model="gemini-2.5-flash", contents=["Say hi"]
-        )
+        stream = client.models.generate_content_stream(model=model, contents=["Say hi"])
 
         # Process streaming events to accumulate usage data
         final_event = None
@@ -156,7 +158,7 @@ def test_gemini_track_streaming(google_api_key, aicm_api_key):
 
         # Track the usage and get the actual response_id that was used
         tracker.track(
-            "gemini", "google::gemini-2.5-flash", usage_payload, response_id=response_id
+            "gemini", f"google::{model}", usage_payload, response_id=response_id
         )
 
         # If no response_id was provided, we need to get it from the persistent delivery

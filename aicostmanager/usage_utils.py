@@ -51,6 +51,17 @@ def _to_serializable_dict(data: Any, _seen: set[int] | None = None) -> dict[str,
                 if not _is_unsafe_object(v)
             ]
 
+        # Handle Gemini ModalityTokenCount objects
+        if type(data).__name__ == "ModalityTokenCount":
+            try:
+                return {
+                    "modality": getattr(data, "modality", None),
+                    "token_count": getattr(data, "token_count", None),
+                }
+            except (AttributeError, TypeError):
+                # If we can't access the attributes, fall back to string representation
+                return str(data)
+
         # Pydantic models and dataclasses may provide model_dump or __dict__
         if hasattr(data, "model_dump"):
             return _to_serializable_dict(data.model_dump(), _seen)
@@ -98,27 +109,144 @@ def _is_safe_primitive(obj: Any) -> bool:
 
 
 def _normalize_gemini_usage(usage: Any) -> dict[str, Any]:
-    """Normalize Gemini usage data to match server schema expectations."""
+    """Normalize Gemini usage data to match server schema expectations.
+
+    Handles both camelCase and snake_case field names, and includes all
+    available usage fields from the Gemini API including caching, thinking,
+    and tool usage tokens.
+    """
+    if usage is None:
+        return {}
+
+    # Convert to dict if it's an object
+    if not isinstance(usage, Mapping):
+        usage = _coerce_mapping(usage)
+
     if not isinstance(usage, dict):
         return {}
 
-    # Map snake_case keys to the expected camelCase keys
-    key_map = {
-        "prompt_token_count": "promptTokenCount",
-        "candidates_token_count": "candidatesTokenCount",
-        "total_token_count": "totalTokenCount",
+    # Map both camelCase and snake_case to standardized camelCase output
+    # Core token counts
+    normalized = {
+        "promptTokenCount": _get_field_value(
+            usage, "promptTokenCount", "prompt_token_count"
+        ),
+        "candidatesTokenCount": _get_field_value(
+            usage, "candidatesTokenCount", "candidates_token_count"
+        ),
+        "totalTokenCount": _get_field_value(
+            usage, "totalTokenCount", "total_token_count"
+        ),
+        # Caching and advanced features
+        "cachedContentTokenCount": _get_field_value(
+            usage, "cachedContentTokenCount", "cached_content_token_count"
+        ),
+        "toolUsePromptTokenCount": _get_field_value(
+            usage, "toolUsePromptTokenCount", "tool_use_prompt_token_count"
+        ),
+        "thoughtsTokenCount": _get_field_value(
+            usage, "thoughtsTokenCount", "thoughts_token_count"
+        ),
     }
 
-    normalized: dict[str, Any] = {}
-    for k, v in usage.items():
-        if k in ("promptTokenCount", "candidatesTokenCount", "totalTokenCount"):
-            normalized[k] = v
-        elif k in key_map:
-            normalized[key_map[k]] = v
+    # Handle detailed breakdowns (arrays/objects) with special processing for ModalityTokenCount
+    def _process_modality_details(details):
+        if not details:
+            return None
+        if not isinstance(details, (list, tuple)):
+            return details
 
-    # Only include keys allowed by server schema to avoid "additional properties" errors
-    allowed = {"promptTokenCount", "candidatesTokenCount", "totalTokenCount"}
-    return {k: v for k, v in normalized.items() if k in allowed}
+        # Process each item in the details array
+        processed = []
+        for item in details:
+            if type(item).__name__ == "ModalityTokenCount":
+                try:
+                    processed.append(
+                        {
+                            "modality": getattr(item, "modality", None),
+                            "token_count": getattr(item, "token_count", None),
+                        }
+                    )
+                except (AttributeError, TypeError):
+                    processed.append(str(item))
+            else:
+                processed.append(item)
+        return processed
+
+    # Process token details arrays
+    prompt_details = _get_field_value(
+        usage, "promptTokensDetails", "prompt_tokens_details"
+    )
+    candidates_details = _get_field_value(
+        usage, "candidatesTokensDetails", "candidates_tokens_details"
+    )
+    cache_details = _get_field_value(
+        usage, "cacheTokensDetails", "cache_tokens_details"
+    )
+
+    if prompt_details is not None:
+        normalized["promptTokensDetails"] = _process_modality_details(prompt_details)
+    if candidates_details is not None:
+        normalized["candidatesTokensDetails"] = _process_modality_details(
+            candidates_details
+        )
+    if cache_details is not None:
+        normalized["cacheTokensDetails"] = _process_modality_details(cache_details)
+
+    # Filter out None values
+    return {k: v for k, v in normalized.items() if v is not None}
+
+
+def _get_field_value(obj: Any, camel_case: str, snake_case: str) -> Any:
+    """Get field value trying both camelCase and snake_case variants."""
+    if hasattr(obj, camel_case):
+        value = getattr(obj, camel_case)
+        if value is not None:
+            return value
+    if hasattr(obj, snake_case):
+        value = getattr(obj, snake_case)
+        if value is not None:
+            return value
+    if isinstance(obj, Mapping):
+        value = obj.get(camel_case)
+        if value is not None:
+            return value
+        value = obj.get(snake_case)
+        if value is not None:
+            return value
+    return None
+
+
+def _coerce_mapping(obj: Any) -> dict:
+    """Best-effort convert SDK objects to plain dicts (only for known fields)."""
+    if isinstance(obj, Mapping):
+        return dict(obj)
+    # Fallback—pull known attributes if present
+    out = {}
+    for name in (
+        "promptTokenCount",
+        "candidatesTokenCount",
+        "totalTokenCount",
+        "cachedContentTokenCount",
+        "toolUsePromptTokenCount",
+        "thoughtsTokenCount",
+        "promptTokensDetails",
+        "candidatesTokensDetails",
+        "cacheTokensDetails",
+        "prompt_token_count",
+        "candidates_token_count",
+        "total_token_count",
+        "cached_content_token_count",
+        "tool_use_prompt_token_count",
+        "thoughts_token_count",
+        "prompt_tokens_details",
+        "candidates_tokens_details",
+        "cache_tokens_details",
+    ):
+        v = getattr(obj, name, None)
+        if v is not None:
+            out[name] = v
+    return out
 
 
 def get_usage_from_response(response: Any, api_id: str) -> dict[str, Any]:
@@ -143,28 +271,14 @@ def get_usage_from_response(response: Any, api_id: str) -> dict[str, Any]:
         else:
             usage = getattr(response, "usage", None)
     elif api_id == "gemini":
-        usage = getattr(response, "usage_metadata", None)
+        # Try both camelCase and snake_case variants
+        usage = getattr(response, "usageMetadata", None) or getattr(
+            response, "usage_metadata", None
+        )
+        # If found, normalize to our standardized format
+        if usage is not None:
+            return _normalize_gemini_usage(usage)
     return _to_serializable_dict(usage)
-
-
-def _get_field_value(meta: Any, camel_case: str, snake_case: str) -> Any:
-    """Get field value trying both camelCase and snake_case variants."""
-    if hasattr(meta, camel_case):
-        value = getattr(meta, camel_case)
-        if value is not None:
-            return value
-    if hasattr(meta, snake_case):
-        value = getattr(meta, snake_case)
-        if value is not None:
-            return value
-    if isinstance(meta, Mapping):
-        value = meta.get(camel_case)
-        if value is not None:
-            return value
-        value = meta.get(snake_case)
-        if value is not None:
-            return value
-    return None
 
 
 def get_streaming_usage_from_response(chunk: Any, api_id: str) -> dict[str, Any]:
@@ -198,51 +312,35 @@ def get_streaming_usage_from_response(chunk: Any, api_id: str) -> dict[str, Any]
                 usage = chunk["usage"]
 
     elif api_id == "gemini":
-        # 1) direct on the event
-        meta = getattr(chunk, "usage_metadata", None)
-        # 2) sometimes nested under .model_response.usage_metadata
+        # Try multiple locations for usage metadata, both camelCase and snake_case
+        meta = None
+
+        # 1) direct on the event (both variants)
+        meta = getattr(chunk, "usageMetadata", None) or getattr(
+            chunk, "usage_metadata", None
+        )
+
+        # 2) sometimes nested under .model_response
         if meta is None and hasattr(chunk, "model_response"):
-            meta = getattr(chunk.model_response, "usage_metadata", None)
+            meta = getattr(chunk.model_response, "usageMetadata", None) or getattr(
+                chunk.model_response, "usage_metadata", None
+            )
+
         # 3) dict-like fallback
         if meta is None and isinstance(chunk, Mapping):
             model_resp = chunk.get("model_response")
-            meta = chunk.get("usage_metadata") or (
-                (model_resp or {}).get("usage_metadata")
+            meta = (
+                chunk.get("usageMetadata")
+                or chunk.get("usage_metadata")
+                or (model_resp or {}).get("usageMetadata")
+                or (model_resp or {}).get("usage_metadata")
                 if isinstance(model_resp, Mapping)
                 else None
             )
 
+        # If found, normalize to our standardized format
         if meta is not None:
-            # Build a minimal serializable dict supporting both camelCase and snake_case
-            # Field mappings: (camelCase, snake_case, output_key)
-            field_mappings = [
-                ("promptTokenCount", "prompt_token_count", "promptTokenCount"),
-                (
-                    "candidatesTokenCount",
-                    "candidates_token_count",
-                    "candidatesTokenCount",
-                ),
-                ("totalTokenCount", "total_token_count", "totalTokenCount"),
-                ("thoughtsTokenCount", "thoughts_token_count", "thoughtsTokenCount"),
-                (
-                    "toolUsePromptTokenCount",
-                    "tool_use_prompt_token_count",
-                    "toolUsePromptTokenCount",
-                ),
-                (
-                    "cachedContentTokenCount",
-                    "cached_content_token_count",
-                    "cachedContentTokenCount",
-                ),
-            ]
-
-            usage = {}
-            for camel_case, snake_case, output_key in field_mappings:
-                value = _get_field_value(meta, camel_case, snake_case)
-                if value is not None:
-                    usage[output_key] = value
-        else:
-            usage = None
+            return _normalize_gemini_usage(meta)
 
     return _to_serializable_dict(usage)
 
@@ -261,12 +359,11 @@ def extract_usage(response: Any) -> dict[str, Any]:
     if hasattr(response, "usage") and hasattr(response.usage, "prompt_tokens"):
         # Looks like OpenAI format
         return get_usage_from_response(response, "openai_chat")
-    elif hasattr(response, "usage_metadata"):
+    elif hasattr(response, "usage_metadata") or hasattr(response, "usageMetadata"):
         # Looks like Gemini format
         usage = get_usage_from_response(response, "gemini")
         # Normalize Gemini usage to match server schema expectations
         return usage
-        # return _normalize_gemini_usage(usage)
     elif hasattr(response, "input_tokens") or hasattr(response, "inputTokens"):
         # Looks like Anthropic/Bedrock format
         return get_usage_from_response(response, "anthropic")
