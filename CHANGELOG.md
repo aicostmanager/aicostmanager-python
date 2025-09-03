@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.32] - 2025-01-27
+### Added
+- **Tracker Instance-Level Metadata**: Added `set_client_customer_key()` and `set_context()` methods to the base `Tracker` class for storing customer key and context information at the instance level
+- **Enhanced Tracker API**: Base `Tracker` class now supports instance-level configuration of `client_customer_key` and `context` values, providing consistency with LLM wrapper classes
+
+### Enhanced
+- **API Consistency**: Improved API consistency across Tracker and wrapper classes by adding instance-level setters for metadata tracking
+- **Developer Experience**: Simplified metadata management for users who want to set customer context once per tracker instance rather than per tracking call
+
 ## [0.1.31] - 2025-09-03
 ### Added
 - **Gemini 2.0 Flash Support**: Added comprehensive support for `gemini-2.0-flash` model across all Gemini tests and usage tracking
