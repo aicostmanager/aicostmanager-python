@@ -6,11 +6,17 @@ from unittest.mock import MagicMock, Mock
 from aicostmanager.wrappers import OpenAIChatWrapper
 
 
+class DummyIniManager:
+    def get_option(self, section, option, fallback=None):
+        return fallback
+
+
 class DummyTracker:
     calls: list
 
     def __init__(self):
         self.calls = []
+        self.ini_manager = DummyIniManager()
 
     def track(self, api_id, service_key, usage, response_id=None):
         self.calls.append((api_id, service_key, usage, response_id))

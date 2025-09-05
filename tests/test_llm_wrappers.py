@@ -3,7 +3,6 @@ import sys
 import types
 from pathlib import Path
 
-
 PACKAGE_DIR = Path(__file__).resolve().parent.parent / "aicostmanager"
 
 # ``test_llm_wrappers`` loads the ``wrappers`` module without importing the
@@ -80,9 +79,15 @@ for name, module in _ORIGINAL_MODULES.items():
         sys.modules.pop(name, None)
 
 
+class DummyIniManager:
+    def get_option(self, section, option, fallback=None):
+        return fallback
+
+
 class DummyTracker:
     def __init__(self):
         self.calls = []
+        self.ini_manager = DummyIniManager()
 
     def track(self, api_id, service_key, usage, **kwargs):
         self.calls.append((api_id, service_key, usage))
@@ -95,7 +100,9 @@ class DummyTracker:
 
 
 def _stream_chunk():
-    yield types.SimpleNamespace(usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2})
+    yield types.SimpleNamespace(
+        usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+    )
     yield types.SimpleNamespace(data="done")
 
 
@@ -226,7 +233,7 @@ def test_wrappers_track_non_streaming():
         tracker.calls.clear()
         wrapper = wrapper_cls(client, tracker=tracker)
         obj = wrapper
-        for attr in call_path.split('.'):
+        for attr in call_path.split("."):
             obj = getattr(obj, attr)
         obj(**kwargs)
         assert tracker.calls and tracker.calls[0][0] == wrapper_cls.api_id
