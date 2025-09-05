@@ -74,6 +74,18 @@ for event in stream:
 print()
 ```
 
+## Inference blocking limits
+
+Wrappers can prevent an inference from running when a matching triggered limit
+exists. Enable this behaviour by setting
+``AICM_ENABLE_INFERENCE_BLOCKING_LIMITS`` to ``true`` in your ``AICM.INI`` file.
+When active, the wrapper checks locally cached triggered limits before making
+the LLM call and raises :class:`~aicostmanager.client.exceptions.UsageLimitExceeded`
+instead of executing the request.
+
+Normal inferences incur minimal overhead and calls proceed as usual when no
+limits are triggered or the setting is disabled.
+
 ## Asynchronous clients
 
 If the underlying SDK provides ``async`` methods, the wrappers preserve that

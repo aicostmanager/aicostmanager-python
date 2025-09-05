@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.34] - 2025-01-27
+### Added
+- Optional pre-inference limit enforcement in LLM wrappers controlled by
+  `AICM_ENABLE_INFERENCE_BLOCKING_LIMITS`.
+
 ## [0.1.33] - 2025-01-27
 ### Added
 - **Automatic Fallback Values**: `track()` and `track_async()` methods now automatically use instance-level `client_customer_key` and `context` values when no explicit parameters are provided, eliminating the need to pass these parameters on every call
