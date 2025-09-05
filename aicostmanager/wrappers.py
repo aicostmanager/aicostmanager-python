@@ -7,6 +7,8 @@ from typing import Any
 from .delivery import DeliveryType
 from .tracker import Tracker
 from .usage_utils import get_streaming_usage_from_response, get_usage_from_response
+from .config_manager import ConfigManager
+from .client.exceptions import UsageLimitExceeded
 
 
 class _Proxy:
@@ -54,6 +56,7 @@ class _Proxy:
 
                 async def async_call(*args, **kwargs):
                     model = self._wrapper._extract_model(attr, args, kwargs)
+                    self._wrapper._pre_inference_check(model)
                     result = await attr(*args, **kwargs)
                     return await self._wrapper._handle_async_result(result, model)
 
@@ -62,6 +65,7 @@ class _Proxy:
 
                 def sync_call(*args, **kwargs):
                     model = self._wrapper._extract_model(attr, args, kwargs)
+                    self._wrapper._pre_inference_check(model)
                     result = attr(*args, **kwargs)
                     return self._wrapper._handle_result(result, model)
 
@@ -79,6 +83,7 @@ class _Proxy:
             result = self._obj(*args, **kwargs)
             return self._wrapper._handle_result(result, None)
         model = self._wrapper._extract_model(self._obj, args, kwargs)
+        self._wrapper._pre_inference_check(model)
         result = self._obj(*args, **kwargs)
         return self._wrapper._handle_result(result, model)
 
@@ -128,6 +133,15 @@ class BaseLLMWrapper:
         self._proxy = _Proxy(client, self)
         self.client_customer_key = client_customer_key
         self.context = context
+        val = self._tracker.ini_manager.get_option(
+            "tracker", "AICM_ENABLE_INFERENCE_BLOCKING_LIMITS", "false"
+        )
+        self._inference_limits_enabled = str(val).lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
     # ------------------------------------------------------------------
     def set_client_customer_key(self, key: str | None) -> None:
@@ -160,6 +174,28 @@ class BaseLLMWrapper:
         vendor = self._get_vendor()
         model_id = model or "unknown-model"
         return f"{vendor}::{model_id}"
+
+    def _pre_inference_check(self, model: str | None) -> None:
+        if not self._inference_limits_enabled:
+            return
+        aicm_key = getattr(self._tracker, "aicm_api_key", None)
+        if not aicm_key:
+            return
+        api_key_id = aicm_key.split(".")[-1] if "." in aicm_key else aicm_key
+        cfg = ConfigManager(ini_path=self._tracker.ini_path, load=False)
+        service_key = self._build_service_key(model)
+        client_key = self.client_customer_key
+        limits = cfg.get_triggered_limits(
+            service_key=service_key, client_customer_key=client_key
+        )
+        limits = [l for l in limits if l.api_key_id == api_key_id]
+        if limits:
+            limits = cfg.get_triggered_limits(
+                service_key=service_key, client_customer_key=client_key
+            )
+            limits = [l for l in limits if l.api_key_id == api_key_id]
+            if limits:
+                raise UsageLimitExceeded(limits)
 
     def _track_usage(self, response: Any, model: str | None) -> Any:
         usage = get_usage_from_response(response, self.api_id)
