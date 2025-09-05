@@ -7,6 +7,12 @@ All notable changes to this project will be documented in this file.
 - Optional pre-inference limit enforcement in LLM wrappers controlled by
   `AICM_ENABLE_INFERENCE_BLOCKING_LIMITS`.
 
+### Fixed
+- **Test Compatibility**: Updated mock tracker classes in test files to include `ini_manager` attribute required by LLM wrapper initialization, fixing AttributeError failures in:
+  - `tests/test_llm_wrappers.py`
+  - `tests/test_magicmock_compatibility.py`
+  - `tests/test_wrapper_delivery_type.py`
+
 ## [0.1.33] - 2025-01-27
 ### Added
 - **Automatic Fallback Values**: `track()` and `track_async()` methods now automatically use instance-level `client_customer_key` and `context` values when no explicit parameters are provided, eliminating the need to pass these parameters on every call
