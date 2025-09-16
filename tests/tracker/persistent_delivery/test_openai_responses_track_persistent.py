@@ -8,7 +8,7 @@ openai = pytest.importorskip("openai")
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
-from aicostmanager.usage_utils import extract_usage
+from aicostmanager.usage_utils import get_usage_from_response
 
 BASE_URL = "http://127.0.0.1:8001"
 
@@ -45,9 +45,9 @@ def test_openai_responses_track_non_streaming(aicm_api_key, tmp_path):
 
         resp = client.responses.create(model="gpt-5-mini", input="Say hi")
         response_id = getattr(resp, "id", None)
-        usage = extract_usage(resp)
+        usage = get_usage_from_response(resp, "openai_responses")
         tracker.track(
-            "openai_responses", "openai::gpt-5-mini", usage, response_id=response_id
+            "openai::gpt-5-mini", usage, response_id=response_id
         )
         # Background delivery: rely on queue drain instead of cost-events endpoint
         deadline = time.time() + 10
@@ -106,7 +106,6 @@ def test_openai_responses_track_streaming(aicm_api_key, tmp_path):
 
         # Track the usage and get the actual response_id that was used (auto-generate if missing)
         used_id = tracker.track(
-            "openai_responses",
             "openai::gpt-5-mini",
             usage_payload,
             response_id=response_id,

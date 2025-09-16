@@ -30,7 +30,7 @@ All configuration keys are fully capitalised and prefixed with `AICM_`.
 | `AICM_LOG_LEVEL` | `INFO` | Logging level |
 | `AICM_LOG_BODIES` | `false` | Include request bodies in logs |
 | `AICM_DELIVERY_LOG_BODIES` | `false` | Legacy alias for `AICM_LOG_BODIES` |
-| `AICM_RAISE_ON_ERROR` | `true` | Raise exceptions when immediate tracking fails |
+| `AICM_RAISE_ON_ERROR` | `false` | Raise exceptions when immediate tracking fails |
 | `AICM_IMMEDIATE_PAUSE_SECONDS` | `5.0` | Post-send wait before checking limits |
 | `AICM_LIMITS_ENABLED` | `false` | Enable triggered limit checks during delivery |
 | `AICM_ENABLE_INFERENCE_BLOCKING_LIMITS` | `false` | Block LLM calls when a matching triggered limit exists |

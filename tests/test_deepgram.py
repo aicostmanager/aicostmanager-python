@@ -265,7 +265,6 @@ def test_deepgram_track_immediate(events, aicm_api_key, aicm_api_base, tmp_path)
     ) as tracker:
         for event in events:
             result = tracker.track(
-                "deepgram",
                 event["service_key"],
                 event["payload"],
                 response_id=event["response_id"],
@@ -294,7 +293,6 @@ def test_deepgram_track_persistent(events, aicm_api_key, aicm_api_base, tmp_path
     ) as tracker:
         for event in events:
             tracker.track(
-                "deepgram",
                 event["service_key"],
                 event["payload"],
                 response_id=event["response_id"],
@@ -321,7 +319,6 @@ def test_deepgram_track_immediate_with_meta(
     ) as tracker:
         for event in events:
             result = tracker.track(
-                "deepgram",
                 event["service_key"],
                 event["payload"],
                 response_id=event["response_id"],
@@ -356,7 +353,6 @@ def test_deepgram_track_persistent_with_meta(
     ) as tracker:
         for event in events:
             tracker.track(
-                "deepgram",
                 event["service_key"],
                 event["payload"],
                 response_id=event["response_id"],

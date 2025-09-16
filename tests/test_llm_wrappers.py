@@ -89,11 +89,11 @@ class DummyTracker:
         self.calls = []
         self.ini_manager = DummyIniManager()
 
-    def track(self, api_id, service_key, usage, **kwargs):
-        self.calls.append((api_id, service_key, usage))
+    def track(self, service_key, usage, **kwargs):
+        self.calls.append((service_key, usage))
 
-    async def track_async(self, api_id, service_key, usage, **kwargs):
-        self.calls.append((api_id, service_key, usage))
+    async def track_async(self, service_key, usage, **kwargs):
+        self.calls.append((service_key, usage))
 
     def close(self):
         pass
@@ -236,8 +236,7 @@ def test_wrappers_track_non_streaming():
         for attr in call_path.split("."):
             obj = getattr(obj, attr)
         obj(**kwargs)
-        assert tracker.calls and tracker.calls[0][0] == wrapper_cls.api_id
-        assert tracker.calls[0][1] == expected
+        assert tracker.calls and tracker.calls[0][0] == expected
 
 
 def test_openai_chat_wrapper_streaming_tracks_once():
@@ -246,8 +245,7 @@ def test_openai_chat_wrapper_streaming_tracks_once():
     wrapper = OpenAIChatWrapper(client, tracker=tracker)
     stream = wrapper.chat.completions.create(model="gpt-4", stream=True)
     list(stream)
-    assert tracker.calls and tracker.calls[0][0] == "openai_chat"
-    assert tracker.calls[0][1] == "openai::gpt-4"
+    assert tracker.calls and tracker.calls[0][0] == "openai::gpt-4"
 
 
 def test_openai_chat_vendor_detection():
@@ -255,7 +253,7 @@ def test_openai_chat_vendor_detection():
     fw_client = make_openai_chat_client("https://api.fireworks.ai")
     wrapper_fw = OpenAIChatWrapper(fw_client, tracker=tracker)
     wrapper_fw.chat.completions.create(model="m1")
-    assert tracker.calls[0][1] == "fireworks-ai::m1"
+    assert tracker.calls[0][0] == "fireworks-ai::m1"
 
     tracker.calls.clear()
     x_client = make_openai_chat_client("https://api.x.ai")

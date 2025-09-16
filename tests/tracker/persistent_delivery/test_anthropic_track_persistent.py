@@ -107,7 +107,6 @@ def test_anthropic_track_streaming(anthropic_api_key, aicm_api_key, tmp_path):
 
         # Track usage; if no response_id from stream, track() will generate one and return it
         used_id = tracker.track(
-            "anthropic",
             "anthropic::claude-3-5-sonnet-20241022",
             usage_payload,
             response_id=response_id,

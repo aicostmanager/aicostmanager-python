@@ -9,7 +9,7 @@ anthropic = pytest.importorskip("anthropic")
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
-from aicostmanager.usage_utils import extract_usage
+from aicostmanager.usage_utils import get_usage_from_response
 
 BASE_URL = os.environ.get("AICM_API_BASE", "http://127.0.0.1:8001")
 
@@ -47,7 +47,7 @@ def test_anthropic_track_non_streaming(anthropic_api_key, aicm_api_key, tmp_path
             max_tokens=20,
         )
         response_id = getattr(resp, "id", None)
-        usage = extract_usage(resp)
+        usage = get_usage_from_response(resp, "anthropic")
         asyncio.run(
             tracker.track_async(
                 "anthropic",

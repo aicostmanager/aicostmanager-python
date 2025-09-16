@@ -43,11 +43,11 @@ methods for the ``/costs`` API.
    page = manager.list_costs_typed(filters)
    print("total events:", page.count)
    for event in page.results:
-       print(event.vendor_id, event.cost)
+       print(event.provider_id, event.cost)
 
    # or iterate through all pages
    for event in manager.iter_costs(filters):
-       print(event.service_id, event.quantity)
+       print(event.service_key, event.quantity)
    ```
 
 4. **Context filters and pagination**
@@ -93,7 +93,7 @@ The API returns a paginated object with the following structure:
 
 Each cost event includes:
 
-- ``vendor_id`` and ``service_id``
+- ``provider_id`` and ``service_key``
 - ``cost_unit_id``
 - ``quantity`` – number of units consumed
 - ``cost_per_unit`` – price for a single unit

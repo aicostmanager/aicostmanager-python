@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import Any
 
 from ..models import ErrorResponse
@@ -24,12 +25,12 @@ class APIRequestError(AICMError):
         if isinstance(detail, dict):
             try:
                 self.error_response = ErrorResponse.model_validate(detail)
-                self.error = self.error_response.error
-                self.message = self.error_response.message
-                self.details = self.error_response.details
+                self.error = self.error_response.detail
+                self.message = self.error_response.detail
+                self.details = self.error_response.code
             except Exception:
-                self.error = detail.get("error")
-                self.message = detail.get("message")
+                self.error = detail.get("detail")
+                self.message = detail.get("detail")
         super().__init__(f"API request failed with status {status_code}: {detail}")
 
 

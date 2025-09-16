@@ -11,7 +11,7 @@ genai = pytest.importorskip("google.genai")
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
-from aicostmanager.usage_utils import extract_usage
+from aicostmanager.usage_utils import get_usage_from_response
 
 BASE_URL = "http://127.0.0.1:8001"
 
@@ -89,10 +89,10 @@ def test_gemini_track_non_streaming(model, google_api_key, aicm_api_key):
         print(f"Response ID: {response_id}")
         print(f"Response type: {type(resp)}")
         print(f"Response dir: {dir(resp)[:20]}...")  # First 20 attributes
-        usage = extract_usage(resp)
+        usage = get_usage_from_response(resp, "gemini")
         print(f"Usage result: {usage}")
         print(f"Usage type: {type(usage)}")
-        tracker.track("gemini", f"google::{model}", usage, response_id=response_id)
+        tracker.track(f"google::{model}", usage, response_id=response_id)
         _wait_for_cost_event(aicm_api_key, response_id)
 
 
@@ -158,7 +158,7 @@ def test_gemini_track_streaming(model, google_api_key, aicm_api_key):
 
         # Track the usage and get the actual response_id that was used
         tracker.track(
-            "gemini", f"google::{model}", usage_payload, response_id=response_id
+            f"google::{model}", usage_payload, response_id=response_id
         )
 
         # If no response_id was provided, we need to get it from the persistent delivery

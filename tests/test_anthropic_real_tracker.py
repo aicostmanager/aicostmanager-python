@@ -121,7 +121,7 @@ def test_anthropic_tracker(
     )
     response_id = getattr(resp, "id", None)
     usage_payload = _usage_to_payload(getattr(resp, "usage", None))
-    tracker.track("anthropic", service_key, usage_payload, response_id=response_id)
+    tracker.track(service_key, usage_payload, response_id=response_id)
     # Wait for the queue to flush
     assert _wait_for_empty(tracker.delivery, timeout=10.0)
     _wait_for_cost_event(aicm_api_key, response_id)
@@ -146,7 +146,7 @@ def test_anthropic_tracker(
     with Tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:
-        t2.track("anthropic", service_key, usage_payload2, response_id=response_id2)
+        t2.track(service_key, usage_payload2, response_id=response_id2)
     _wait_for_cost_event(aicm_api_key, response_id2)
 
     tracker.close()

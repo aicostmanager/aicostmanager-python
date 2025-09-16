@@ -10,7 +10,7 @@ boto3 = pytest.importorskip("boto3")
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
-from aicostmanager.usage_utils import extract_usage
+from aicostmanager.usage_utils import get_usage_from_response
 
 BASE_URL = "http://127.0.0.1:8001"
 
@@ -100,8 +100,8 @@ def test_bedrock_track_non_streaming(
         response_id = resp.get("output", {}).get("message", {}).get("id") or resp.get(
             "ResponseMetadata", {}
         ).get("RequestId")
-        usage = extract_usage(resp)
-        tracker.track("amazon-bedrock", service_key, usage, response_id=response_id)
+        usage = get_usage_from_response(resp, "amazon-bedrock")
+        tracker.track(service_key, usage, response_id=response_id)
         _wait_for_cost_event(aicm_api_key, response_id)
 
 
@@ -183,6 +183,6 @@ def test_bedrock_track_streaming(
         usage_payload = final_usage
 
         tracker.track(
-            "amazon-bedrock", service_key, usage_payload, response_id=response_id
+            service_key, usage_payload, response_id=response_id
         )
         _wait_for_cost_event(aicm_api_key, response_id)

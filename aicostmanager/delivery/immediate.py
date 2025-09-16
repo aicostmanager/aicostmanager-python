@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict
 from pathlib import Path
+from typing import Any, Dict
 
 from ..client.exceptions import NoCostsTrackedException, UsageLimitExceeded
 from ..config_manager import ConfigManager
@@ -45,9 +45,7 @@ class ImmediateDelivery(Delivery):
                 or str(ini_dir / "aicm.log")
             )
             log_level = _get("AICM_LOG_LEVEL") or os.getenv("AICM_LOG_LEVEL")
-            timeout = float(
-                _get("AICM_TIMEOUT") or os.getenv("AICM_TIMEOUT") or "10.0"
-            )
+            timeout = float(_get("AICM_TIMEOUT") or os.getenv("AICM_TIMEOUT") or "10.0")
             immediate_pause_seconds = float(
                 _get("AICM_IMMEDIATE_PAUSE_SECONDS")
                 or os.getenv("AICM_IMMEDIATE_PAUSE_SECONDS")
@@ -56,11 +54,14 @@ class ImmediateDelivery(Delivery):
             raise_on_error_val = (
                 _get("AICM_RAISE_ON_ERROR")
                 or os.getenv("AICM_RAISE_ON_ERROR")
-                or "true"
+                or "false"
             )
-            raise_on_error = (
-                str(raise_on_error_val).lower() in {"1", "true", "yes", "on"}
-            )
+            raise_on_error = str(raise_on_error_val).lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
 
             config = DeliveryConfig(
                 ini_manager=ini_manager,
@@ -82,7 +83,7 @@ class ImmediateDelivery(Delivery):
                     else None
                 )
                 if val is None:
-                    val = os.getenv("AICM_RAISE_ON_ERROR", "true")
+                    val = os.getenv("AICM_RAISE_ON_ERROR", "false")
                 raise_on_error = str(val).lower() in {"1", "true", "yes", "on"}
 
         super().__init__(config)

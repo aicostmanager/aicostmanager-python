@@ -1,7 +1,5 @@
-from decimal import Decimal
-
 from aicostmanager import CostQueryManager
-from aicostmanager.models import CostEvent, CostEventFilters, CostEventsResponse
+from aicostmanager.models import CostEventFilters, CostEventItem, CostEventsResponse
 
 
 class DummyResponse:
@@ -25,8 +23,8 @@ def test_list_costs_typed(monkeypatch):
         "previous": None,
         "results": [
             {
-                "vendor_id": "v1",
-                "service_id": "s1",
+                "provider_id": "v1",
+                "service_key": "s1",
                 "cost_unit_id": "cu1",
                 "quantity": "1",
                 "cost_per_unit": "0.01",
@@ -47,7 +45,8 @@ def test_list_costs_typed(monkeypatch):
     resp = manager.list_costs_typed(filters)
 
     assert isinstance(resp, CostEventsResponse)
-    assert isinstance(resp.results[0], CostEvent)
+    assert isinstance(resp.results[0], CostEventItem)
+    assert resp.results[0].provider_id == "v1"
     assert captured["response_id"] == "resp_123"
 
 
@@ -59,8 +58,8 @@ def test_iter_costs(monkeypatch):
         {
             "results": [
                 {
-                    "vendor_id": "v1",
-                    "service_id": "s1",
+                    "provider_id": "v1",
+                    "service_key": "s1",
                     "cost_unit_id": "cu1",
                     "quantity": "1",
                     "cost_per_unit": "0.01",
@@ -72,8 +71,8 @@ def test_iter_costs(monkeypatch):
         {
             "results": [
                 {
-                    "vendor_id": "v2",
-                    "service_id": "s2",
+                    "provider_id": "v2",
+                    "service_key": "s2",
                     "cost_unit_id": "cu2",
                     "quantity": "2",
                     "cost_per_unit": "0.02",
@@ -90,8 +89,8 @@ def test_iter_costs(monkeypatch):
     monkeypatch.setattr("requests.Session.request", requester)
 
     events = list(manager.iter_costs())
-    assert [e.vendor_id for e in events] == ["v1", "v2"]
-    assert events[0].cost == Decimal("0.01")
+    assert [e.provider_id for e in events] == ["v1", "v2"]
+    assert str(events[0].cost) == "0.01"
 
 
 def test_list_costs_with_context_filters(monkeypatch):
@@ -102,7 +101,9 @@ def test_list_costs_with_context_filters(monkeypatch):
 
     def requester(self, method, url, **kwargs):
         captured.update(kwargs.get("params", {}))
-        return DummyResponse({"count": 0, "next": None, "previous": None, "results": []})
+        return DummyResponse(
+            {"count": 0, "next": None, "previous": None, "results": []}
+        )
 
     monkeypatch.setattr("requests.Session.request", requester)
 

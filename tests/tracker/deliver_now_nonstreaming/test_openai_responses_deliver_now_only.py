@@ -79,7 +79,6 @@ def test_openai_responses_deliver_now_only(
         usage_payload = get_usage_from_response(resp, "openai_responses")
 
         tracker.track(
-            "openai_responses",
             service_key,
             usage_payload,
             response_id=response_id,

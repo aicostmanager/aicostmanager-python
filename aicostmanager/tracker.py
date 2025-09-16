@@ -54,15 +54,10 @@ class Tracker:
         max_attempts = int(_get("AICM_MAX_ATTEMPTS", "3"))
         max_retries = int(_get("AICM_MAX_RETRIES", "5"))
         max_batch_size = int(_get("AICM_MAX_BATCH_SIZE", "1000"))
-        # ``AICM_DELIVERY_LOG_BODIES`` was the legacy environment variable name.
-        # Prefer the new ``AICM_LOG_BODIES`` but fall back to the old name for
-        # backward compatibility.
-        log_bodies_val = _get("AICM_LOG_BODIES") or _get(
-            "AICM_DELIVERY_LOG_BODIES", "false"
-        )
+        log_bodies_val = _get("AICM_LOG_BODIES", "false")
         log_bodies = str(log_bodies_val).lower() in {"1", "true", "yes", "on"}
 
-        raise_on_error_val = _get("AICM_RAISE_ON_ERROR", "true")
+        raise_on_error_val = _get("AICM_RAISE_ON_ERROR", "false")
         raise_on_error = str(raise_on_error_val).lower() in {"1", "true", "yes", "on"}
 
         db_path = _get("AICM_DB_PATH", str(ini_dir / "queue.db"))
@@ -133,8 +128,7 @@ class Tracker:
     # ------------------------------------------------------------------
     def _build_record(
         self,
-        api_id: str,
-        system_key: Optional[str],
+        service_key: str,
         usage: Dict[str, Any],
         *,
         response_id: Optional[str],
@@ -143,19 +137,17 @@ class Tracker:
         context: Optional[Dict[str, Any]],
     ) -> Dict[str, Any]:
         record: Dict[str, Any] = {
-            "api_id": api_id,
+            "service_key": service_key,
             "response_id": response_id or uuid4().hex,
             "timestamp": (
-                timestamp.isoformat()
+                timestamp.timestamp()
                 if isinstance(timestamp, datetime)
-                else timestamp or datetime.now(timezone.utc).isoformat()
+                else datetime.fromisoformat(timestamp).timestamp()
+                if isinstance(timestamp, str)
+                else datetime.now(timezone.utc).timestamp()
             ),
             "payload": usage,
         }
-        # Only include service_key when provided. Some server-side validators
-        # treat explicit null differently from an omitted field.
-        if system_key is not None:
-            record["service_key"] = system_key
         if client_customer_key is not None:
             record["client_customer_key"] = client_customer_key
         if context is not None:
@@ -165,8 +157,7 @@ class Tracker:
     # ------------------------------------------------------------------
     def track(
         self,
-        api_id: str,
-        system_key: Optional[str],
+        service_key: str,
         usage: Dict[str, Any],
         *,
         response_id: Optional[str] = None,
@@ -187,8 +178,7 @@ class Tracker:
             context = self.context
 
         record = self._build_record(
-            api_id,
-            system_key,
+            service_key,
             usage,
             response_id=response_id,
             timestamp=timestamp,
@@ -202,8 +192,7 @@ class Tracker:
 
     async def track_async(
         self,
-        api_id: str,
-        system_key: Optional[str],
+        service_key: str,
         usage: Dict[str, Any],
         *,
         response_id: Optional[str] = None,
@@ -213,8 +202,7 @@ class Tracker:
     ) -> Any:
         return await asyncio.to_thread(
             self.track,
-            api_id,
-            system_key,
+            service_key,
             usage,
             response_id=response_id,
             timestamp=timestamp,
@@ -224,7 +212,7 @@ class Tracker:
 
     def track_llm_usage(
         self,
-        api_id: str,
+        service_key: str,
         response: Any,
         *,
         response_id: Optional[str] = None,
@@ -236,27 +224,15 @@ class Tracker:
 
         Parameters are identical to :meth:`track` except that ``response`` is
         the raw LLM client response.  Usage information is obtained via
-        :func:`get_usage_from_response` using the provided ``api_id``.
+        :func:`get_usage_from_response` using the provided ``service_key``.
         ``response`` is returned to allow call chaining. If a ``response_id`` was
         not provided and one is generated, it is attached to the response as
         ``response.aicm_response_id`` for convenience.
         """
-        usage = get_usage_from_response(response, api_id)
+        usage = get_usage_from_response(response, service_key)
         if isinstance(usage, dict) and usage:
-            model = getattr(response, "model", None)
-            vendor_map = {
-                "openai_chat": "openai",
-                "openai_responses": "openai",
-                "anthropic": "anthropic",
-                "gemini": "google",
-            }
-            vendor_prefix = vendor_map.get(api_id)
-            system_key = (
-                f"{vendor_prefix}::{model}" if vendor_prefix and model else model
-            )
             track_result = self.track(
-                api_id,
-                system_key,
+                service_key,
                 usage,
                 response_id=response_id,
                 timestamp=timestamp,
@@ -276,7 +252,7 @@ class Tracker:
 
     async def track_llm_usage_async(
         self,
-        api_id: str,
+        service_key: str,
         response: Any,
         *,
         response_id: Optional[str] = None,
@@ -287,7 +263,7 @@ class Tracker:
         """Async version of :meth:`track_llm_usage`."""
         return await asyncio.to_thread(
             self.track_llm_usage,
-            api_id,
+            service_key,
             response,
             response_id=response_id,
             timestamp=timestamp,
@@ -297,7 +273,7 @@ class Tracker:
 
     def track_llm_stream_usage(
         self,
-        api_id: str,
+        service_key: str,
         stream: Any,
         *,
         response_id: Optional[str] = None,
@@ -312,23 +288,13 @@ class Tracker:
         :func:`get_streaming_usage_from_response` and sent via :meth:`track` once
         available.
         """
-        model = getattr(stream, "model", None)
-        vendor_map = {
-            "openai_chat": "openai",
-            "openai_responses": "openai",
-            "anthropic": "anthropic",
-            "gemini": "google",
-        }
-        vendor_prefix = vendor_map.get(api_id)
-        system_key = f"{vendor_prefix}::{model}" if vendor_prefix and model else model
         usage_sent = False
         for chunk in stream:
             if not usage_sent:
-                usage = get_streaming_usage_from_response(chunk, api_id)
+                usage = get_streaming_usage_from_response(chunk, service_key)
                 if isinstance(usage, dict) and usage:
                     self.track(
-                        api_id,
-                        system_key,
+                        service_key,
                         usage,
                         response_id=response_id,
                         timestamp=timestamp,
@@ -340,7 +306,7 @@ class Tracker:
 
     async def track_llm_stream_usage_async(
         self,
-        api_id: str,
+        service_key: str,
         stream: Any,
         *,
         response_id: Optional[str] = None,
@@ -349,15 +315,13 @@ class Tracker:
         context: Optional[Dict[str, Any]] = None,
     ):
         """Asynchronous version of :meth:`track_llm_stream_usage`."""
-        system_key = getattr(stream, "model", None)
         usage_sent = False
         async for chunk in stream:
             if not usage_sent:
-                usage = get_streaming_usage_from_response(chunk, api_id)
+                usage = get_streaming_usage_from_response(chunk, service_key)
                 if isinstance(usage, dict) and usage:
                     await self.track_async(
-                        api_id,
-                        system_key,
+                        service_key,
                         usage,
                         response_id=response_id,
                         timestamp=timestamp,

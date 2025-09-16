@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from decimal import Decimal
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -10,13 +9,13 @@ from .common import Period, ThresholdType
 
 class UsageLimitIn(BaseModel):
     threshold_type: ThresholdType
-    amount: Decimal
+    amount: Any  # number or string
     period: Period
-    vendor: Optional[str] = None
-    service: Optional[str] = None
+    service_key: Optional[str] = None
     client: Optional[str] = None
     team_uuid: Optional[str] = None
     user_uuid: Optional[str] = None
+    user_email: Optional[str] = None
     api_key_uuid: Optional[str] = None
     notification_list: Optional[List[str]] = None
     active: Optional[bool] = True
@@ -27,14 +26,10 @@ class UsageLimitIn(BaseModel):
 class UsageLimitOut(BaseModel):
     uuid: str
     threshold_type: ThresholdType
-    amount: Decimal
+    amount: Any  # number or string
     period: Period
-    vendor: Optional[str] = None
     service: Optional[str] = None
     client: Optional[str] = None
-    team_uuid: Optional[str] = None
-    user_uuid: Optional[str] = None
-    api_key_uuid: Optional[str] = None
     notification_list: Optional[List[str]] = None
     active: bool
 
@@ -42,5 +37,15 @@ class UsageLimitOut(BaseModel):
 
 
 class UsageLimitProgressOut(UsageLimitOut):
-    current_spend: Decimal
-    remaining_amount: Decimal
+    current_spend: Any  # number or string
+    remaining_amount: Any  # number or string
+
+
+class LimitEventOut(BaseModel):
+    uuid: str
+    limit_id: str
+    triggered_at: str  # datetime string
+    sent_at: Optional[str] = None  # datetime string
+    expires_at: Optional[str] = None  # datetime string
+
+    model_config = ConfigDict(from_attributes=True)

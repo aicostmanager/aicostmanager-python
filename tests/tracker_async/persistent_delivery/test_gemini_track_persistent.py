@@ -12,7 +12,7 @@ genai = pytest.importorskip("google.genai")
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
-from aicostmanager.usage_utils import extract_usage
+from aicostmanager.usage_utils import get_usage_from_response
 
 BASE_URL = "http://127.0.0.1:8001"
 
@@ -94,7 +94,7 @@ def test_gemini_track_non_streaming(model, google_api_key, aicm_api_key, tmp_pat
         print(f"Response ID: {response_id}")
         print(f"Response type: {type(resp)}")
         print(f"Response dir: {dir(resp)[:20]}...")  # First 20 attributes
-        usage = extract_usage(resp)
+        usage = get_usage_from_response(resp, "gemini")
         print(f"Usage result: {usage}")
         print(f"Usage type: {type(usage)}")
         asyncio.run(

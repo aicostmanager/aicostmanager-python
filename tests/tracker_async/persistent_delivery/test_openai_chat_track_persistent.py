@@ -13,7 +13,7 @@ openai = pytest.importorskip("openai")
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
-from aicostmanager.usage_utils import extract_usage
+from aicostmanager.usage_utils import get_usage_from_response
 
 BASE_URL = "http://127.0.0.1:8001"
 
@@ -88,7 +88,7 @@ def test_openai_chat_track_non_streaming(aicm_api_key):
             max_completion_tokens=20,
         )
         response_id = getattr(resp, "id", None)
-        usage = extract_usage(resp)
+        usage = get_usage_from_response(resp, "openai_chat")
         asyncio.run(
             tracker.track_async(
                 "openai_chat", "openai::gpt-5-mini", usage, response_id=response_id

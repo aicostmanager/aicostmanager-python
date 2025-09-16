@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.35] - 2025-09-16
+### Changed
+- **Default Error Handling**: Changed `AICM_RAISE_ON_ERROR` default from `true` to `false`. By default, tracking failures now log errors and continue instead of raising exceptions. Set `AICM_RAISE_ON_ERROR=true` to restore the previous behavior.
+
 ## [0.1.34] - 2025-01-27
 ### Added
 - Optional pre-inference limit enforcement in LLM wrappers controlled by

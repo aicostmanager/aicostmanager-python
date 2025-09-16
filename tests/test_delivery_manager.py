@@ -1,5 +1,4 @@
 import json
-import json
 import time
 
 import httpx
@@ -44,8 +43,8 @@ def test_tracker_default_immediate_delivery():
     dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
     delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
     tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
-    tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
-    assert received and received[0]["tracked"][0]["api_id"] == "openai"
+    tracker.track("openai::gpt-5-mini", {"input_tokens": 1})
+    assert received and received[0]["tracked"][0]["service_key"] == "openai::gpt-5-mini"
     tracker.close()
 
 
@@ -75,7 +74,7 @@ def test_tracker_persistent_queue_delivery(tmp_path):
     tracker = Tracker(
         aicm_api_key="test", ini_path=str(tmp_path / "ini"), delivery=delivery
     )
-    tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
+    tracker.track("openai::gpt-5-mini", {"input_tokens": 1})
     for _ in range(20):
         if received:
             break
@@ -120,7 +119,7 @@ def test_immediate_delivery_retries():
     dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
     delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
     tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
-    tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
+    tracker.track("openai::gpt-5-mini", {"input_tokens": 1})
     tracker.close()
     assert attempts["count"] == 3
 
@@ -139,10 +138,9 @@ def test_immediate_delivery_does_not_retry_client_error():
     dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
     delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
     tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
-    try:
-        tracker.track("openai", "gpt-5-mini", {"input_tokens": 1})
-    except httpx.HTTPStatusError:
-        pass
+    # With new default (raise_on_error=false), this should not raise an exception
+    result = tracker.track("openai::gpt-5-mini", {"input_tokens": 1})
+    assert "error" in result  # Should contain error information
     tracker.close()
     assert attempts["count"] == 1
 

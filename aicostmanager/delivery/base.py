@@ -124,14 +124,10 @@ class Delivery(ABC):
             service_key=service_key,
             client_customer_key=client_customer_key,
         )
-        # Match against the API key ID used by the server (typically the UUID
-        # suffix of the API key string "....<uuid>"). Fallback to the full
-        # key if no dot is present for compatibility with older formats.
+        # Extract the API key ID (UUID suffix after the last dot)
         api_key_id = None
-        if self.api_key:
-            api_key_id = (
-                self.api_key.split(".")[-1] if "." in self.api_key else self.api_key
-            )
+        if self.api_key and "." in self.api_key:
+            api_key_id = self.api_key.split(".")[-1]
         if api_key_id:
             limits = [l for l in limits if l.api_key_id == api_key_id]
         if limits:

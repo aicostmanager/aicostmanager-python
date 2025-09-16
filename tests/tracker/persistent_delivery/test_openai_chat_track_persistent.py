@@ -12,7 +12,7 @@ openai = pytest.importorskip("openai")
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
-from aicostmanager.usage_utils import extract_usage
+from aicostmanager.usage_utils import get_usage_from_response
 
 BASE_URL = "http://127.0.0.1:8001"
 
@@ -91,9 +91,9 @@ def test_openai_chat_track_non_streaming(aicm_api_key, tmp_path):
             max_completion_tokens=20,
         )
         response_id = getattr(resp, "id", None)
-        usage = extract_usage(resp)
+        usage = get_usage_from_response(resp, "openai_chat")
         tracker.track(
-            "openai_chat", "openai::gpt-5-mini", usage, response_id=response_id
+            "openai::gpt-5-mini", usage, response_id=response_id
         )
         _wait_for_cost_event(aicm_api_key, response_id)
 
@@ -149,7 +149,7 @@ def test_openai_chat_track_streaming(aicm_api_key, tmp_path):
 
         # Track the usage and get the actual response_id that was used
         tracker.track(
-            "openai_chat", "openai::gpt-5-mini", usage_payload, response_id=response_id
+            "openai::gpt-5-mini", usage_payload, response_id=response_id
         )
 
         # If no response_id was provided, we need to get it from the persistent delivery

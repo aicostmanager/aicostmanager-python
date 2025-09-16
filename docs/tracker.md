@@ -52,8 +52,8 @@ See [`config.md`](config.md) for the full list of settings.
 ## Choosing a delivery manager
 
 The tracker supports multiple delivery strategies. The default ``IMMEDIATE`` mode sends each record
-synchronously with up to three retries for transient errors. By default, a failure to reach the
-tracking API raises an exception; set ``AICM_RAISE_ON_ERROR=false`` to log and continue. Use
+synchronously with up to three retries for transient errors. By default, failures to reach the
+tracking API are logged and ignored; set ``AICM_RAISE_ON_ERROR=true`` to raise exceptions instead. Use
 ``PERSISTENT_QUEUE`` for a durable SQLite-backed queue with background
 delivery.
 

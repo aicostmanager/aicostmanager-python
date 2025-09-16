@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterator, Optional
 
 from .client import CostManagerClient
-from .models import CostEvent, CostEventFilters, CostEventsResponse
+from .models import CostEventFilters, CostEventItem, CostEventsResponse
 
 
 class CostQueryManager:
@@ -67,7 +67,7 @@ class CostQueryManager:
         self,
         filters: CostEventFilters | Dict[str, Any] | None = None,
         **params: Any,
-    ) -> Iterator[CostEvent]:
+    ) -> Iterator[CostEventItem]:
         """Iterate over cost events across paginated responses."""
 
         if filters:
@@ -76,4 +76,4 @@ class CostQueryManager:
             else:
                 params.update({k: v for k, v in filters.items() if v is not None})
         for item in self.client._iter_paginated("/costs/", **params):
-            yield CostEvent.model_validate(item)
+            yield CostEventItem.model_validate(item)

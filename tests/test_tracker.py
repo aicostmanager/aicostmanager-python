@@ -32,7 +32,7 @@ def test_tracker_builds_record():
     delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
     tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
     tracker.track(
-        "openai", "gpt-5-mini", {"input_tokens": 1}, client_customer_key="abc"
+        "openai::gpt-5-mini", {"input_tokens": 1}, client_customer_key="abc"
     )
     tracker.close()
     assert received
