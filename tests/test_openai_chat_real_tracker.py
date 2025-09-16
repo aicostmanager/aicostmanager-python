@@ -1,7 +1,5 @@
-import json
 import os
-import time
-import urllib.request
+
 import pytest
 
 openai = pytest.importorskip("openai")
@@ -69,9 +67,7 @@ def test_openai_chat_tracker(
         )
         response_id = getattr(resp, "id", None)
         usage_payload = get_usage_from_response(resp, "openai_chat")
-        result = tracker.track(
-            service_key, usage_payload, response_id=response_id
-        )
+        result = tracker.track(service_key, usage_payload, response_id=response_id)
         assert result["result"]["cost_events"]
 
     # Immediate delivery

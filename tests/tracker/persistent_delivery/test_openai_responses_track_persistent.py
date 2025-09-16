@@ -46,9 +46,7 @@ def test_openai_responses_track_non_streaming(aicm_api_key, tmp_path):
         resp = client.responses.create(model="gpt-5-mini", input="Say hi")
         response_id = getattr(resp, "id", None)
         usage = get_usage_from_response(resp, "openai_responses")
-        tracker.track(
-            "openai::gpt-5-mini", usage, response_id=response_id
-        )
+        tracker.track("openai::gpt-5-mini", usage, response_id=response_id)
         # Background delivery: rely on queue drain instead of cost-events endpoint
         deadline = time.time() + 10
         while time.time() < deadline:

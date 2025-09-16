@@ -149,7 +149,7 @@ def test_gemini_tracker(service_key, model, google_api_key, aicm_api_key, tmp_pa
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:
         usage2 = _extract_usage_payload(resp2)
-        used2 = t2.track("gemini", service_key, usage2, response_id=response_id2)
+        used2 = t2.track(service_key, usage2, response_id=response_id2)
     final2 = _extract_response_id(used2, response_id2)
     # Immediate delivery returns cost_events in the response
     assert isinstance(used2, dict)

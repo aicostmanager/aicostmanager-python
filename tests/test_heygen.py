@@ -1,6 +1,5 @@
 import datetime
 import os
-import time
 from typing import Dict, List
 
 import pytest
@@ -10,7 +9,7 @@ from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 
-SERVICE_KEY = "heygen::api.heygen.com/v2/streaming.list"
+SERVICE_KEY = "heygen::streaming-avatar"
 BASE_URL = "https://api.heygen.com/v2/streaming.list"
 
 if os.environ.get("RUN_NETWORK_TESTS") != "1":
@@ -91,7 +90,6 @@ def test_heygen_track_immediate(heygen_events, aicm_api_key, aicm_api_base, tmp_
     ) as tracker:
         for event in immediate_events:
             result = tracker.track(
-                "heygen",
                 SERVICE_KEY,
                 event["payload"],
                 response_id=event["response_id"],
@@ -120,7 +118,6 @@ def test_heygen_track_persistent(heygen_events, aicm_api_key, aicm_api_base, tmp
     ) as tracker:
         for event in persistent_events:
             tracker.track(
-                "heygen",
                 SERVICE_KEY,
                 event["payload"],
                 response_id=event["response_id"],

@@ -98,9 +98,7 @@ def test_gemini_track_non_streaming(model, google_api_key, aicm_api_key, tmp_pat
         print(f"Usage result: {usage}")
         print(f"Usage type: {type(usage)}")
         asyncio.run(
-            tracker.track_async(
-                "gemini", f"google::{model}", usage, response_id=response_id
-            )
+            tracker.track_async(f"google::{model}", usage, response_id=response_id)
         )
         _wait_for_cost_event(aicm_api_key, response_id)
 
@@ -172,7 +170,6 @@ def test_gemini_track_streaming(model, google_api_key, aicm_api_key, tmp_path):
         # Track the usage and get the actual response_id that was used
         asyncio.run(
             tracker.track_async(
-                "gemini",
                 f"google::{model}",
                 usage_payload,
                 response_id=response_id,

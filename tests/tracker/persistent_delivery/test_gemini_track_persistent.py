@@ -157,9 +157,7 @@ def test_gemini_track_streaming(model, google_api_key, aicm_api_key):
             )
 
         # Track the usage and get the actual response_id that was used
-        tracker.track(
-            f"google::{model}", usage_payload, response_id=response_id
-        )
+        tracker.track(f"google::{model}", usage_payload, response_id=response_id)
 
         # If no response_id was provided, we need to get it from the persistent delivery
         # The persistent delivery generates its own ID when none is provided

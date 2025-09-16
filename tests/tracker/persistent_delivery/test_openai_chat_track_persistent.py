@@ -92,9 +92,7 @@ def test_openai_chat_track_non_streaming(aicm_api_key, tmp_path):
         )
         response_id = getattr(resp, "id", None)
         usage = get_usage_from_response(resp, "openai_chat")
-        tracker.track(
-            "openai::gpt-5-mini", usage, response_id=response_id
-        )
+        tracker.track("openai::gpt-5-mini", usage, response_id=response_id)
         _wait_for_cost_event(aicm_api_key, response_id)
 
 
@@ -148,9 +146,7 @@ def test_openai_chat_track_streaming(aicm_api_key, tmp_path):
             pytest.skip("No usage returned in streaming events; skipping")
 
         # Track the usage and get the actual response_id that was used
-        tracker.track(
-            "openai::gpt-5-mini", usage_payload, response_id=response_id
-        )
+        tracker.track("openai::gpt-5-mini", usage_payload, response_id=response_id)
 
         # If no response_id was provided, we need to get it from the persistent delivery
         # The persistent delivery generates its own ID when none is provided

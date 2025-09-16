@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import datetime, timezone
 
 import pytest
@@ -10,249 +11,262 @@ from aicostmanager.tracker import Tracker
 if os.environ.get("RUN_NETWORK_TESTS") != "1":
     pytestmark = pytest.mark.skip(reason="requires network access")
 
-_SCENARIOS = [
-    (
-        "transcription_nova3_en_no_terms",
-        [
-            {
-                "response_id": "dg-transcription-nova3-en-no-terms",
-                "service_key": "deepgram::deepgram_websocket_transcription",
-                "payload": {
-                    "model": "nova-3",
-                    "language": "en",
-                    "duration": 120,
-                    "keywords": [],
-                },
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            }
-        ],
-    ),
-    (
-        "transcription_nova3_en_with_terms",
-        [
-            {
-                "response_id": "dg-transcription-nova3-en-with-terms",
-                "service_key": "deepgram::deepgram_websocket_transcription",
-                "payload": {
-                    "model": "nova-3",
-                    "language": "en",
-                    "duration": 90,
-                    "keywords": ["brand", "product"],
-                },
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            }
-        ],
-    ),
-    (
-        "transcription_nova3_multi",
-        [
-            {
-                "response_id": "dg-transcription-nova3-multi",
-                "service_key": "deepgram::deepgram_websocket_transcription",
-                "payload": {
-                    "model": "nova-3",
-                    "language": "multi",
-                    "duration": 45,
-                },
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            }
-        ],
-    ),
-    (
-        "transcription_fallback_nova2",
-        [
-            {
-                "response_id": "dg-transcription-fallback-nova2",
-                "service_key": "deepgram::deepgram_websocket_transcription",
-                "payload": {
-                    "model": "nova-2",
-                    "language": "en",
-                    "duration": 30,
-                },
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            }
-        ],
-    ),
-    (
-        "tts_aura1_500",
-        [
-            {
-                "response_id": "dg-tts-aura1-500",
-                "service_key": "deepgram::deepgram_streaming_tts",
-                "payload": {
-                    "model": "aura-1",
-                    "char_count": 500,
-                },
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            }
-        ],
-    ),
-    (
-        "tts_aura1_2500",
-        [
-            {
-                "response_id": "dg-tts-aura1-2500",
-                "service_key": "deepgram::deepgram_streaming_tts",
-                "payload": {
-                    "model": "aura-1",
-                    "char_count": 2500,
-                },
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            }
-        ],
-    ),
-    (
-        "tts_aura2_1000",
-        [
-            {
-                "response_id": "dg-tts-aura2-1000",
-                "service_key": "deepgram::deepgram_streaming_tts",
-                "payload": {
-                    "model": "aura-2",
-                    "char_count": 1000,
-                },
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            }
-        ],
-    ),
-    (
-        "tts_aura2_750",
-        [
-            {
-                "response_id": "dg-tts-aura2-750",
-                "service_key": "deepgram::deepgram_streaming_tts",
-                "payload": {
-                    "model": "aura-2",
-                    "char_count": 750,
-                },
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            }
-        ],
-    ),
-    (
-        "mixed_batch",
-        [
-            {
-                "response_id": "dg-batch-transcription",
-                "service_key": "deepgram::deepgram_websocket_transcription",
-                "payload": {
-                    "model": "nova-3",
-                    "language": "en",
-                    "duration": 120,
-                },
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            },
-            {
-                "response_id": "dg-batch-tts",
-                "service_key": "deepgram::deepgram_streaming_tts",
-                "payload": {
-                    "model": "aura-1",
-                    "char_count": 1500,
-                },
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            },
-        ],
-    ),
-]
+
+def _generate_unique_id():
+    """Generate a unique ID for test response_ids."""
+    return str(uuid.uuid4())[:8]
 
 
-# Scenarios with client_customer_key and context
-_SCENARIOS_WITH_META = [
-    (
-        "transcription_nova3_en_with_meta",
-        [
-            {
-                "response_id": "dg-transcription-nova3-en-meta",
-                "service_key": "deepgram::deepgram_websocket_transcription",
-                "payload": {
-                    "model": "nova-3",
-                    "language": "en",
-                    "duration": 120,
-                    "keywords": [],
+def _get_scenarios():
+    """Generate test scenarios with unique response_ids and timestamps."""
+    base_timestamp = datetime.now(timezone.utc)
+    unique_id = _generate_unique_id()
+
+    return [
+        (
+            "transcription_nova3_en_no_terms",
+            [
+                {
+                    "response_id": f"dg-transcription-nova3-en-no-terms-{unique_id}",
+                    "service_key": "deepgram::tts-streaming",
+                    "payload": {
+                        "model": "nova-3",
+                        "language": "en",
+                        "duration": 120,
+                        "keywords": [],
+                    },
+                    "timestamp": base_timestamp.isoformat().replace("+00:00", "Z"),
+                }
+            ],
+        ),
+        (
+            "transcription_nova3_en_with_terms",
+            [
+                {
+                    "response_id": f"dg-transcription-nova3-en-with-terms-{unique_id}",
+                    "service_key": "deepgram::tts-streaming",
+                    "payload": {
+                        "model": "nova-3",
+                        "language": "en",
+                        "duration": 90,
+                        "keywords": ["brand", "product"],
+                    },
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                }
+            ],
+        ),
+        (
+            "transcription_nova3_multi",
+            [
+                {
+                    "response_id": f"dg-transcription-nova3-multi-{unique_id}",
+                    "service_key": "deepgram::tts-streaming",
+                    "payload": {
+                        "model": "nova-3",
+                        "language": "multi",
+                        "duration": 45,
+                    },
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                }
+            ],
+        ),
+        (
+            "transcription_fallback_nova2",
+            [
+                {
+                    "response_id": f"dg-transcription-fallback-nova2-{unique_id}",
+                    "service_key": "deepgram::tts-streaming",
+                    "payload": {
+                        "model": "nova-2",
+                        "language": "en",
+                        "duration": 30,
+                    },
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                }
+            ],
+        ),
+        (
+            "tts_aura1_500",
+            [
+                {
+                    "response_id": f"dg-tts-aura1-500-{unique_id}",
+                    "service_key": "deepgram::tts",
+                    "payload": {
+                        "model": "aura-1",
+                        "char_count": 500,
+                    },
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                }
+            ],
+        ),
+        (
+            "tts_aura1_2500",
+            [
+                {
+                    "response_id": f"dg-tts-aura1-2500-{unique_id}",
+                    "service_key": "deepgram::tts",
+                    "payload": {
+                        "model": "aura-1",
+                        "char_count": 2500,
+                    },
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                }
+            ],
+        ),
+        (
+            "tts_aura2_1000",
+            [
+                {
+                    "response_id": f"dg-tts-aura2-1000-{unique_id}",
+                    "service_key": "deepgram::tts",
+                    "payload": {
+                        "model": "aura-2",
+                        "char_count": 1000,
+                    },
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                }
+            ],
+        ),
+        (
+            "tts_aura2_750",
+            [
+                {
+                    "response_id": f"dg-tts-aura2-750-{unique_id}",
+                    "service_key": "deepgram::tts",
+                    "payload": {
+                        "model": "aura-2",
+                        "char_count": 750,
+                    },
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                }
+            ],
+        ),
+        (
+            "mixed_batch",
+            [
+                {
+                    "response_id": f"dg-batch-transcription-{unique_id}",
+                    "service_key": "deepgram::tts-streaming",
+                    "payload": {
+                        "model": "nova-3",
+                        "language": "en",
+                        "duration": 120,
+                    },
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
                 },
-                "client_customer_key": "customer-123",
-                "context": {"environment": "production", "session_id": "sess-456"},
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            }
-        ],
-    ),
-    (
-        "tts_aura1_with_meta",
-        [
-            {
-                "response_id": "dg-tts-aura1-meta",
-                "service_key": "deepgram::deepgram_streaming_tts",
-                "payload": {
-                    "model": "aura-1",
-                    "char_count": 500,
+                {
+                    "response_id": f"dg-batch-tts-{unique_id}",
+                    "service_key": "deepgram::tts",
+                    "payload": {
+                        "model": "aura-1",
+                        "char_count": 1500,
+                    },
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
                 },
-                "client_customer_key": "customer-789",
-                "context": {"user_id": "user-123", "feature": "tts"},
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            }
-        ],
-    ),
-    (
-        "mixed_batch_with_meta",
-        [
-            {
-                "response_id": "dg-batch-transcription-meta",
-                "service_key": "deepgram::deepgram_websocket_transcription",
-                "payload": {
-                    "model": "nova-3",
-                    "language": "en",
-                    "duration": 120,
+            ],
+        ),
+    ]
+
+
+def _get_scenarios_with_meta():
+    """Generate test scenarios with meta data (client_customer_key, context) and unique response_ids."""
+    base_timestamp = datetime.now(timezone.utc)
+    unique_id = _generate_unique_id()
+
+    return [
+        (
+            "transcription_nova3_en_with_meta",
+            [
+                {
+                    "response_id": f"dg-transcription-nova3-en-meta-{unique_id}",
+                    "service_key": "deepgram::tts-streaming",
+                    "payload": {
+                        "model": "nova-3",
+                        "language": "en",
+                        "duration": 120,
+                        "keywords": [],
+                    },
+                    "client_customer_key": "customer-123",
+                    "context": {"environment": "production", "session_id": "sess-456"},
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                }
+            ],
+        ),
+        (
+            "tts_aura1_with_meta",
+            [
+                {
+                    "response_id": f"dg-tts-aura1-meta-{unique_id}",
+                    "service_key": "deepgram::tts",
+                    "payload": {
+                        "model": "aura-1",
+                        "char_count": 500,
+                    },
+                    "client_customer_key": "customer-789",
+                    "context": {"user_id": "user-123", "feature": "tts"},
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                }
+            ],
+        ),
+        (
+            "mixed_batch_with_meta",
+            [
+                {
+                    "response_id": f"dg-batch-transcription-meta-{unique_id}",
+                    "service_key": "deepgram::tts-streaming",
+                    "payload": {
+                        "model": "nova-3",
+                        "language": "en",
+                        "duration": 120,
+                    },
+                    "client_customer_key": "customer-batch",
+                    "context": {"batch_id": "batch-001", "priority": "high"},
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
                 },
-                "client_customer_key": "customer-batch",
-                "context": {"batch_id": "batch-001", "priority": "high"},
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            },
-            {
-                "response_id": "dg-batch-tts-meta",
-                "service_key": "deepgram::deepgram_streaming_tts",
-                "payload": {
-                    "model": "aura-1",
-                    "char_count": 1500,
+                {
+                    "response_id": f"dg-batch-tts-meta-{unique_id}",
+                    "service_key": "deepgram::tts",
+                    "payload": {
+                        "model": "aura-1",
+                        "char_count": 1500,
+                    },
+                    "client_customer_key": "customer-batch",
+                    "context": {"batch_id": "batch-001", "priority": "high"},
+                    "timestamp": datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
                 },
-                "client_customer_key": "customer-batch",
-                "context": {"batch_id": "batch-001", "priority": "high"},
-                "timestamp": datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            },
-        ],
-    ),
-]
+            ],
+        ),
+    ]
 
 
 @pytest.mark.parametrize(
-    "events", [s[1] for s in _SCENARIOS], ids=[s[0] for s in _SCENARIOS]
+    "events", [s[1] for s in _get_scenarios()], ids=[s[0] for s in _get_scenarios()]
 )
 def test_deepgram_track_immediate(events, aicm_api_key, aicm_api_base, tmp_path):
     ini = IniManager(str(tmp_path / "ini_immediate"))
@@ -274,7 +288,7 @@ def test_deepgram_track_immediate(events, aicm_api_key, aicm_api_base, tmp_path)
 
 
 @pytest.mark.parametrize(
-    "events", [s[1] for s in _SCENARIOS], ids=[s[0] for s in _SCENARIOS]
+    "events", [s[1] for s in _get_scenarios()], ids=[s[0] for s in _get_scenarios()]
 )
 def test_deepgram_track_persistent(events, aicm_api_key, aicm_api_base, tmp_path):
     ini = IniManager(str(tmp_path / "ini_persistent"))
@@ -303,8 +317,8 @@ def test_deepgram_track_persistent(events, aicm_api_key, aicm_api_base, tmp_path
 
 @pytest.mark.parametrize(
     "events",
-    [s[1] for s in _SCENARIOS_WITH_META],
-    ids=[s[0] for s in _SCENARIOS_WITH_META],
+    [s[1] for s in _get_scenarios_with_meta()],
+    ids=[s[0] for s in _get_scenarios_with_meta()],
 )
 def test_deepgram_track_immediate_with_meta(
     events, aicm_api_key, aicm_api_base, tmp_path
@@ -331,8 +345,8 @@ def test_deepgram_track_immediate_with_meta(
 
 @pytest.mark.parametrize(
     "events",
-    [s[1] for s in _SCENARIOS_WITH_META],
-    ids=[s[0] for s in _SCENARIOS_WITH_META],
+    [s[1] for s in _get_scenarios_with_meta()],
+    ids=[s[0] for s in _get_scenarios_with_meta()],
 )
 def test_deepgram_track_persistent_with_meta(
     events, aicm_api_key, aicm_api_base, tmp_path

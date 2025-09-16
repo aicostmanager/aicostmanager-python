@@ -182,7 +182,5 @@ def test_bedrock_track_streaming(
             pytest.skip("No usage found in Bedrock streaming response; skipping")
         usage_payload = final_usage
 
-        tracker.track(
-            service_key, usage_payload, response_id=response_id
-        )
+        tracker.track(service_key, usage_payload, response_id=response_id)
         _wait_for_cost_event(aicm_api_key, response_id)

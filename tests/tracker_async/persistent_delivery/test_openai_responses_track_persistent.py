@@ -45,7 +45,6 @@ def test_openai_responses_track_non_streaming(aicm_api_key):
         usage = get_usage_from_response(resp, "openai_responses")
         asyncio.run(
             tracker.track_async(
-                "openai_responses",
                 "openai::gpt-5-mini",
                 usage,
                 response_id=response_id,
@@ -105,7 +104,6 @@ def test_openai_responses_track_streaming(aicm_api_key):
         # Track the usage and get the actual response_id that was used
         used_id = asyncio.run(
             tracker.track_async(
-                "openai_responses",
                 "openai::gpt-5-mini",
                 usage_payload,
                 response_id=response_id,

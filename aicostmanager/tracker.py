@@ -140,11 +140,11 @@ class Tracker:
             "service_key": service_key,
             "response_id": response_id or uuid4().hex,
             "timestamp": (
-                timestamp.timestamp()
+                str(timestamp.timestamp())
                 if isinstance(timestamp, datetime)
-                else datetime.fromisoformat(timestamp).timestamp()
+                else str(datetime.fromisoformat(timestamp).timestamp())
                 if isinstance(timestamp, str)
-                else datetime.now(timezone.utc).timestamp()
+                else str(datetime.now(timezone.utc).timestamp())
             ),
             "payload": usage,
         }
