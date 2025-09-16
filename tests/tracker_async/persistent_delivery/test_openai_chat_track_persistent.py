@@ -91,7 +91,7 @@ def test_openai_chat_track_non_streaming(aicm_api_key):
         usage = get_usage_from_response(resp, "openai_chat")
         asyncio.run(
             tracker.track_async(
-                "openai_chat", "openai::gpt-5-mini", usage, response_id=response_id
+                "openai::gpt-5-mini", usage, response_id=response_id
             )
         )
         _wait_for_cost_event(aicm_api_key, response_id)
@@ -145,7 +145,6 @@ def test_openai_chat_track_streaming(aicm_api_key):
         # Track the usage and get the actual response_id that was used
         asyncio.run(
             tracker.track_async(
-                "openai_chat",
                 "openai::gpt-5-mini",
                 usage_payload,
                 response_id=response_id,

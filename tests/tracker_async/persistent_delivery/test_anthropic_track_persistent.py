@@ -50,7 +50,6 @@ def test_anthropic_track_non_streaming(anthropic_api_key, aicm_api_key, tmp_path
         usage = get_usage_from_response(resp, "anthropic")
         asyncio.run(
             tracker.track_async(
-                "anthropic",
                 "anthropic::claude-3-5-sonnet-20241022",
                 usage,
                 response_id=response_id,
@@ -115,7 +114,6 @@ def test_anthropic_track_streaming(anthropic_api_key, aicm_api_key, tmp_path):
         # Track the usage and get the actual response_id that was used
         used_id = asyncio.run(
             tracker.track_async(
-                "anthropic",
                 "anthropic::claude-3-5-sonnet-20241022",
                 usage_payload,
                 response_id=response_id,

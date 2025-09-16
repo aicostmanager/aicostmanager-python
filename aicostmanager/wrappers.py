@@ -161,7 +161,6 @@ class BaseLLMWrapper:
         model_id = model or "unknown-model"
         return f"{vendor}::{model_id}"
 
-
     def _track_usage(self, response: Any, model: str | None) -> Any:
         usage = get_usage_from_response(response, self.api_id)
         if usage:

@@ -130,9 +130,7 @@ def test_gemini_tracker(service_key, model, google_api_key, aicm_api_key, tmp_pa
     # Try helper path by feeding usage via track(); if no id, generate and track
     response_id = getattr(resp, "id", None) or getattr(resp, "response_id", None)
     usage_payload = _extract_usage_payload(resp)
-    used_id = tracker.track(
-        service_key, usage_payload, response_id=response_id
-    )
+    used_id = tracker.track(service_key, usage_payload, response_id=response_id)
     final_id = _extract_response_id(used_id, response_id)
     assert _wait_for_empty(tracker.delivery, timeout=10.0)
 
