@@ -90,9 +90,7 @@ def test_openai_chat_track_non_streaming(aicm_api_key):
         response_id = getattr(resp, "id", None)
         usage = get_usage_from_response(resp, "openai_chat")
         asyncio.run(
-            tracker.track_async(
-                "openai::gpt-5-mini", usage, response_id=response_id
-            )
+            tracker.track_async("openai::gpt-5-mini", usage, response_id=response_id)
         )
         _wait_for_cost_event(aicm_api_key, response_id)
 
