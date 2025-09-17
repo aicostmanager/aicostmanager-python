@@ -259,4 +259,4 @@ def test_openai_chat_vendor_detection():
     x_client = make_openai_chat_client("https://api.x.ai")
     wrapper_x = OpenAIChatWrapper(x_client, tracker=tracker)
     wrapper_x.chat.completions.create(model="m2")
-    assert tracker.calls[0][1] == "xai::m2"
+    assert tracker.calls[0][0] == "xai::m2"

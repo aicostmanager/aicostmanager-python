@@ -4,7 +4,7 @@ import asyncio
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 from uuid import uuid4
 
 from .delivery import (
@@ -117,6 +117,8 @@ class Tracker:
         self.context: Optional[Dict[str, Any]] = None
 
     # ------------------------------------------------------------------
+    # Configuration Methods
+    # ------------------------------------------------------------------
     def set_client_customer_key(self, key: str | None) -> None:
         """Update the ``client_customer_key`` used for tracking."""
         self.client_customer_key = key
@@ -126,6 +128,63 @@ class Tracker:
         self.context = context
 
     # ------------------------------------------------------------------
+    # Helper Methods
+    # ------------------------------------------------------------------
+    def _get_vendor_api_mapping(self, service_key: str) -> Tuple[str, str]:
+        """Extract vendor and api_id from service_key.
+
+        Returns:
+            Tuple of (vendor, api_id)
+        """
+        if "::" in service_key:
+            vendor = service_key.split("::")[0]
+            # Map vendor to api_id
+            vendor_to_api = {
+                "openai": "openai_chat",
+                "anthropic": "anthropic",
+                "amazon-bedrock": "amazon-bedrock",
+                "fireworks-ai": "openai_chat",  # Fireworks uses OpenAI-compatible API
+                "xai": "openai_chat",  # X.AI uses OpenAI-compatible API
+                "google": "gemini",
+            }
+            api_id = vendor_to_api.get(vendor, vendor)
+            return vendor, api_id
+        else:
+            # If no "::" found, assume it's already an api_id
+            return service_key, service_key
+
+    def _build_final_service_key(
+        self, service_key: str, api_id: str, response_or_chunk: Any
+    ) -> str:
+        """Build the final service_key from api_id and model if needed."""
+        if "::" not in service_key:
+            # service_key was actually an api_id, extract model from response
+            model = getattr(response_or_chunk, "model", None)
+            if model:
+                # Map api_id back to vendor
+                api_to_vendor = {
+                    "openai_chat": "openai",
+                    "openai_responses": "openai",
+                    "anthropic": "anthropic",
+                    "amazon-bedrock": "amazon-bedrock",
+                    "gemini": "google",
+                }
+                vendor = api_to_vendor.get(api_id, api_id)
+                return f"{vendor}::{model}"
+        return service_key
+
+    def _resolve_tracking_params(
+        self, client_customer_key: Optional[str], context: Optional[Dict[str, Any]]
+    ) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+        """Resolve tracking parameters using instance defaults as fallbacks."""
+        resolved_key = (
+            client_customer_key
+            if client_customer_key is not None
+            else self.client_customer_key
+        )
+        resolved_context = context if context is not None else self.context
+        return resolved_key, resolved_context
+
     def _build_record(
         self,
         service_key: str,
@@ -155,6 +214,8 @@ class Tracker:
         return record
 
     # ------------------------------------------------------------------
+    # Core Tracking Methods
+    # ------------------------------------------------------------------
     def track(
         self,
         service_key: str,
@@ -172,10 +233,9 @@ class Tracker:
         ``{"queued": <count>}`` indicating the queue length.
         """
         # Use instance-level values as fallbacks if parameters are None
-        if client_customer_key is None:
-            client_customer_key = self.client_customer_key
-        if context is None:
-            context = self.context
+        client_customer_key, context = self._resolve_tracking_params(
+            client_customer_key, context
+        )
 
         record = self._build_record(
             service_key,
@@ -210,6 +270,9 @@ class Tracker:
             context=context,
         )
 
+    # ------------------------------------------------------------------
+    # LLM Tracking Methods
+    # ------------------------------------------------------------------
     def track_llm_usage(
         self,
         service_key: str,
@@ -229,26 +292,36 @@ class Tracker:
         not provided and one is generated, it is attached to the response as
         ``response.aicm_response_id`` for convenience.
         """
-        usage = get_usage_from_response(response, service_key)
+        vendor, api_id = self._get_vendor_api_mapping(service_key)
+
+        usage = get_usage_from_response(response, api_id)
         if isinstance(usage, dict) and usage:
+            final_service_key = self._build_final_service_key(
+                service_key, api_id, response
+            )
+
             track_result = self.track(
-                service_key,
+                final_service_key,
                 usage,
                 response_id=response_id,
                 timestamp=timestamp,
                 client_customer_key=client_customer_key,
                 context=context,
             )
-            try:
-                setattr(
-                    response,
-                    "aicm_response_id",
-                    track_result.get("result", {}).get("response_id"),
-                )
-                setattr(response, "aicm_track_result", track_result)
-            except Exception:
-                pass
+            self._attach_tracking_metadata(response, track_result)
         return response
+
+    def _attach_tracking_metadata(self, response: Any, track_result: Any) -> None:
+        """Safely attach tracking metadata to response object."""
+        try:
+            setattr(
+                response,
+                "aicm_response_id",
+                track_result.get("result", {}).get("response_id"),
+            )
+            setattr(response, "aicm_track_result", track_result)
+        except Exception:
+            pass
 
     async def track_llm_usage_async(
         self,
@@ -288,13 +361,28 @@ class Tracker:
         :func:`get_streaming_usage_from_response` and sent via :meth:`track` once
         available.
         """
+        vendor, api_id = self._get_vendor_api_mapping(service_key)
+
         usage_sent = False
         for chunk in stream:
             if not usage_sent:
-                usage = get_streaming_usage_from_response(chunk, service_key)
+                usage = get_streaming_usage_from_response(chunk, api_id)
                 if isinstance(usage, dict) and usage:
+                    # For streaming, try to get model from both stream and chunk
+                    chunk_with_model = type(
+                        "MockResponse",
+                        (),
+                        {
+                            "model": getattr(stream, "model", None)
+                            or getattr(chunk, "model", None)
+                        },
+                    )()
+                    final_service_key = self._build_final_service_key(
+                        service_key, api_id, chunk_with_model
+                    )
+
                     self.track(
-                        service_key,
+                        final_service_key,
                         usage,
                         response_id=response_id,
                         timestamp=timestamp,
@@ -315,13 +403,28 @@ class Tracker:
         context: Optional[Dict[str, Any]] = None,
     ):
         """Asynchronous version of :meth:`track_llm_stream_usage`."""
+        vendor, api_id = self._get_vendor_api_mapping(service_key)
+
         usage_sent = False
         async for chunk in stream:
             if not usage_sent:
-                usage = get_streaming_usage_from_response(chunk, service_key)
+                usage = get_streaming_usage_from_response(chunk, api_id)
                 if isinstance(usage, dict) and usage:
+                    # For streaming, try to get model from both stream and chunk
+                    chunk_with_model = type(
+                        "MockResponse",
+                        (),
+                        {
+                            "model": getattr(stream, "model", None)
+                            or getattr(chunk, "model", None)
+                        },
+                    )()
+                    final_service_key = self._build_final_service_key(
+                        service_key, api_id, chunk_with_model
+                    )
+
                     await self.track_async(
-                        service_key,
+                        final_service_key,
                         usage,
                         response_id=response_id,
                         timestamp=timestamp,
@@ -331,6 +434,8 @@ class Tracker:
                     usage_sent = True
             yield chunk
 
+    # ------------------------------------------------------------------
+    # Context Manager and Lifecycle Methods
     # ------------------------------------------------------------------
     def __enter__(self):
         """Context manager entry point."""
@@ -355,6 +460,5 @@ class Tracker:
         delivery across multiple trackers should manage the delivery lifecycle
         separately instead of relying on the tracker's context manager.
         """
-
         if getattr(self, "delivery", None) is not None:
             self.delivery.stop()

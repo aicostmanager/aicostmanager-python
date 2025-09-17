@@ -141,7 +141,7 @@ def test_limits_immediate_end_to_end(
         # First call might not raise if server hasn't processed the limit yet
         try:
             tracker.track(
-                "openai_responses",
+                SERVICE_KEY,
                 payload,
                 response_id=getattr(resp, "id", None),
             )
@@ -273,7 +273,7 @@ def test_limits_queue_end_to_end(
         payload = get_usage_from_response(resp, "openai_responses")
         try:
             tracker.track(
-                "openai_responses",
+                SERVICE_KEY,
                 payload,
                 response_id=getattr(resp, "id", None),
             )
@@ -410,7 +410,7 @@ def test_limits_customer_immediate(
         # First call might not raise if server hasn't processed the limit yet
         try:
             tracker.track(
-                "openai_responses",
+                SERVICE_KEY,
                 payload,
                 response_id=getattr(resp, "id", None),
                 client_customer_key=customer,
