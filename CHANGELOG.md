@@ -5,17 +5,42 @@ All notable changes to this project will be documented in this file.
 ## [0.1.35] - 2025-09-16
 ### Changed
 - **Default Error Handling**: Changed `AICM_RAISE_ON_ERROR` default from `true` to `false`. By default, tracking failures now log errors and continue instead of raising exceptions. Set `AICM_RAISE_ON_ERROR=true` to restore the previous behavior.
+- **API Model Updates**: Updated cost event models to align with latest API:
+  - `CostEvent` renamed to `CostEventItem`
+  - `vendor_id` field renamed to `provider_id`
+  - `service_id` field renamed to `service_key`
+  - Enhanced type flexibility for cost fields to support both numeric and string values
+  - Updated `ErrorResponse` schema: `error`/`message` fields renamed to `detail`/`code` for API consistency
+- **API Parameter Updates**: Renamed `api_id` parameter to `service_key` across all Tracker methods for consistency with the updated API
+- **Environment Variable Cleanup**: Removed legacy `AICM_DELIVERY_LOG_BODIES` environment variable in favor of the standardized `AICM_LOG_BODIES`
 
-## [0.1.34] - 2025-01-27
 ### Added
-- Optional pre-inference limit enforcement in LLM wrappers controlled by
-  `AICM_ENABLE_INFERENCE_BLOCKING_LIMITS`.
+- **Vendor-API Mapping**: Added `_get_vendor_api_mapping()` helper method to Tracker class for extracting vendor and API information from service keys
+- **Service Key Building**: Added `_build_final_service_key()` method for constructing proper service keys from API responses
+- **Parameter Resolution**: Added `_resolve_tracking_params()` helper for intelligent fallback handling of client metadata
+- **Response Metadata Attachment**: Added `_attach_tracking_metadata()` method to safely attach tracking results to LLM response objects
+- **Enhanced Type Support**: Improved cost field handling to support flexible numeric/string types in API responses
+- **Code Organization**: Added comprehensive section comments and method organization within Tracker class
+- **Expanded Model Library**: Added comprehensive new model classes for tracking, analytics, webhooks, and custom services:
+  - `TrackRequest`, `TrackResponse`, `TrackResult`, `TrackedRecord` for tracking operations
+  - `TriggeredLimitPayload` for encrypted limit data
+  - Analytics models: `CustomerBreakdownSchema`, `TrendsResponseSchema`, `SnapshotsResponseSchema`
+  - Webhook models: `WebhookEndpointCreate`, `WebhookEndpointOut`, `WebhookEndpointsResponse`
+  - Custom service models: `CustomServiceIn`, `CustomServiceOut`, `CustomCostUnitIn`
+  - Export scheduling models: `ExportScheduleCreate`, `ExportScheduleOut`, `ExportJobsResponse`
 
 ### Fixed
 - **Test Compatibility**: Updated mock tracker classes in test files to include `ini_manager` attribute required by LLM wrapper initialization, fixing AttributeError failures in:
   - `tests/test_llm_wrappers.py`
   - `tests/test_magicmock_compatibility.py`
   - `tests/test_wrapper_delivery_type.py`
+- **API Response Handling**: Updated CostQueryManager to work with new `CostEventItem` model structure and return type annotations
+- **Service Key Corrections**: Fixed service key handling and mapping issues across various components
+
+## [0.1.34] - 2025-01-27
+### Added
+- Optional pre-inference limit enforcement in LLM wrappers controlled by
+  `AICM_ENABLE_INFERENCE_BLOCKING_LIMITS`.
 
 ## [0.1.33] - 2025-01-27
 ### Added
