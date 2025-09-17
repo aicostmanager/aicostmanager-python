@@ -191,8 +191,6 @@ def test_gemini_deliver_now_only(service_key, model, google_api_key, aicm_api_ke
         )
 
         asyncio.run(
-            tracker.track_async(
-                "gemini", service_key, usage_payload, response_id=response_id
-            )
+            tracker.track_async(service_key, usage_payload, response_id=response_id)
         )
         _wait_for_cost_event(aicm_api_key, response_id)

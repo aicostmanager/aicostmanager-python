@@ -114,8 +114,6 @@ def test_openai_responses_deliver_now_streaming(
         with Tracker(
             aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
         ) as t2:
-            t2.track(
-                "openai_responses", service_key, usage_payload, response_id=response_id
-            )
+            t2.track(service_key, usage_payload, response_id=response_id)
 
         _wait_for_cost_event(aicm_api_key, response_id)

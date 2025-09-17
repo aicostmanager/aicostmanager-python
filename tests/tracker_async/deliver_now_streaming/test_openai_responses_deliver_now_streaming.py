@@ -117,7 +117,6 @@ def test_openai_responses_deliver_now_streaming(
         ) as t2:
             asyncio.run(
                 t2.track_async(
-                    "openai_responses",
                     service_key,
                     usage_payload,
                     response_id=response_id,

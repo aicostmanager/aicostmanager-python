@@ -96,11 +96,7 @@ def test_bedrock_track_non_streaming(service_key, model, aws_region, aicm_api_ke
             "ResponseMetadata", {}
         ).get("RequestId")
         usage = get_usage_from_response(resp, "amazon-bedrock")
-        asyncio.run(
-            tracker.track_async(
-                "amazon-bedrock", service_key, usage, response_id=response_id
-            )
-        )
+        asyncio.run(tracker.track_async(service_key, usage, response_id=response_id))
         _wait_for_cost_event(aicm_api_key, response_id)
 
 
@@ -176,8 +172,6 @@ def test_bedrock_track_streaming(service_key, model, aws_region, aicm_api_key):
         usage_payload = final_usage
 
         asyncio.run(
-            tracker.track_async(
-                "amazon-bedrock", service_key, usage_payload, response_id=response_id
-            )
+            tracker.track_async(service_key, usage_payload, response_id=response_id)
         )
         _wait_for_cost_event(aicm_api_key, response_id)

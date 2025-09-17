@@ -55,7 +55,6 @@ def test_track_single_event_success(aicm_api_key, aicm_api_base, tmp_path):
     tracker = _make_tracker(aicm_api_key, aicm_api_base, tmp_path)
     tracker.track(
         "openai_chat",
-        "openai::gpt-5-mini",
         VALID_PAYLOAD,
         response_id="evt1",
         timestamp="2025-01-01T00:00:00Z",
@@ -131,7 +130,6 @@ def test_track_multiple_events_with_errors(aicm_api_key, aicm_api_base, tmp_path
     for event in events:
         tracker.track(
             event["api_id"],
-            event.get("service_key"),
             event["payload"],
             response_id=event.get("response_id"),
             timestamp=event.get("timestamp"),
@@ -156,7 +154,6 @@ def test_deliver_now_single_event_success(aicm_api_key, aicm_api_base):
     ) as tracker:
         result = tracker.track(
             "openai_chat",
-            "openai::gpt-5-mini",
             VALID_PAYLOAD,
             response_id="evt1",
             timestamp="2025-01-01T00:00:00Z",
@@ -307,7 +304,6 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
             try:
                 tracker.track(
                     event["api_id"],
-                    event.get("service_key"),
                     event["payload"],
                     response_id=event.get("response_id"),
                     timestamp=event.get("timestamp"),

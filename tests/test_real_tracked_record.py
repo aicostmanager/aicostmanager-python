@@ -40,7 +40,6 @@ def test_deliver_now_with_client_customer_key_and_context(aicm_api_key, aicm_api
     with Tracker(aicm_api_key=aicm_api_key, ini_path="ini", delivery=delivery2) as t2:
         t2.track(
             "openai_chat",
-            "openai::gpt-5-mini",
             VALID_USAGE,
             response_id=response_id,
             client_customer_key="c1",
@@ -72,7 +71,6 @@ def test_deliver_now_without_client_customer_key_and_context(
     with Tracker(aicm_api_key=aicm_api_key, ini_path="ini", delivery=delivery2) as t2:
         t2.track(
             "openai_chat",
-            "openai::gpt-5-mini",
             VALID_USAGE,
             response_id=response_id,
             timestamp="2025-01-01T00:00:00Z",

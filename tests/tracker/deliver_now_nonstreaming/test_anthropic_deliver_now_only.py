@@ -84,5 +84,5 @@ def test_anthropic_deliver_now_only(
         response_id = getattr(resp, "id", None)
         usage_payload = get_usage_from_response(resp, "anthropic")
 
-        tracker.track("anthropic", service_key, usage_payload, response_id=response_id)
+        tracker.track(service_key, usage_payload, response_id=response_id)
         _wait_for_cost_event(aicm_api_key, response_id)

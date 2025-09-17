@@ -68,7 +68,11 @@ def test_openai_chat_tracker(
         response_id = getattr(resp, "id", None)
         usage_payload = get_usage_from_response(resp, "openai_chat")
         result = tracker.track(service_key, usage_payload, response_id=response_id)
-        assert result["result"]["cost_events"]
+        if not result or result.get("result") is None:
+            pytest.fail(
+                "Server rejected tracking request - check server logs for validation errors"
+            )
+        assert result.get("result", {}).get("cost_events")
 
     # Immediate delivery
     resp2 = client.chat.completions.create(
@@ -90,7 +94,11 @@ def test_openai_chat_tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:
         usage2 = get_usage_from_response(resp2, "openai_chat")
-        result2 = t2.track("openai_chat", service_key, usage2, response_id=response_id2)
-        assert result2["result"]["cost_events"]
+        result2 = t2.track(service_key, usage2, response_id=response_id2)
+        if not result2 or result2.get("result") is None:
+            pytest.fail(
+                "Server rejected tracking request - check server logs for validation errors"
+            )
+        assert result2.get("result", {}).get("cost_events")
 
     # No explicit close needed; context managers handled shutdown

@@ -142,7 +142,6 @@ def test_limits_immediate_end_to_end(
         try:
             tracker.track(
                 "openai_responses",
-                SERVICE_KEY,
                 payload,
                 response_id=getattr(resp, "id", None),
             )
@@ -152,7 +151,6 @@ def test_limits_immediate_end_to_end(
             with pytest.raises(UsageLimitExceeded):
                 tracker.track(
                     "openai_responses",
-                    SERVICE_KEY,
                     payload2,
                     response_id=getattr(resp2, "id", None),
                 )
@@ -166,7 +164,6 @@ def test_limits_immediate_end_to_end(
         with pytest.raises(UsageLimitExceeded):
             tracker.track(
                 "openai_responses",
-                SERVICE_KEY,
                 payload3,
                 response_id=getattr(resp3, "id", None),
             )
@@ -197,7 +194,6 @@ def test_limits_immediate_end_to_end(
             try:
                 tracker.track(
                     "openai_responses",
-                    SERVICE_KEY,
                     payload4,
                     response_id=getattr(resp4, "id", None),
                 )
@@ -219,7 +215,6 @@ def test_limits_immediate_end_to_end(
         try:
             tracker.track(
                 "openai_responses",
-                SERVICE_KEY,
                 payload5,
                 response_id=getattr(resp5, "id", None),
             )
@@ -279,7 +274,6 @@ def test_limits_queue_end_to_end(
         try:
             tracker.track(
                 "openai_responses",
-                SERVICE_KEY,
                 payload,
                 response_id=getattr(resp, "id", None),
             )
@@ -296,7 +290,6 @@ def test_limits_queue_end_to_end(
         with pytest.raises(UsageLimitExceeded):
             tracker.track(
                 "openai_responses",
-                SERVICE_KEY,
                 payload2,
                 response_id=getattr(resp2, "id", None),
             )
@@ -325,7 +318,6 @@ def test_limits_queue_end_to_end(
             try:
                 tracker.track(
                     "openai_responses",
-                    SERVICE_KEY,
                     payload3,
                     response_id=getattr(resp3, "id", None),
                 )
@@ -349,7 +341,6 @@ def test_limits_queue_end_to_end(
         try:
             tracker.track(
                 "openai_responses",
-                SERVICE_KEY,
                 payload4,
                 response_id=getattr(resp4, "id", None),
             )
@@ -420,7 +411,6 @@ def test_limits_customer_immediate(
         try:
             tracker.track(
                 "openai_responses",
-                SERVICE_KEY,
                 payload,
                 response_id=getattr(resp, "id", None),
                 client_customer_key=customer,
@@ -431,7 +421,6 @@ def test_limits_customer_immediate(
             with pytest.raises(UsageLimitExceeded):
                 tracker.track(
                     "openai_responses",
-                    SERVICE_KEY,
                     payload2,
                     response_id=getattr(resp2, "id", None),
                     client_customer_key=customer,
@@ -446,7 +435,6 @@ def test_limits_customer_immediate(
         with pytest.raises(UsageLimitExceeded):
             tracker.track(
                 "openai_responses",
-                SERVICE_KEY,
                 payload3,
                 response_id=getattr(resp3, "id", None),
                 client_customer_key=customer,
@@ -478,7 +466,6 @@ def test_limits_customer_immediate(
             try:
                 tracker.track(
                     "openai_responses",
-                    SERVICE_KEY,
                     payload4,
                     response_id=getattr(resp4, "id", None),
                     client_customer_key=customer,

@@ -110,9 +110,7 @@ def test_openai_chat_deliver_now_streaming(
             aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
         ) as t2:
             asyncio.run(
-                t2.track_async(
-                    "openai_chat", service_key, usage_payload, response_id=response_id
-                )
+                t2.track_async(service_key, usage_payload, response_id=response_id)
             )
 
         _wait_for_cost_event(aicm_api_key, response_id)

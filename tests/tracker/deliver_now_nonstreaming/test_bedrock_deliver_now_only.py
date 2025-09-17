@@ -107,7 +107,5 @@ def test_bedrock_deliver_now_only(service_key, model, aws_region, aicm_api_key):
         ).get("RequestId")
         usage_payload = get_usage_from_response(resp, "amazon-bedrock")
 
-        tracker.track(
-            "amazon-bedrock", service_key, usage_payload, response_id=response_id
-        )
+        tracker.track(service_key, usage_payload, response_id=response_id)
         _wait_for_cost_event(aicm_api_key, response_id)

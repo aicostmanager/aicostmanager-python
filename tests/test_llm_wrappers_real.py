@@ -55,7 +55,7 @@ def test_openai_chat_real():
         )
 
     _call_or_skip(non_stream, "openai chat non-stream")
-    assert calls and calls[-1]["api_id"] == "openai_chat"
+    assert calls
     assert calls[-1]["service_key"] == f"openai::{model}"
     assert calls[-1]["client_customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
@@ -112,7 +112,7 @@ def test_openai_responses_real():
         )
 
     _call_or_skip(non_stream, "openai responses non-stream")
-    assert calls and calls[-1]["api_id"] == "openai_responses"
+    assert calls
     assert calls[-1]["service_key"] == f"openai::{model}"
     assert calls[-1]["client_customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
@@ -169,7 +169,7 @@ def test_anthropic_real():
         )
 
     _call_or_skip(non_stream, "anthropic non-stream")
-    assert calls and calls[-1]["api_id"] == "anthropic"
+    assert calls
     assert calls[-1]["service_key"] == f"anthropic::{model}"
     assert calls[-1]["client_customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
@@ -226,7 +226,7 @@ def test_gemini_real():
         )
 
     _call_or_skip(non_stream, "gemini non-stream")
-    assert calls and calls[-1]["api_id"] == "gemini"
+    assert calls
     assert calls[-1]["service_key"] == f"google::{model}"
     assert calls[-1]["client_customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
@@ -284,7 +284,7 @@ def test_bedrock_real():
         )
 
     _call_or_skip(non_stream, "bedrock non-stream")
-    assert calls and calls[-1]["api_id"] == "amazon-bedrock"
+    assert calls
     assert calls[-1]["service_key"] == f"amazon-bedrock::{model_id}"
     assert calls[-1]["client_customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
@@ -342,7 +342,7 @@ def test_xai_real():
         )
 
     _call_or_skip(non_stream, "xai non-stream")
-    assert calls and calls[-1]["api_id"] == "openai_chat"
+    assert calls
     assert calls[-1]["service_key"] == f"xai::{model}"
     assert calls[-1]["client_customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
@@ -402,7 +402,7 @@ def test_fireworks_real():
         )
 
     _call_or_skip(non_stream, "fireworks non-stream")
-    assert calls and calls[-1]["api_id"] == "openai_chat"
+    assert calls
     assert calls[-1]["service_key"] == f"fireworks-ai::{model}"
     assert calls[-1]["client_customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}

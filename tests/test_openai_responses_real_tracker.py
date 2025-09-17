@@ -1,4 +1,3 @@
-import json
 import os
 import time
 
@@ -22,7 +21,6 @@ def _wait_for_empty(delivery, timeout: float = 10.0) -> bool:
             return True
         time.sleep(0.05)
     return False
-
 
 
 @pytest.mark.parametrize(
@@ -60,10 +58,12 @@ def test_openai_responses_tracker(
     resp = client.responses.create(model=model, input="Say hi")
     response_id = getattr(resp, "id", None)
     usage_payload = get_usage_from_response(resp, "openai_responses")
-    track_res = tracker.track(
-        "openai_responses", service_key, usage_payload, response_id=response_id
-    )
-    assert track_res["queued"] >= 0
+    track_res = tracker.track(service_key, usage_payload, response_id=response_id)
+    if not track_res:
+        pytest.fail(
+            "Server rejected tracking request - check server logs for validation errors"
+        )
+    assert track_res.get("queued", 0) >= 0
     assert _wait_for_empty(tracker.delivery, timeout=10.0)
 
     # Immediate delivery
@@ -81,9 +81,11 @@ def test_openai_responses_tracker(
         aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
     ) as t2:
         usage2 = get_usage_from_response(resp2, "openai_responses")
-        result2 = t2.track(
-            "openai_responses", service_key, usage2, response_id=response_id2
-        )
-        assert result2["result"]["cost_events"]
+        result2 = t2.track(service_key, usage2, response_id=response_id2)
+        if not result2 or result2.get("result") is None:
+            pytest.fail(
+                "Server rejected tracking request - check server logs for validation errors"
+            )
+        assert result2.get("result", {}).get("cost_events")
 
     tracker.close()

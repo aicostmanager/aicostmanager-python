@@ -84,7 +84,5 @@ def test_openai_chat_deliver_now_only(service_key, model, key_env, maker, aicm_a
         response_id = getattr(resp, "id", None)
         usage_payload = get_usage_from_response(resp, "openai_chat")
 
-        tracker.track(
-            "openai_chat", service_key, usage_payload, response_id=response_id
-        )
+        tracker.track(service_key, usage_payload, response_id=response_id)
         _wait_for_cost_event(aicm_api_key, response_id)

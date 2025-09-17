@@ -138,9 +138,7 @@ def test_gemini_deliver_now_streaming(service_key, model, google_api_key, aicm_a
                 aicm_api_key=aicm_api_key, ini_path=ini.ini_path, delivery=delivery2
             ) as t2:
                 asyncio.run(
-                    t2.track_async(
-                        "gemini", service_key, usage_payload, response_id=response_id
-                    )
+                    t2.track_async(service_key, usage_payload, response_id=response_id)
                 )
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 422:

@@ -148,7 +148,6 @@ def test_bedrock_deliver_now_streaming(service_key, model, aws_region, aicm_api_
         ) as t2:
             asyncio.run(
                 t2.track_async(
-                    "amazon-bedrock",
                     service_key,
                     usage_payload,
                     response_id=response_id,
