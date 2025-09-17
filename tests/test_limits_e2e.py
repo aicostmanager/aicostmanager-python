@@ -150,7 +150,7 @@ def test_limits_immediate_end_to_end(
             payload2 = get_usage_from_response(resp2, "openai_responses")
             with pytest.raises(UsageLimitExceeded):
                 tracker.track(
-                    "openai_responses",
+                    SERVICE_KEY,
                     payload2,
                     response_id=getattr(resp2, "id", None),
                 )
@@ -163,7 +163,7 @@ def test_limits_immediate_end_to_end(
         payload3 = get_usage_from_response(resp3, "openai_responses")
         with pytest.raises(UsageLimitExceeded):
             tracker.track(
-                "openai_responses",
+                SERVICE_KEY,
                 payload3,
                 response_id=getattr(resp3, "id", None),
             )
@@ -193,7 +193,7 @@ def test_limits_immediate_end_to_end(
         for attempt in range(3):
             try:
                 tracker.track(
-                    "openai_responses",
+                    SERVICE_KEY,
                     payload4,
                     response_id=getattr(resp4, "id", None),
                 )
@@ -214,7 +214,7 @@ def test_limits_immediate_end_to_end(
         payload5 = get_usage_from_response(resp5, "openai_responses")
         try:
             tracker.track(
-                "openai_responses",
+                SERVICE_KEY,
                 payload5,
                 response_id=getattr(resp5, "id", None),
             )
@@ -289,7 +289,7 @@ def test_limits_queue_end_to_end(
         payload2 = get_usage_from_response(resp2, "openai_responses")
         with pytest.raises(UsageLimitExceeded):
             tracker.track(
-                "openai_responses",
+                SERVICE_KEY,
                 payload2,
                 response_id=getattr(resp2, "id", None),
             )
@@ -317,7 +317,7 @@ def test_limits_queue_end_to_end(
         for attempt in range(3):
             try:
                 tracker.track(
-                    "openai_responses",
+                    SERVICE_KEY,
                     payload3,
                     response_id=getattr(resp3, "id", None),
                 )
@@ -340,7 +340,7 @@ def test_limits_queue_end_to_end(
         payload4 = get_usage_from_response(resp4, "openai_responses")
         try:
             tracker.track(
-                "openai_responses",
+                SERVICE_KEY,
                 payload4,
                 response_id=getattr(resp4, "id", None),
             )
@@ -420,7 +420,7 @@ def test_limits_customer_immediate(
             payload2 = get_usage_from_response(resp2, "openai_responses")
             with pytest.raises(UsageLimitExceeded):
                 tracker.track(
-                    "openai_responses",
+                    SERVICE_KEY,
                     payload2,
                     response_id=getattr(resp2, "id", None),
                     client_customer_key=customer,
@@ -434,7 +434,7 @@ def test_limits_customer_immediate(
         payload3 = get_usage_from_response(resp3, "openai_responses")
         with pytest.raises(UsageLimitExceeded):
             tracker.track(
-                "openai_responses",
+                SERVICE_KEY,
                 payload3,
                 response_id=getattr(resp3, "id", None),
                 client_customer_key=customer,
@@ -465,7 +465,7 @@ def test_limits_customer_immediate(
         for attempt in range(3):
             try:
                 tracker.track(
-                    "openai_responses",
+                    SERVICE_KEY,
                     payload4,
                     response_id=getattr(resp4, "id", None),
                     client_customer_key=customer,
