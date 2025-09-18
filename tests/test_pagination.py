@@ -92,7 +92,7 @@ def test_list_usage_rollups_typed(monkeypatch):
         "previous": None,
         "results": [
             {
-                "client_customer_key": "c1",
+                "customer_key": "c1",
                 "service_id": "svc",
                 "date": "2024-01-01",
                 "quantity": 1,
@@ -122,7 +122,7 @@ def test_list_customers_typed(monkeypatch):
         "results": [
             {
                 "uuid": "u1",
-                "client_customer_key": "c1",
+                "customer_key": "c1",
                 "name": "n",
                 "phone": None,
                 "email": None,

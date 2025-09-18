@@ -104,7 +104,7 @@ tracker.track(
     "openai",
     "gpt-5-mini",
     usage,
-    client_customer_key="acme_corp",
+    customer_key="acme_corp",
     context={"env": "prod"},
     response_id="external-session-id",
     timestamp="2024-01-01T00:00:00Z",
@@ -115,7 +115,7 @@ tracker.track(
 
 Every delivery mechanism refreshes triggered limit data from the API after
 successfully sending a batch. Triggered limits are matched by API key ID and
-optionally by ``client_customer_key`` and ``service_key``. The service key is
+optionally by ``customer_key`` and ``service_key``. The service key is
 treated as an opaque value and is **not** split into vendor and service
 components. The decrypted limits are cached in memory and persisted to
 ``AICM.ini`` as a fallback. Enqueued payloads are compared against this

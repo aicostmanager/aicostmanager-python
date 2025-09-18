@@ -52,7 +52,7 @@ def _wait_for_cleared_limits(
     Matching filters:
     - service_key exact match
     - api_key_id exact match
-    - optional client_customer_key exact match when provided
+    - optional customer_key exact match when provided
     """
     from aicostmanager.config_manager import ConfigManager
 
@@ -74,7 +74,7 @@ def _wait_for_cleared_limits(
             for e in events
             if e.get("service_key") == service_key
             and e.get("api_key_id") == api_key_id
-            and (client_key is None or e.get("client_customer_key") == client_key)
+            and (client_key is None or e.get("customer_key") == client_key)
         ]
         if not remaining:
             return True
@@ -413,7 +413,7 @@ def test_limits_customer_immediate(
                 SERVICE_KEY,
                 payload,
                 response_id=getattr(resp, "id", None),
-                client_customer_key=customer,
+                customer_key=customer,
             )
             # If first call doesn't raise, the second one should
             resp2 = client.responses.create(model=MODEL, input="hi2")
@@ -423,7 +423,7 @@ def test_limits_customer_immediate(
                     SERVICE_KEY,
                     payload2,
                     response_id=getattr(resp2, "id", None),
-                    client_customer_key=customer,
+                    customer_key=customer,
                 )
         except UsageLimitExceeded:
             # First call raised as expected
@@ -437,7 +437,7 @@ def test_limits_customer_immediate(
                 SERVICE_KEY,
                 payload3,
                 response_id=getattr(resp3, "id", None),
-                client_customer_key=customer,
+                customer_key=customer,
             )
 
         # Cleanup
@@ -468,7 +468,7 @@ def test_limits_customer_immediate(
                     SERVICE_KEY,
                     payload4,
                     response_id=getattr(resp4, "id", None),
-                    client_customer_key=customer,
+                    customer_key=customer,
                 )
                 break  # Success
             except UsageLimitExceeded:

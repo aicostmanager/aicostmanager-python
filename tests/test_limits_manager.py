@@ -1,23 +1,26 @@
 import pathlib
 import time
+
 import jwt
 
 from aicostmanager.client import CostManagerClient
 from aicostmanager.config_manager import ConfigManager
 from aicostmanager.limits import TriggeredLimitManager, UsageLimitManager
 from aicostmanager.models import (
+    Period,
+    ThresholdType,
     UsageLimitIn,
     UsageLimitOut,
     UsageLimitProgressOut,
-    ThresholdType,
-    Period,
 )
 
 PRIVATE_KEY = (pathlib.Path(__file__).parent / "threshold_private_key.pem").read_text()
 PUBLIC_KEY = (pathlib.Path(__file__).parent / "threshold_public_key.pem").read_text()
 
 
-def _make_triggered_limits(payload_user: str | None = None, event_user: str | None = None):
+def _make_triggered_limits(
+    payload_user: str | None = None, event_user: str | None = None
+):
     now = int(time.time())
     event = {
         "event_id": "evt-api-key-limit",
@@ -28,7 +31,7 @@ def _make_triggered_limits(payload_user: str | None = None, event_user: str | No
         "limit_context": "key",
         "limit_message": "Usage limit exceeded",
         "service_key": "openai::gpt-4",
-        "client_customer_key": "api-key-customer",
+        "customer_key": "api-key-customer",
         "api_key_id": "550e8400-e29b-41d4-a716-446655440000",
         "triggered_at": "2024-12-31T18:00:00Z",
         "expires_at": "2025-01-01T18:00:00Z",

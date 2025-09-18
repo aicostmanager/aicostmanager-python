@@ -44,11 +44,11 @@ Example request:
 from datetime import date
 from aicostmanager.models import CustomerIn, UsageEventFilters
 
-new_customer = CustomerIn(client_customer_key="cust1", name="Example")
+new_customer = CustomerIn(customer_key="cust1", name="Example")
 created = client.create_customer(new_customer)
 print(created.uuid)
 
-filters = UsageEventFilters(client_customer_key="cust1", start_date=date(2024, 1, 1), limit=100)
+filters = UsageEventFilters(customer_key="cust1", start_date=date(2024, 1, 1), limit=100)
 for event in client.iter_usage_events(filters):
     print(event.event_id)
 

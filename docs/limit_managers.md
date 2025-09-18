@@ -71,7 +71,7 @@ tl_mgr.update_triggered_limits()
 events = tl_mgr.check_triggered_limits(
     api_key_id="550e8400-e29b-41d4-a716-446655440000",
     service_key="openai::gpt-4",
-    client_customer_key="customer1",
+    customer_key="customer1",
 )
 for tl in events:
     print(tl.limit_id, tl.threshold_type)

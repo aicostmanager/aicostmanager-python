@@ -43,7 +43,7 @@ def test_openai_chat_real():
     client = openai.OpenAI()
     wrapper = OpenAIChatWrapper(
         client,
-        client_customer_key="cck1",
+        customer_key="cck1",
         context={"ctx": "v1"},
     )
     calls = _setup_capture(wrapper)
@@ -57,13 +57,13 @@ def test_openai_chat_real():
     _call_or_skip(non_stream, "openai chat non-stream")
     assert calls
     assert calls[-1]["service_key"] == f"openai::{model}"
-    assert calls[-1]["client_customer_key"] == "cck1"
+    assert calls[-1]["customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
     calls.clear()
 
-    wrapper.client_customer_key = "cck2"
+    wrapper.customer_key = "cck2"
     _call_or_skip(non_stream, "openai chat non-stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"openai::{model}"
     calls.clear()
@@ -79,15 +79,15 @@ def test_openai_chat_real():
             pass
 
     _call_or_skip(stream, "openai chat stream")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"openai::{model}"
     calls.clear()
 
-    wrapper.client_customer_key = "cck3"
+    wrapper.customer_key = "cck3"
     wrapper.context = {"ctx": "v2"}
     _call_or_skip(stream, "openai chat stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck3"
+    assert calls and calls[-1]["customer_key"] == "cck3"
     assert calls[-1]["context"] == {"ctx": "v2"}
     assert calls[-1]["service_key"] == f"openai::{model}"
 
@@ -100,7 +100,7 @@ def test_openai_responses_real():
     client = openai.OpenAI()
     wrapper = OpenAIResponsesWrapper(
         client,
-        client_customer_key="cck1",
+        customer_key="cck1",
         context={"ctx": "v1"},
     )
     calls = _setup_capture(wrapper)
@@ -114,13 +114,13 @@ def test_openai_responses_real():
     _call_or_skip(non_stream, "openai responses non-stream")
     assert calls
     assert calls[-1]["service_key"] == f"openai::{model}"
-    assert calls[-1]["client_customer_key"] == "cck1"
+    assert calls[-1]["customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
     calls.clear()
 
-    wrapper.client_customer_key = "cck2"
+    wrapper.customer_key = "cck2"
     _call_or_skip(non_stream, "openai responses non-stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"openai::{model}"
     calls.clear()
@@ -135,15 +135,15 @@ def test_openai_responses_real():
             pass
 
     _call_or_skip(stream, "openai responses stream")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"openai::{model}"
     calls.clear()
 
-    wrapper.client_customer_key = "cck3"
+    wrapper.customer_key = "cck3"
     wrapper.context = {"ctx": "v2"}
     _call_or_skip(stream, "openai responses stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck3"
+    assert calls and calls[-1]["customer_key"] == "cck3"
     assert calls[-1]["context"] == {"ctx": "v2"}
     assert calls[-1]["service_key"] == f"openai::{model}"
 
@@ -156,7 +156,7 @@ def test_anthropic_real():
     client = anthropic.Anthropic()
     wrapper = AnthropicWrapper(
         client,
-        client_customer_key="cck1",
+        customer_key="cck1",
         context={"ctx": "v1"},
     )
     calls = _setup_capture(wrapper)
@@ -171,13 +171,13 @@ def test_anthropic_real():
     _call_or_skip(non_stream, "anthropic non-stream")
     assert calls
     assert calls[-1]["service_key"] == f"anthropic::{model}"
-    assert calls[-1]["client_customer_key"] == "cck1"
+    assert calls[-1]["customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
     calls.clear()
 
-    wrapper.client_customer_key = "cck2"
+    wrapper.customer_key = "cck2"
     _call_or_skip(non_stream, "anthropic non-stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"anthropic::{model}"
     calls.clear()
@@ -193,15 +193,15 @@ def test_anthropic_real():
             pass
 
     _call_or_skip(stream, "anthropic stream")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"anthropic::{model}"
     calls.clear()
 
-    wrapper.client_customer_key = "cck3"
+    wrapper.customer_key = "cck3"
     wrapper.context = {"ctx": "v2"}
     _call_or_skip(stream, "anthropic stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck3"
+    assert calls and calls[-1]["customer_key"] == "cck3"
     assert calls[-1]["context"] == {"ctx": "v2"}
     assert calls[-1]["service_key"] == f"anthropic::{model}"
 
@@ -214,7 +214,7 @@ def test_gemini_real():
     client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     wrapper = GeminiWrapper(
         client,
-        client_customer_key="cck1",
+        customer_key="cck1",
         context={"ctx": "v1"},
     )
     calls = _setup_capture(wrapper)
@@ -228,13 +228,13 @@ def test_gemini_real():
     _call_or_skip(non_stream, "gemini non-stream")
     assert calls
     assert calls[-1]["service_key"] == f"google::{model}"
-    assert calls[-1]["client_customer_key"] == "cck1"
+    assert calls[-1]["customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
     calls.clear()
 
-    wrapper.client_customer_key = "cck2"
+    wrapper.customer_key = "cck2"
     _call_or_skip(non_stream, "gemini non-stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"google::{model}"
     calls.clear()
@@ -248,15 +248,15 @@ def test_gemini_real():
             pass
 
     _call_or_skip(stream, "gemini stream")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"google::{model}"
     calls.clear()
 
-    wrapper.client_customer_key = "cck3"
+    wrapper.customer_key = "cck3"
     wrapper.context = {"ctx": "v2"}
     _call_or_skip(stream, "gemini stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck3"
+    assert calls and calls[-1]["customer_key"] == "cck3"
     assert calls[-1]["context"] == {"ctx": "v2"}
     assert calls[-1]["service_key"] == f"google::{model}"
 
@@ -270,7 +270,7 @@ def test_bedrock_real():
     client = boto3.client("bedrock-runtime", region_name=aws_region)
     wrapper = BedrockWrapper(
         client,
-        client_customer_key="cck1",
+        customer_key="cck1",
         context={"ctx": "v1"},
     )
     calls = _setup_capture(wrapper)
@@ -286,13 +286,13 @@ def test_bedrock_real():
     _call_or_skip(non_stream, "bedrock non-stream")
     assert calls
     assert calls[-1]["service_key"] == f"amazon-bedrock::{model_id}"
-    assert calls[-1]["client_customer_key"] == "cck1"
+    assert calls[-1]["customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
     calls.clear()
 
-    wrapper.client_customer_key = "cck2"
+    wrapper.customer_key = "cck2"
     _call_or_skip(non_stream, "bedrock non-stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"amazon-bedrock::{model_id}"
     calls.clear()
@@ -307,15 +307,15 @@ def test_bedrock_real():
             pass
 
     _call_or_skip(stream, "bedrock stream")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"amazon-bedrock::{model_id}"
     calls.clear()
 
-    wrapper.client_customer_key = "cck3"
+    wrapper.customer_key = "cck3"
     wrapper.context = {"ctx": "v2"}
     _call_or_skip(stream, "bedrock stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck3"
+    assert calls and calls[-1]["customer_key"] == "cck3"
     assert calls[-1]["context"] == {"ctx": "v2"}
     assert calls[-1]["service_key"] == f"amazon-bedrock::{model_id}"
 
@@ -330,7 +330,7 @@ def test_xai_real():
     )
     wrapper = OpenAIChatWrapper(
         client,
-        client_customer_key="cck1",
+        customer_key="cck1",
         context={"ctx": "v1"},
     )
     calls = _setup_capture(wrapper)
@@ -344,13 +344,13 @@ def test_xai_real():
     _call_or_skip(non_stream, "xai non-stream")
     assert calls
     assert calls[-1]["service_key"] == f"xai::{model}"
-    assert calls[-1]["client_customer_key"] == "cck1"
+    assert calls[-1]["customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
     calls.clear()
 
-    wrapper.client_customer_key = "cck2"
+    wrapper.customer_key = "cck2"
     _call_or_skip(non_stream, "xai non-stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"xai::{model}"
     calls.clear()
@@ -366,15 +366,15 @@ def test_xai_real():
             pass
 
     _call_or_skip(stream, "xai stream")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"xai::{model}"
     calls.clear()
 
-    wrapper.client_customer_key = "cck3"
+    wrapper.customer_key = "cck3"
     wrapper.context = {"ctx": "v2"}
     _call_or_skip(stream, "xai stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck3"
+    assert calls and calls[-1]["customer_key"] == "cck3"
     assert calls[-1]["context"] == {"ctx": "v2"}
     assert calls[-1]["service_key"] == f"xai::{model}"
 
@@ -390,7 +390,7 @@ def test_fireworks_real():
     )
     wrapper = OpenAIChatWrapper(
         client,
-        client_customer_key="cck1",
+        customer_key="cck1",
         context={"ctx": "v1"},
     )
     calls = _setup_capture(wrapper)
@@ -404,13 +404,13 @@ def test_fireworks_real():
     _call_or_skip(non_stream, "fireworks non-stream")
     assert calls
     assert calls[-1]["service_key"] == f"fireworks-ai::{model}"
-    assert calls[-1]["client_customer_key"] == "cck1"
+    assert calls[-1]["customer_key"] == "cck1"
     assert calls[-1]["context"] == {"ctx": "v1"}
     calls.clear()
 
-    wrapper.client_customer_key = "cck2"
+    wrapper.customer_key = "cck2"
     _call_or_skip(non_stream, "fireworks non-stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"fireworks-ai::{model}"
     calls.clear()
@@ -426,14 +426,14 @@ def test_fireworks_real():
             pass
 
     _call_or_skip(stream, "fireworks stream")
-    assert calls and calls[-1]["client_customer_key"] == "cck2"
+    assert calls and calls[-1]["customer_key"] == "cck2"
     assert calls[-1]["context"] == {"ctx": "v1"}
     assert calls[-1]["service_key"] == f"fireworks-ai::{model}"
     calls.clear()
 
-    wrapper.client_customer_key = "cck3"
+    wrapper.customer_key = "cck3"
     wrapper.context = {"ctx": "v2"}
     _call_or_skip(stream, "fireworks stream updated")
-    assert calls and calls[-1]["client_customer_key"] == "cck3"
+    assert calls and calls[-1]["customer_key"] == "cck3"
     assert calls[-1]["context"] == {"ctx": "v2"}
     assert calls[-1]["service_key"] == f"fireworks-ai::{model}"
