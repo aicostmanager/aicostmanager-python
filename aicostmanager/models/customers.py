@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class CustomerIn(BaseModel):
-    client_customer_key: str
+    customer_key: str
     name: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -23,7 +23,7 @@ class CustomerOut(CustomerIn):
 class CustomerFilters(BaseModel):
     """Query parameters for ``list_customers``."""
 
-    client_customer_key: Optional[str] = None
+    customer_key: Optional[str] = None
     name: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None

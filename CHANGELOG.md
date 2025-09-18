@@ -44,7 +44,7 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.33] - 2025-01-27
 ### Added
-- **Automatic Fallback Values**: `track()` and `track_async()` methods now automatically use instance-level `client_customer_key` and `context` values when no explicit parameters are provided, eliminating the need to pass these parameters on every call
+- **Automatic Fallback Values**: `track()` and `track_async()` methods now automatically use instance-level `customer_key` and `context` values when no explicit parameters are provided, eliminating the need to pass these parameters on every call
 
 ### Enhanced
 - **Parameter Override Support**: Explicit method parameters take precedence over instance-level values when provided
@@ -52,8 +52,8 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.32] - 2025-01-27
 ### Added
-- **Tracker Instance-Level Metadata**: Added `set_client_customer_key()` and `set_context()` methods to the base `Tracker` class for storing customer key and context information at the instance level
-- **Enhanced Tracker API**: Base `Tracker` class now supports instance-level configuration of `client_customer_key` and `context` values, providing consistency with LLM wrapper classes
+- **Tracker Instance-Level Metadata**: Added `set_customer_key()` and `set_context()` methods to the base `Tracker` class for storing customer key and context information at the instance level
+- **Enhanced Tracker API**: Base `Tracker` class now supports instance-level configuration of `customer_key` and `context` values, providing consistency with LLM wrapper classes
 
 ### Enhanced
 - **API Consistency**: Improved API consistency across Tracker and wrapper classes by adding instance-level setters for metadata tracking
@@ -109,7 +109,7 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.29] - 2025-01-27
 ### Added
-- LLM wrappers now accept ``client_customer_key`` and ``context`` at
+- LLM wrappers now accept ``customer_key`` and ``context`` at
   initialization and allow updating them between inferences for tracking.
 - Expanded real wrapper tests to verify per-inference updates across
   streaming and non-streaming calls.
@@ -195,7 +195,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - REST API tracking guide (`docs/rest.md`) and example script `examples/heygen_sync.py` showing batch/manual tracking with `Tracker`
-- Per-call context support in REST wrappers via `set_client_customer_key()` and `set_context()`
+- Per-call context support in REST wrappers via `set_customer_key()` and `set_context()`
 
 ### Enhanced
 - `UniversalExtractor`: base_url autodetection, streaming `final_fields` support, UUID generation for missing `response_id`, and broader JSON serialization (httpx.URL/urllib `ParseResult`, Pydantic `model_dump`, objects with `dict`/`__dict__`)
@@ -270,8 +270,8 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.10] - 2025-08-04
 ### Added
-- Custom client metadata support with `client_customer_key` and `context` parameters
-- New `set_client_customer_key()` and `set_context()` methods for all cost manager classes
+- Custom client metadata support with `customer_key` and `context` parameters
+- New `set_customer_key()` and `set_context()` methods for all cost manager classes
 - Automatic augmentation of usage payloads with client metadata for tracking and identification
 - Client metadata support across all cost manager types: `CostManager`, `AsyncCostManager`, `RestCostManager`, and `AsyncRestCostManager`
 

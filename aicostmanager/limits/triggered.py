@@ -38,10 +38,10 @@ class TriggeredLimitManager(BaseLimitManager):
         self,
         api_key_id: str,
         service_key: Optional[str] = None,
-        client_customer_key: Optional[str] = None,
+        customer_key: Optional[str] = None,
     ) -> List[TriggeredLimit]:
         limits = self.config_manager.get_triggered_limits(
             service_key=service_key,
-            client_customer_key=client_customer_key,
+            customer_key=customer_key,
         )
         return [l for l in limits if l.api_key_id == api_key_id]

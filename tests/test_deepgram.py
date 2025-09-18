@@ -28,7 +28,7 @@ def _get_scenarios():
             [
                 {
                     "response_id": f"dg-transcription-nova3-en-no-terms-{unique_id}",
-                    "service_key": "deepgram::tts-streaming",
+                    "service_key": "deepgram::stt-streaming",
                     "payload": {
                         "model": "nova-3",
                         "language": "en",
@@ -44,7 +44,7 @@ def _get_scenarios():
             [
                 {
                     "response_id": f"dg-transcription-nova3-en-with-terms-{unique_id}",
-                    "service_key": "deepgram::tts-streaming",
+                    "service_key": "deepgram::stt-streaming",
                     "payload": {
                         "model": "nova-3",
                         "language": "en",
@@ -62,7 +62,7 @@ def _get_scenarios():
             [
                 {
                     "response_id": f"dg-transcription-nova3-multi-{unique_id}",
-                    "service_key": "deepgram::tts-streaming",
+                    "service_key": "deepgram::stt-streaming",
                     "payload": {
                         "model": "nova-3",
                         "language": "multi",
@@ -79,7 +79,7 @@ def _get_scenarios():
             [
                 {
                     "response_id": f"dg-transcription-fallback-nova2-{unique_id}",
-                    "service_key": "deepgram::tts-streaming",
+                    "service_key": "deepgram::stt-streaming",
                     "payload": {
                         "model": "nova-2",
                         "language": "en",
@@ -160,7 +160,7 @@ def _get_scenarios():
             [
                 {
                     "response_id": f"dg-batch-transcription-{unique_id}",
-                    "service_key": "deepgram::tts-streaming",
+                    "service_key": "deepgram::stt-streaming",
                     "payload": {
                         "model": "nova-3",
                         "language": "en",
@@ -187,7 +187,7 @@ def _get_scenarios():
 
 
 def _get_scenarios_with_meta():
-    """Generate test scenarios with meta data (client_customer_key, context) and unique response_ids."""
+    """Generate test scenarios with meta data (customer_key, context) and unique response_ids."""
     base_timestamp = datetime.now(timezone.utc)
     unique_id = _generate_unique_id()
 
@@ -197,14 +197,14 @@ def _get_scenarios_with_meta():
             [
                 {
                     "response_id": f"dg-transcription-nova3-en-meta-{unique_id}",
-                    "service_key": "deepgram::tts-streaming",
+                    "service_key": "deepgram::stt-streaming",
                     "payload": {
                         "model": "nova-3",
                         "language": "en",
                         "duration": 120,
                         "keywords": [],
                     },
-                    "client_customer_key": "customer-123",
+                    "customer_key": "customer-123",
                     "context": {"environment": "production", "session_id": "sess-456"},
                     "timestamp": datetime.now(timezone.utc)
                     .isoformat()
@@ -222,7 +222,7 @@ def _get_scenarios_with_meta():
                         "model": "aura-1",
                         "char_count": 500,
                     },
-                    "client_customer_key": "customer-789",
+                    "customer_key": "customer-789",
                     "context": {"user_id": "user-123", "feature": "tts"},
                     "timestamp": datetime.now(timezone.utc)
                     .isoformat()
@@ -235,13 +235,13 @@ def _get_scenarios_with_meta():
             [
                 {
                     "response_id": f"dg-batch-transcription-meta-{unique_id}",
-                    "service_key": "deepgram::tts-streaming",
+                    "service_key": "deepgram::stt-streaming",
                     "payload": {
                         "model": "nova-3",
                         "language": "en",
                         "duration": 120,
                     },
-                    "client_customer_key": "customer-batch",
+                    "customer_key": "customer-batch",
                     "context": {"batch_id": "batch-001", "priority": "high"},
                     "timestamp": datetime.now(timezone.utc)
                     .isoformat()
@@ -254,7 +254,7 @@ def _get_scenarios_with_meta():
                         "model": "aura-1",
                         "char_count": 1500,
                     },
-                    "client_customer_key": "customer-batch",
+                    "customer_key": "customer-batch",
                     "context": {"batch_id": "batch-001", "priority": "high"},
                     "timestamp": datetime.now(timezone.utc)
                     .isoformat()
@@ -336,7 +336,7 @@ def test_deepgram_track_immediate_with_meta(
                 event["service_key"],
                 event["payload"],
                 response_id=event["response_id"],
-                client_customer_key=event["client_customer_key"],
+                customer_key=event["customer_key"],
                 context=event["context"],
                 timestamp=event["timestamp"],
             )
@@ -370,7 +370,7 @@ def test_deepgram_track_persistent_with_meta(
                 event["service_key"],
                 event["payload"],
                 response_id=event["response_id"],
-                client_customer_key=event["client_customer_key"],
+                customer_key=event["customer_key"],
                 context=event["context"],
                 timestamp=event["timestamp"],
             )

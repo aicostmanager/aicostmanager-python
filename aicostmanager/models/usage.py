@@ -14,7 +14,7 @@ class UsageEvent(BaseModel):
     service_id: Optional[str] = None
     timestamp: str
     response_id: str
-    client_customer_key: Optional[str] = None
+    customer_key: Optional[str] = None
     usage: Dict[str, Any] = Field(default_factory=dict)
     base_url: Optional[str] = None
     context: Optional[Dict[str, Any]] = None
@@ -24,7 +24,7 @@ class UsageEvent(BaseModel):
 
 
 class UsageRollup(BaseModel):
-    client_customer_key: Optional[str] = None
+    customer_key: Optional[str] = None
     service_id: str
     date: str
     quantity: float
@@ -36,7 +36,7 @@ class UsageRollup(BaseModel):
 class UsageEventFilters(BaseModel):
     """Query parameters for ``list_usage_events``/``iter_usage_events``."""
 
-    client_customer_key: Optional[str] = None
+    customer_key: Optional[str] = None
     config_id: Optional[str] = None
     service_id: Optional[str] = None
     start_date: Optional[date] = None
@@ -50,7 +50,7 @@ class UsageEventFilters(BaseModel):
 class RollupFilters(BaseModel):
     """Query parameters for ``list_usage_rollups``/``iter_usage_rollups``."""
 
-    client_customer_key: Optional[str] = None
+    customer_key: Optional[str] = None
     service_id: Optional[str] = None
     granularity: Granularity = Granularity.DAILY
     start_date: Optional[date] = None

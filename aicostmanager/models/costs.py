@@ -23,7 +23,7 @@ class CostEventFilters(BaseModel):
 
     response_id: Optional[str] = None
     api_key_id: Optional[List[str]] = None  # UUID strings
-    client_customer_key: Optional[List[str]] = None
+    customer_key: Optional[List[str]] = None
     service_key: Optional[List[str]] = None
     start_date: Optional[str] = None  # date string
     end_date: Optional[str] = None  # date string
@@ -50,7 +50,7 @@ class ApiCostEventOut(BaseModel):
     team_id: str
     api_key_id: str
     timestamp: str  # datetime string
-    client_customer_key: Optional[str] = None
+    customer_key: Optional[str] = None
     response_id: str
     provider_id: str
     service_key: str

@@ -123,10 +123,10 @@ class ImmediateDelivery(Delivery):
                 # Use the ConfigManager instance we created above
                 cfg_limits = cfg
                 request_service_key = payload.get("service_key")
-                client_customer_key = payload.get("client_customer_key")
+                customer_key = payload.get("customer_key")
                 limits = cfg_limits.get_triggered_limits(
                     service_key=request_service_key,
-                    client_customer_key=client_customer_key,
+                    customer_key=customer_key,
                 )
                 api_key_id = (
                     self.api_key.split(".")[-1]

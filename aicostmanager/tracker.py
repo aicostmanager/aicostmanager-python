@@ -113,15 +113,15 @@ class Tracker:
             )
 
         # Instance-level tracking metadata
-        self.client_customer_key: Optional[str] = None
+        self.customer_key: Optional[str] = None
         self.context: Optional[Dict[str, Any]] = None
 
     # ------------------------------------------------------------------
     # Configuration Methods
     # ------------------------------------------------------------------
-    def set_client_customer_key(self, key: str | None) -> None:
-        """Update the ``client_customer_key`` used for tracking."""
-        self.client_customer_key = key
+    def set_customer_key(self, key: str | None) -> None:
+        """Update the ``customer_key`` used for tracking."""
+        self.customer_key = key
 
     def set_context(self, context: Dict[str, Any] | None) -> None:
         """Update the ``context`` dictionary used for tracking."""
@@ -174,14 +174,10 @@ class Tracker:
         return service_key
 
     def _resolve_tracking_params(
-        self, client_customer_key: Optional[str], context: Optional[Dict[str, Any]]
+        self, customer_key: Optional[str], context: Optional[Dict[str, Any]]
     ) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
         """Resolve tracking parameters using instance defaults as fallbacks."""
-        resolved_key = (
-            client_customer_key
-            if client_customer_key is not None
-            else self.client_customer_key
-        )
+        resolved_key = customer_key if customer_key is not None else self.customer_key
         resolved_context = context if context is not None else self.context
         return resolved_key, resolved_context
 
@@ -192,7 +188,7 @@ class Tracker:
         *,
         response_id: Optional[str],
         timestamp: str | datetime | None,
-        client_customer_key: Optional[str],
+        customer_key: Optional[str],
         context: Optional[Dict[str, Any]],
     ) -> Dict[str, Any]:
         record: Dict[str, Any] = {
@@ -207,8 +203,8 @@ class Tracker:
             ),
             "payload": usage,
         }
-        if client_customer_key is not None:
-            record["client_customer_key"] = client_customer_key
+        if customer_key is not None:
+            record["customer_key"] = customer_key
         if context is not None:
             record["context"] = context
         return record
@@ -223,7 +219,7 @@ class Tracker:
         *,
         response_id: Optional[str] = None,
         timestamp: str | datetime | None = None,
-        client_customer_key: Optional[str] = None,
+        customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """Track usage data.
@@ -233,16 +229,14 @@ class Tracker:
         ``{"queued": <count>}`` indicating the queue length.
         """
         # Use instance-level values as fallbacks if parameters are None
-        client_customer_key, context = self._resolve_tracking_params(
-            client_customer_key, context
-        )
+        customer_key, context = self._resolve_tracking_params(customer_key, context)
 
         record = self._build_record(
             service_key,
             usage,
             response_id=response_id,
             timestamp=timestamp,
-            client_customer_key=client_customer_key,
+            customer_key=customer_key,
             context=context,
         )
         result = self.delivery.enqueue(record)
@@ -257,7 +251,7 @@ class Tracker:
         *,
         response_id: Optional[str] = None,
         timestamp: str | datetime | None = None,
-        client_customer_key: Optional[str] = None,
+        customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> Any:
         return await asyncio.to_thread(
@@ -266,7 +260,7 @@ class Tracker:
             usage,
             response_id=response_id,
             timestamp=timestamp,
-            client_customer_key=client_customer_key,
+            customer_key=customer_key,
             context=context,
         )
 
@@ -280,7 +274,7 @@ class Tracker:
         *,
         response_id: Optional[str] = None,
         timestamp: str | datetime | None = None,
-        client_customer_key: Optional[str] = None,
+        customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """Extract usage from an LLM response and enqueue it.
@@ -305,7 +299,7 @@ class Tracker:
                 usage,
                 response_id=response_id,
                 timestamp=timestamp,
-                client_customer_key=client_customer_key,
+                customer_key=customer_key,
                 context=context,
             )
             self._attach_tracking_metadata(response, track_result)
@@ -330,7 +324,7 @@ class Tracker:
         *,
         response_id: Optional[str] = None,
         timestamp: str | datetime | None = None,
-        client_customer_key: Optional[str] = None,
+        customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """Async version of :meth:`track_llm_usage`."""
@@ -340,7 +334,7 @@ class Tracker:
             response,
             response_id=response_id,
             timestamp=timestamp,
-            client_customer_key=client_customer_key,
+            customer_key=customer_key,
             context=context,
         )
 
@@ -351,7 +345,7 @@ class Tracker:
         *,
         response_id: Optional[str] = None,
         timestamp: str | datetime | None = None,
-        client_customer_key: Optional[str] = None,
+        customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ):
         """Yield streaming events while tracking usage.
@@ -386,7 +380,7 @@ class Tracker:
                         usage,
                         response_id=response_id,
                         timestamp=timestamp,
-                        client_customer_key=client_customer_key,
+                        customer_key=customer_key,
                         context=context,
                     )
                     usage_sent = True
@@ -399,7 +393,7 @@ class Tracker:
         *,
         response_id: Optional[str] = None,
         timestamp: str | datetime | None = None,
-        client_customer_key: Optional[str] = None,
+        customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ):
         """Asynchronous version of :meth:`track_llm_stream_usage`."""
@@ -428,7 +422,7 @@ class Tracker:
                         usage,
                         response_id=response_id,
                         timestamp=timestamp,
-                        client_customer_key=client_customer_key,
+                        customer_key=customer_key,
                         context=context,
                     )
                     usage_sent = True

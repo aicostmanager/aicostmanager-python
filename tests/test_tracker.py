@@ -31,12 +31,12 @@ def test_tracker_builds_record():
     dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test", transport=transport)
     delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
     tracker = Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery)
-    tracker.track("openai::gpt-5-mini", {"input_tokens": 1}, client_customer_key="abc")
+    tracker.track("openai::gpt-5-mini", {"input_tokens": 1}, customer_key="abc")
     tracker.close()
     assert received
     record = received[0]["tracked"][0]
     assert record["service_key"] == "openai::gpt-5-mini"
-    assert record["client_customer_key"] == "abc"
+    assert record["customer_key"] == "abc"
 
 
 def test_tracker_track_async():

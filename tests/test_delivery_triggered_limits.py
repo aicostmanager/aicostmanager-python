@@ -1,5 +1,4 @@
 import pathlib
-import pathlib
 import time
 
 import jwt
@@ -26,7 +25,7 @@ def _setup_triggered_limits(ini_path):
         "limit_context": "key",
         "limit_message": "Usage limit exceeded",
         "service_key": "openai::gpt-4",
-        "client_customer_key": "api-key-customer",
+        "customer_key": "api-key-customer",
         "api_key_id": "550e8400-e29b-41d4-a716-446655440000",
         "triggered_at": "2024-12-31T18:00:00Z",
         "expires_at": "2025-01-01T18:00:00Z",
@@ -64,14 +63,17 @@ def test_immediate_enforce_triggered_limit(tmp_path):
 
     def fake_post(body, max_attempts):
         called["called"] = True
-        return {"results": [{"response_id": "r1", "cost_events": [{"x": 1}]}], "triggered_limits": {}}
+        return {
+            "results": [{"response_id": "r1", "cost_events": [{"x": 1}]}],
+            "triggered_limits": {},
+        }
 
     delivery._post_with_retry = fake_post
 
     payload = {
         "api_id": "openai",
         "service_key": event["service_key"],
-        "client_customer_key": event["client_customer_key"],
+        "customer_key": event["customer_key"],
         "payload": {},
     }
     with pytest.raises(UsageLimitExceeded):
@@ -88,13 +90,16 @@ def test_triggered_limits_cached_in_memory(tmp_path, monkeypatch):
     delivery = ImmediateDelivery(config)
 
     def fake_post(body, max_attempts):
-        return {"results": [{"response_id": "r1", "cost_events": [{"x": 1}]}], "triggered_limits": {}}
+        return {
+            "results": [{"response_id": "r1", "cost_events": [{"x": 1}]}],
+            "triggered_limits": {},
+        }
 
     delivery._post_with_retry = fake_post
     payload = {
         "api_id": "openai",
         "service_key": event["service_key"],
-        "client_customer_key": event["client_customer_key"],
+        "customer_key": event["customer_key"],
         "payload": {},
     }
     with pytest.raises(UsageLimitExceeded):

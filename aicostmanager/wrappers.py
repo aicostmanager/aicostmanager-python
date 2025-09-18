@@ -117,7 +117,7 @@ class BaseLLMWrapper:
         *,
         aicm_api_key: str | None = None,
         tracker: Tracker | None = None,
-        client_customer_key: str | None = None,
+        customer_key: str | None = None,
         context: dict[str, Any] | None = None,
         delivery_type: DeliveryType | str | None = None,
     ) -> None:
@@ -126,13 +126,13 @@ class BaseLLMWrapper:
             aicm_api_key=aicm_api_key, delivery_type=delivery_type
         )
         self._proxy = _Proxy(client, self)
-        self.client_customer_key = client_customer_key
+        self.customer_key = customer_key
         self.context = context
 
     # ------------------------------------------------------------------
-    def set_client_customer_key(self, key: str | None) -> None:
-        """Update the ``client_customer_key`` used for tracking."""
-        self.client_customer_key = key
+    def set_customer_key(self, key: str | None) -> None:
+        """Update the ``customer_key`` used for tracking."""
+        self.customer_key = key
 
     def set_context(self, context: dict[str, Any] | None) -> None:
         """Update the ``context`` dictionary used for tracking."""
@@ -181,7 +181,7 @@ class BaseLLMWrapper:
                 self._build_service_key(model),
                 usage,
                 response_id=response_id,
-                client_customer_key=self.client_customer_key,
+                customer_key=self.customer_key,
                 context=self.context,
             )
         return response
@@ -211,7 +211,7 @@ class BaseLLMWrapper:
                     self._tracker.track(
                         service_key,
                         usage,
-                        client_customer_key=self.client_customer_key,
+                        customer_key=self.customer_key,
                         context=self.context,
                     )
                     usage_sent = True
@@ -243,7 +243,7 @@ class BaseLLMWrapper:
                     await self._tracker.track_async(
                         service_key,
                         usage,
-                        client_customer_key=self.client_customer_key,
+                        customer_key=self.customer_key,
                         context=self.context,
                     )
                     usage_sent = True

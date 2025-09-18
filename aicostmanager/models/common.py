@@ -85,7 +85,7 @@ class TrackedRecord(BaseModel):
     service_key: Optional[str] = None
     response_id: Optional[str] = None
     timestamp: Optional[str] = None  # ISO 8601 string or UNIX epoch seconds
-    client_customer_key: Optional[str] = None
+    customer_key: Optional[str] = None
     context: Optional[Dict[str, Any]] = None
     payload: Optional[Dict[str, Any]] = None
 

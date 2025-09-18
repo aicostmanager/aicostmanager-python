@@ -24,7 +24,7 @@ def _setup_triggered_limit(ini_path, *, service_key, client_key, api_key_id):
         "limit_context": "key",
         "limit_message": "blocked",
         "service_key": service_key,
-        "client_customer_key": client_key,
+        "customer_key": client_key,
         "api_key_id": api_key_id,
         "triggered_at": "2024-01-01T00:00:00Z",
         "expires_at": "2099-01-01T00:00:00Z",
@@ -83,7 +83,7 @@ def test_wrapper_allows_inference_when_disabled(tmp_path):
     tracker = _make_tracker(ini, f"sk-test.{event['api_key_id']}")
     client = CountingClient()
     wrapper = OpenAIResponsesWrapper(client, tracker=tracker)
-    wrapper.set_client_customer_key(event["client_customer_key"])
+    wrapper.set_customer_key(event["customer_key"])
     result = wrapper.responses.create(model="allowed-model")
     assert result == {"ok": True}
     assert client.responses.count == 1

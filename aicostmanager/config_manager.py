@@ -37,7 +37,7 @@ class TriggeredLimit:
     limit_context: Optional[str]
     limit_message: Optional[str]
     service_key: Optional[str]
-    client_customer_key: Optional[str]
+    customer_key: Optional[str]
     api_key_id: str
     triggered_at: str
     expires_at: Optional[str]
@@ -267,7 +267,7 @@ class ConfigManager:
     def get_triggered_limits(
         self,
         service_key: Optional[str] = None,
-        client_customer_key: Optional[str] = None,
+        customer_key: Optional[str] = None,
     ) -> List[TriggeredLimit]:
         """Return triggered limits for the given parameters."""
         events = triggered_limits_cache.get()
@@ -310,11 +310,8 @@ class ConfigManager:
             )
 
             matches_client = (
-                (
-                    client_customer_key
-                    and event.get("client_customer_key") == client_customer_key
-                )
-                if client_customer_key
+                (customer_key and event.get("customer_key") == customer_key)
+                if customer_key
                 else True
             )
 
@@ -329,7 +326,7 @@ class ConfigManager:
                         limit_context=event.get("limit_context"),
                         limit_message=event.get("limit_message"),
                         service_key=event.get("service_key"),
-                        client_customer_key=event.get("client_customer_key"),
+                        customer_key=event.get("customer_key"),
                         api_key_id=event.get("api_key_id"),
                         triggered_at=event.get("triggered_at"),
                         expires_at=event.get("expires_at"),

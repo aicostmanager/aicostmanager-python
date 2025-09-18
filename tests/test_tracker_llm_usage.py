@@ -26,14 +26,14 @@ def test_track_llm_usage():
     tracker = Tracker(delivery=delivery, ini_path="ini")
 
     resp = Resp({"input_tokens": 1}, "gpt-5-mini")
-    out = tracker.track_llm_usage("openai::gpt-5-mini", resp, client_customer_key="abc")
+    out = tracker.track_llm_usage("openai::gpt-5-mini", resp, customer_key="abc")
     assert out is resp
     tracker.close()
 
     record = delivery.records[0]
     assert record["payload"] == {"input_tokens": 1}
     assert record["service_key"] == "openai::gpt-5-mini"
-    assert record["client_customer_key"] == "abc"
+    assert record["customer_key"] == "abc"
 
 
 def test_track_llm_usage_async():

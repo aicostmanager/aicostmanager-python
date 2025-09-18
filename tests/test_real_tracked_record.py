@@ -20,7 +20,7 @@ VALID_USAGE = {
 }
 
 
-def test_deliver_now_with_client_customer_key_and_context(aicm_api_key, aicm_api_base):
+def test_deliver_now_with_customer_key_and_context(aicm_api_key, aicm_api_base):
     ini = IniManager("ini")
     dconfig = DeliveryConfig(
         ini_manager=ini,
@@ -42,16 +42,14 @@ def test_deliver_now_with_client_customer_key_and_context(aicm_api_key, aicm_api
             "openai_chat",
             VALID_USAGE,
             response_id=response_id,
-            client_customer_key="c1",
+            customer_key="c1",
             context={"foo": "bar"},
             timestamp="2025-01-01T00:00:00Z",
         )
     tracker.close()
 
 
-def test_deliver_now_without_client_customer_key_and_context(
-    aicm_api_key, aicm_api_base
-):
+def test_deliver_now_without_customer_key_and_context(aicm_api_key, aicm_api_base):
     ini = IniManager("ini")
     dconfig = DeliveryConfig(
         ini_manager=ini,

@@ -8,12 +8,12 @@ from pydantic import BaseModel
 class DateFilterSchema(BaseModel):
     start_date: Optional[str] = None  # date string
     end_date: Optional[str] = None  # date string
-    client_customer_key: Optional[str] = None
+    customer_key: Optional[str] = None
 
 
 class SnapshotFilterSchema(BaseModel):
     service_key: Optional[str] = None
-    client_customer_key: Optional[str] = None
+    customer_key: Optional[str] = None
 
 
 class SnapshotTotalsSchema(BaseModel):
@@ -31,7 +31,7 @@ class SnapshotsResponseSchema(BaseModel):
 class TrendsFilterSchema(BaseModel):
     period: str = "7d"
     service_key: Optional[str] = None
-    client_customer_key: Optional[str] = None
+    customer_key: Optional[str] = None
 
 
 class TrendPointSchema(BaseModel):
@@ -53,12 +53,12 @@ class CustomerBreakdownFilterSchema(BaseModel):
 
 
 class CustomerBreakdownSchema(BaseModel):
-    client_customer_key: str
+    customer_key: str
     total_cost: float
     event_count: int
 
 
 class CustomerTokenBreakdownSchema(BaseModel):
-    client_customer_key: str
+    customer_key: str
     total_tokens: float
     event_count: int
