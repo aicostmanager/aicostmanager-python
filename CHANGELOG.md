@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.36] - 2025-09-18
+### Changed
+- **API Parameter Rename**: Renamed `client_customer_key` to `customer_key` throughout the entire codebase for consistency and simplicity. This affects all models, methods, and documentation. The `set_client_customer_key()` method is now `set_customer_key()`.
+
 ## [0.1.35] - 2025-09-16
 ### Changed
 - **Default Error Handling**: Changed `AICM_RAISE_ON_ERROR` default from `true` to `false`. By default, tracking failures now log errors and continue instead of raising exceptions. Set `AICM_RAISE_ON_ERROR=true` to restore the previous behavior.
