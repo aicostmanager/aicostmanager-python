@@ -41,7 +41,6 @@ class TriggeredLimit:
     api_key_id: str
     triggered_at: str
     expires_at: Optional[str]
-    user: Optional[str] = None
 
 
 class ConfigManager:
@@ -125,7 +124,7 @@ class ConfigManager:
                 payload = self._decode(token, public_key)
                 if payload:
                     triggered_limits_cache.set(
-                        payload.get("triggered_limits", []), data, data.get("user")
+                        payload.get("triggered_limits", []), data
                     )
                 else:
                     triggered_limits_cache.clear()
@@ -141,9 +140,7 @@ class ConfigManager:
         if token and public_key:
             payload = self._decode(token, public_key)
             if payload:
-                triggered_limits_cache.set(
-                    payload.get("triggered_limits", []), data, data.get("user")
-                )
+                triggered_limits_cache.set(payload.get("triggered_limits", []), data)
             else:
                 triggered_limits_cache.clear()
         else:
@@ -293,16 +290,12 @@ class ConfigManager:
                     triggered_limits_cache.clear()
                     return []
                 events = payload.get("triggered_limits", [])
-                triggered_limits_cache.set(events, tl_raw, tl_raw.get("user"))
+                triggered_limits_cache.set(events, tl_raw)
 
         if not events:
             return []
-        cached_user = triggered_limits_cache.get_user()
         results: List[TriggeredLimit] = []
         for event in events:
-            event_user = event.get("user")
-            if event_user and event_user != cached_user:
-                continue
             matches_service = (
                 (service_key and event.get("service_key") == service_key)
                 if service_key
@@ -330,7 +323,6 @@ class ConfigManager:
                         api_key_id=event.get("api_key_id"),
                         triggered_at=event.get("triggered_at"),
                         expires_at=event.get("expires_at"),
-                        user=event_user,
                     )
                 )
         return results

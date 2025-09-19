@@ -14,8 +14,6 @@ class UsageLimitIn(BaseModel):
     service_key: Optional[str] = None
     client: Optional[str] = None
     team_uuid: Optional[str] = None
-    user_uuid: Optional[str] = None
-    user_email: Optional[str] = None
     api_key_uuid: Optional[str] = None
     notification_list: Optional[List[str]] = None
     active: Optional[bool] = True

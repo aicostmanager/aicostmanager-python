@@ -68,7 +68,6 @@ class TriggeredLimitPayload(BaseModel):
     version: str
     public_key: str
     key_id: str
-    user: str
     encrypted_payload: str
 
 

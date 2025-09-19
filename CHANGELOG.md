@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.37] - 2025-09-19
+### Removed
+- **User-Based Limit Logic**: Completely removed backward compatibility for user-specific limits. The following components no longer support user-based filtering:
+  - `TriggeredLimit` class no longer has `user` field
+  - `TriggeredLimitPayload` model no longer has `user` field
+  - `TriggeredLimitsCache` no longer stores or retrieves user information
+  - Removed user filtering logic from triggered limits processing
+  - Removed `test_triggered_limit_user_filter` test function
+
+### Enhanced
+- **Simplified Triggered Limits**: Streamlined triggered limits functionality by removing user-based complexity:
+  - Cleaner filtering logic that only considers service key and customer key matching
+  - Reduced cache complexity with focus on core data storage
+  - Simplified model definitions without legacy user fields
+  - Improved performance by eliminating unnecessary user comparison operations
+
+### Changed
+- **API Compatibility**: Updated internal models to no longer expect or handle user fields in triggered limit responses, aligning with the current API specification that no longer supports user-based limits
+
 ## [0.1.36] - 2025-09-18
 ### Changed
 - **API Parameter Rename**: Renamed `client_customer_key` to `customer_key` throughout the entire codebase for consistency and simplicity. This affects all models, methods, and documentation. The `set_client_customer_key()` method is now `set_customer_key()`.
