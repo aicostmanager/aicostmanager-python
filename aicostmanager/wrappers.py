@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import AsyncIterable, Iterable, Iterator
-from typing import Any
+from typing import Any, Callable
 
 from .delivery import DeliveryType
 from .tracker import Tracker
@@ -120,14 +120,28 @@ class BaseLLMWrapper:
         customer_key: str | None = None,
         context: dict[str, Any] | None = None,
         delivery_type: DeliveryType | str | None = None,
+        anonymize_fields: Iterable[str] | None = None,
+        anonymizer: Callable[[Any], Any] | None = None,
     ) -> None:
         self._client = client
-        self._tracker = tracker or Tracker(
-            aicm_api_key=aicm_api_key, delivery_type=delivery_type
-        )
+        if tracker is None:
+            self._tracker = Tracker(
+                aicm_api_key=aicm_api_key,
+                delivery_type=delivery_type,
+                anonymize_fields=anonymize_fields,
+                anonymizer=anonymizer,
+            )
+        else:
+            self._tracker = tracker
+            if anonymize_fields is not None:
+                self._tracker.set_anonymize_fields(anonymize_fields)
+            if anonymizer is not None:
+                self._tracker.set_anonymizer(anonymizer)
         self._proxy = _Proxy(client, self)
         self.customer_key = customer_key
         self.context = context
+        self._anonymize_fields = tuple(anonymize_fields) if anonymize_fields is not None else None
+        self._anonymizer = anonymizer
 
     # ------------------------------------------------------------------
     def set_customer_key(self, key: str | None) -> None:
@@ -137,6 +151,20 @@ class BaseLLMWrapper:
     def set_context(self, context: dict[str, Any] | None) -> None:
         """Update the ``context`` dictionary used for tracking."""
         self.context = context
+
+    def set_anonymize_fields(self, fields: Iterable[str] | None) -> None:
+        """Update the usage fields that should be anonymized before tracking."""
+
+        self._anonymize_fields = (
+            tuple(fields) if fields is not None else None
+        )
+        self._tracker.set_anonymize_fields(fields)
+
+    def set_anonymizer(self, anonymizer: Callable[[Any], Any] | None) -> None:
+        """Update the anonymizer callable used for sensitive fields."""
+
+        self._anonymizer = anonymizer
+        self._tracker.set_anonymizer(anonymizer)
 
     # ------------------------------------------------------------------
     def _extract_model(self, method: Any, args: tuple, kwargs: dict) -> str | None:
@@ -183,6 +211,8 @@ class BaseLLMWrapper:
                 response_id=response_id,
                 customer_key=self.customer_key,
                 context=self.context,
+                anonymize_fields=self._anonymize_fields,
+                anonymizer=self._anonymizer,
             )
         return response
 
@@ -213,6 +243,8 @@ class BaseLLMWrapper:
                         usage,
                         customer_key=self.customer_key,
                         context=self.context,
+                        anonymize_fields=self._anonymize_fields,
+                        anonymizer=self._anonymizer,
                     )
                     usage_sent = True
             yield chunk
@@ -245,6 +277,8 @@ class BaseLLMWrapper:
                         usage,
                         customer_key=self.customer_key,
                         context=self.context,
+                        anonymize_fields=self._anonymize_fields,
+                        anonymizer=self._anonymizer,
                     )
                     usage_sent = True
             yield chunk

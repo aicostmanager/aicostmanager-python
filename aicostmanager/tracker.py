@@ -4,7 +4,8 @@ import asyncio
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from collections.abc import Iterable, Mapping
+from typing import Any, Callable, Dict, Optional, Tuple
 from uuid import uuid4
 
 from .delivery import (
@@ -31,6 +32,8 @@ class Tracker:
         ini_path: str | None = None,
         delivery: Delivery | None = None,
         delivery_type: DeliveryType | str | None = None,
+        anonymize_fields: Iterable[str] | None = None,
+        anonymizer: Callable[[Any], Any] | None = None,
     ) -> None:
         self.ini_manager = IniManager(IniManager.resolve_path(ini_path))
         self.ini_path = self.ini_manager.ini_path
@@ -115,6 +118,10 @@ class Tracker:
         # Instance-level tracking metadata
         self.customer_key: Optional[str] = None
         self.context: Optional[Dict[str, Any]] = None
+        self._anonymize_fields = {
+            str(field) for field in anonymize_fields or []
+        }
+        self._anonymizer = anonymizer or self._default_anonymizer
 
     # ------------------------------------------------------------------
     # Configuration Methods
@@ -126,6 +133,16 @@ class Tracker:
     def set_context(self, context: Dict[str, Any] | None) -> None:
         """Update the ``context`` dictionary used for tracking."""
         self.context = context
+
+    def set_anonymize_fields(self, fields: Iterable[str] | None) -> None:
+        """Configure usage payload fields that should be anonymized before sending."""
+
+        self._anonymize_fields = {str(field) for field in fields or []}
+
+    def set_anonymizer(self, anonymizer: Callable[[Any], Any] | None) -> None:
+        """Set the callable used to anonymize sensitive values."""
+
+        self._anonymizer = anonymizer or self._default_anonymizer
 
     # ------------------------------------------------------------------
     # Helper Methods
@@ -181,6 +198,98 @@ class Tracker:
         resolved_context = context if context is not None else self.context
         return resolved_key, resolved_context
 
+    def _apply_anonymization(
+        self,
+        usage: Dict[str, Any],
+        *,
+        anonymize_fields: Iterable[str] | None,
+        anonymizer: Callable[[Any], Any] | None,
+    ) -> Dict[str, Any]:
+        fields = set(self._anonymize_fields)
+        if anonymize_fields:
+            fields.update(str(field) for field in anonymize_fields)
+        if not fields:
+            return usage
+
+        anonymizer_fn = anonymizer or self._anonymizer
+        if anonymizer_fn is None:
+            return usage
+
+        if not isinstance(usage, Mapping):
+            return usage
+
+        return self._anonymize_mapping(usage, fields, anonymizer_fn)
+
+    def _anonymize_mapping(
+        self,
+        data: Mapping[str, Any],
+        fields: set[str],
+        anonymizer: Callable[[Any], Any],
+    ) -> Dict[str, Any]:
+        sanitized: Dict[str, Any] = {}
+        for key, value in data.items():
+            if key in fields:
+                sanitized[key] = self._apply_anonymizer(value, anonymizer)
+            else:
+                sanitized[key] = self._anonymize_value(value, fields, anonymizer)
+        return sanitized
+
+    def _anonymize_value(
+        self,
+        value: Any,
+        fields: set[str],
+        anonymizer: Callable[[Any], Any],
+    ) -> Any:
+        if isinstance(value, Mapping):
+            return self._anonymize_mapping(value, fields, anonymizer)
+        if isinstance(value, list):
+            return [
+                self._anonymize_value(item, fields, anonymizer) for item in value
+            ]
+        if isinstance(value, tuple):
+            return tuple(
+                self._anonymize_value(item, fields, anonymizer) for item in value
+            )
+        if isinstance(value, set):
+            return {
+                self._anonymize_value(item, fields, anonymizer)
+                for item in value
+            }
+        return value
+
+    def _apply_anonymizer(
+        self, value: Any, anonymizer: Callable[[Any], Any]
+    ) -> Any:
+        try:
+            return anonymizer(value)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            self.logger.warning("Anonymizer failed: %s", exc)
+            return value
+
+    @staticmethod
+    def _default_anonymizer(value: Any) -> Any:
+        if isinstance(value, str):
+            return "[REDACTED]"
+        if isinstance(value, bytes):
+            return b"[REDACTED]"
+        if isinstance(value, bytearray):
+            return bytearray(b"[REDACTED]")
+        if isinstance(value, Mapping):
+            return {
+                key: Tracker._default_anonymizer(inner)
+                for key, inner in value.items()
+            }
+        if isinstance(value, list):
+            return [Tracker._default_anonymizer(inner) for inner in value]
+        if isinstance(value, tuple):
+            return tuple(Tracker._default_anonymizer(inner) for inner in value)
+        if isinstance(value, set):
+            return {
+                f"[REDACTED_{idx}]" if isinstance(inner, str) else Tracker._default_anonymizer(inner)
+                for idx, inner in enumerate(value)
+            }
+        return value
+
     def _build_record(
         self,
         service_key: str,
@@ -221,6 +330,8 @@ class Tracker:
         timestamp: str | datetime | None = None,
         customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
+        anonymize_fields: Iterable[str] | None = None,
+        anonymizer: Callable[[Any], Any] | None = None,
     ) -> Any:
         """Track usage data.
 
@@ -231,9 +342,13 @@ class Tracker:
         # Use instance-level values as fallbacks if parameters are None
         customer_key, context = self._resolve_tracking_params(customer_key, context)
 
+        anonymized_usage = self._apply_anonymization(
+            usage, anonymize_fields=anonymize_fields, anonymizer=anonymizer
+        )
+
         record = self._build_record(
             service_key,
-            usage,
+            anonymized_usage,
             response_id=response_id,
             timestamp=timestamp,
             customer_key=customer_key,
@@ -253,6 +368,8 @@ class Tracker:
         timestamp: str | datetime | None = None,
         customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
+        anonymize_fields: Iterable[str] | None = None,
+        anonymizer: Callable[[Any], Any] | None = None,
     ) -> Any:
         return await asyncio.to_thread(
             self.track,
@@ -262,6 +379,8 @@ class Tracker:
             timestamp=timestamp,
             customer_key=customer_key,
             context=context,
+            anonymize_fields=anonymize_fields,
+            anonymizer=anonymizer,
         )
 
     # ------------------------------------------------------------------
@@ -276,6 +395,8 @@ class Tracker:
         timestamp: str | datetime | None = None,
         customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
+        anonymize_fields: Iterable[str] | None = None,
+        anonymizer: Callable[[Any], Any] | None = None,
     ) -> Any:
         """Extract usage from an LLM response and enqueue it.
 
@@ -301,6 +422,8 @@ class Tracker:
                 timestamp=timestamp,
                 customer_key=customer_key,
                 context=context,
+                anonymize_fields=anonymize_fields,
+                anonymizer=anonymizer,
             )
             self._attach_tracking_metadata(response, track_result)
         return response
@@ -326,6 +449,8 @@ class Tracker:
         timestamp: str | datetime | None = None,
         customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
+        anonymize_fields: Iterable[str] | None = None,
+        anonymizer: Callable[[Any], Any] | None = None,
     ) -> Any:
         """Async version of :meth:`track_llm_usage`."""
         return await asyncio.to_thread(
@@ -336,6 +461,8 @@ class Tracker:
             timestamp=timestamp,
             customer_key=customer_key,
             context=context,
+            anonymize_fields=anonymize_fields,
+            anonymizer=anonymizer,
         )
 
     def track_llm_stream_usage(
@@ -347,6 +474,8 @@ class Tracker:
         timestamp: str | datetime | None = None,
         customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
+        anonymize_fields: Iterable[str] | None = None,
+        anonymizer: Callable[[Any], Any] | None = None,
     ):
         """Yield streaming events while tracking usage.
 
@@ -382,6 +511,8 @@ class Tracker:
                         timestamp=timestamp,
                         customer_key=customer_key,
                         context=context,
+                        anonymize_fields=anonymize_fields,
+                        anonymizer=anonymizer,
                     )
                     usage_sent = True
             yield chunk
@@ -395,6 +526,8 @@ class Tracker:
         timestamp: str | datetime | None = None,
         customer_key: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
+        anonymize_fields: Iterable[str] | None = None,
+        anonymizer: Callable[[Any], Any] | None = None,
     ):
         """Asynchronous version of :meth:`track_llm_stream_usage`."""
         vendor, api_id = self._get_vendor_api_mapping(service_key)
@@ -424,6 +557,8 @@ class Tracker:
                         timestamp=timestamp,
                         customer_key=customer_key,
                         context=context,
+                        anonymize_fields=anonymize_fields,
+                        anonymizer=anonymizer,
                     )
                     usage_sent = True
             yield chunk
