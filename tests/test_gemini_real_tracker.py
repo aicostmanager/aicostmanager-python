@@ -8,6 +8,7 @@ genai = pytest.importorskip("google.genai")
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
+from tests.track_asserts import assert_track_result_payload
 
 BASE_URL = os.environ.get("AICM_API_BASE", "http://localhost:8001")
 
@@ -151,8 +152,7 @@ def test_gemini_tracker(service_key, model, google_api_key, aicm_api_key, tmp_pa
         usage2 = _extract_usage_payload(resp2)
         used2 = t2.track(service_key, usage2, response_id=response_id2)
     final2 = _extract_response_id(used2, response_id2)
-    # Immediate delivery returns cost_events in the response
     assert isinstance(used2, dict)
-    assert used2.get("result", {}).get("cost_events")
+    assert_track_result_payload(used2.get("result", {}))
 
     tracker.close()

@@ -125,6 +125,37 @@ payload matches a triggered limit. The check occurs *after* the enqueue or
 delivery action so tracking data is never discarded even when a limit has been
 reached.
 
+## Interpreting results
+
+The `/track` ingestion pipeline now separates validation from background
+processing. Immediate delivery still returns the first result entry, but the
+payload includes a richer status signal:
+
+- ``queued`` – the service key was resolved and the event is queued for async
+  processing. Cost events may not be available yet.
+- ``completed`` – synchronous processing finished and cost events are present.
+- ``error`` – the event failed validation or processing. Inspect the
+  ``errors`` array for details.
+- ``service_key_unknown`` – the service key is not recognised. The event is
+  quarantined for review and includes guidance on how to resolve the unknown
+  service.
+
+Unknown services now return descriptive error messages such as:
+
+```json
+{
+  "response_id": "evt-123",
+  "status": "service_key_unknown",
+  "errors": [
+    "Service key 'vendor::model' is not recognized. Event queued for review."
+  ]
+}
+```
+
+Applications should branch on ``result.status`` rather than assuming cost
+events are available immediately. Handling ``service_key_unknown`` separately
+lets you build workflows to create the missing service or notify your team.
+
 ## Asynchronous usage
 
 All operations are safe to call from asynchronous applications.  The

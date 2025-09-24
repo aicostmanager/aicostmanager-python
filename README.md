@@ -102,6 +102,37 @@ unacceptable and immediate delivery when every call can block on the API. See
 [Persistent Delivery](docs/persistent_delivery.md) and the
 [Tracker guide](docs/tracker.md#choosing-a-delivery-manager) for details.
 
+## Interpreting `/track` responses
+
+The `/track` endpoint now distinguishes between ingestion and background
+processing. Immediate delivery still returns the first result item, but the
+payload may not include `cost_events` right away. Instead, check the
+`status` field to understand how the event will be processed:
+
+| Status | Meaning |
+| ------ | ------- |
+| `queued` | The service key is recognised and the event has been queued for processing. |
+| `completed` | Processing finished synchronously (legacy servers may still return cost events immediately). |
+| `error` | The event failed processing and includes descriptive errors. |
+| `service_key_unknown` | The service key is not recognised; the event is quarantined for review. |
+
+Unknown services now produce a friendly error message, for example:
+
+```json
+{
+  "response_id": "resp-456",
+  "status": "service_key_unknown",
+  "errors": [
+    "Service key 'unknown::service' is not recognized. Event queued for review."
+  ]
+}
+```
+
+Existing integrations should branch on `result.status` and treat
+`service_key_unknown` differently from `error`. See the
+[tracker documentation](docs/tracker.md#interpreting-results) for detailed
+guidance and migration tips.
+
 For real-time insight into the persistent queue, run the `queue-monitor`
 command against the SQLite database created by `PersistentDelivery`:
 

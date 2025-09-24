@@ -1,10 +1,12 @@
 import time
 
 import httpx
+import pytest
 
 from aicostmanager import Tracker
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
+from tests.track_asserts import assert_track_result_payload
 
 VALID_PAYLOAD = {
     "prompt_tokens": 19,
@@ -162,7 +164,9 @@ def test_deliver_now_single_event_success(aicm_api_key, aicm_api_base):
             pytest.skip(
                 "Server rejected tracking request - check server logs for validation errors"
             )
-        assert result["result"]["cost_events"]
+        payload = result.get("result") or {}
+        assert payload, "Immediate track should return a result payload"
+        assert_track_result_payload(payload)
         assert "triggered_limits" in result
 
 
@@ -239,16 +243,29 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
         },
     ]
 
-    results = []
+    def _extract_payload(data: dict, fallback_id: str) -> dict:
+        results = data.get("results", [])
+        if results and isinstance(results[0], dict):
+            payload = results[0]
+            payload.setdefault("response_id", fallback_id)
+            return payload
+        errors = data.get("errors") or data.get("detail")
+        if isinstance(errors, str):
+            errors = [errors]
+        elif not isinstance(errors, list):
+            errors = ["Rejected by server"]
+        return {"response_id": fallback_id, "errors": errors}
+
+    collected: dict[str, dict] = {}
+
     for idx, event in enumerate(events):
+        response_id = event.get("response_id") or f"evt-{idx}"
         if idx == 1:
-            # Missing service_key: the client raises on 422, so verify behavior via raw HTTP call
             body = {
                 "tracked": [
                     {
                         "api_id": event["api_id"],
-                        # intentionally omit service_key
-                        "response_id": event["response_id"],
+                        "response_id": response_id,
                         "timestamp": event["timestamp"],
                         "payload": event["payload"],
                     }
@@ -260,30 +277,18 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
                     json=body,
                     headers={"Authorization": f"Bearer {aicm_api_key}"},
                 )
-            # Server may respond 422 with results array now; collect errors mapping
-            if resp.status_code == 422:
-                data = resp.json()
-                res = data.get("results", [])
-                if res and isinstance(res[0], dict):
-                    rid = res[0].get("response_id") or event.get("response_id")
-                    errs = res[0].get("errors") or ["Rejected by server"]
-                    results.append({rid: errs})
-                else:
-                    results.append({event.get("response_id"): ["Rejected by server"]})
-            else:
-                results.append({event.get("response_id"): "sent"})
+            data = resp.json()
+            collected_response = _extract_payload(data, response_id)
+            collected[collected_response["response_id"]] = collected_response
             continue
 
-        # For invalid inputs that will cause 422 (e.g., bad service_key format or missing totals),
-        # send directly to server to assert validation instead of using immediate delivery.
-        invalid_case = idx in (2, 3, 5)
-        if invalid_case:
+        if idx in (2, 3, 5):
             body = {
                 "tracked": [
                     {
                         "api_id": event["api_id"],
                         "service_key": event.get("service_key"),
-                        "response_id": event.get("response_id"),
+                        "response_id": response_id,
                         "timestamp": event.get("timestamp"),
                         "payload": event.get("payload"),
                     }
@@ -295,41 +300,55 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
                     json=body,
                     headers={"Authorization": f"Bearer {aicm_api_key}"},
                 )
-            assert resp.status_code == 422, resp.text
+            assert resp.status_code in {202, 422}, resp.text
             data = resp.json()
-            res = data.get("results", [])
-            if res and isinstance(res[0], dict):
-                rid = res[0].get("response_id") or event.get("response_id")
-                errs = res[0].get("errors") or ["Rejected by server"]
-                results.append({rid: errs})
-            else:
-                results.append({event.get("response_id"): ["Rejected by server"]})
+            collected_response = _extract_payload(data, response_id)
+            collected[collected_response["response_id"]] = collected_response
+            continue
+
+        track_res = tracker.track(
+            event["api_id"],
+            event["payload"],
+            response_id=response_id,
+            timestamp=event.get("timestamp"),
+        )
+        payload = track_res.get("result") if isinstance(track_res, dict) else None
+        if isinstance(payload, dict):
+            collected[payload.get("response_id", response_id)] = payload
         else:
-            try:
-                tracker.track(
-                    event["api_id"],
-                    event["payload"],
-                    response_id=event.get("response_id"),
-                    timestamp=event.get("timestamp"),
-                )
-                results.append({event.get("response_id"): "sent"})
-            except httpx.HTTPStatusError as e:
-                # If server rejects even the valid case due to schema drift, accept server-side validation
-                if e.response is not None and e.response.status_code == 422:
-                    results.append({event.get("response_id"): ["Rejected by server"]})
-                else:
-                    raise
+            collected[response_id] = {"response_id": response_id, "errors": ["Rejected by server"]}
 
     tracker.close()
 
-    # Server now returns errors under results[x].errors
-    assert results[0]["ok1"] in ("sent", ["Rejected by server"])
-    assert results[1]["missing"] == ["Rejected by server"]
-    assert results[2]["badformat"] == ["Rejected by server"]
-    assert results[3]["noservice"] == ["Rejected by server"]
-    assert results[4]["noapi"] in ("sent", ["Rejected by server"])
-    err = results[5]["badpayload"]
-    assert isinstance(err, list)
+    ok_payload = collected.get("ok1")
+    assert ok_payload is not None
+    assert_track_result_payload(ok_payload)
+
+    missing_payload = collected.get("missing")
+    assert missing_payload is not None
+    assert missing_payload.get("errors")
+    assert any("service_key" in e.lower() for e in missing_payload.get("errors", []))
+
+    badformat_payload = collected.get("badformat")
+    assert badformat_payload is not None
+    assert badformat_payload.get("errors")
+
+    noservice_payload = collected.get("noservice")
+    assert noservice_payload is not None
+    assert_track_result_payload(noservice_payload)
+    assert noservice_payload.get("status") == "service_key_unknown"
+
+    noapi_payload = collected.get("noapi")
+    if noapi_payload is not None:
+        # Some servers may reject this at ingestion time if the API client is unknown
+        if noapi_payload.get("errors"):
+            assert any("api" in e.lower() for e in noapi_payload["errors"])
+        else:
+            assert_track_result_payload(noapi_payload)
+
+    badpayload_payload = collected.get("badpayload")
+    assert badpayload_payload is not None
+    assert badpayload_payload.get("errors")
 
 
 def test_track_missing_response_id_generates_unknown_and_422(

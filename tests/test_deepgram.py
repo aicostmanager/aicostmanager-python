@@ -7,6 +7,7 @@ import pytest
 from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
+from tests.track_asserts import assert_track_result_payload
 
 if os.environ.get("RUN_NETWORK_TESTS") != "1":
     pytestmark = pytest.mark.skip(reason="requires network access")
@@ -284,7 +285,7 @@ def test_deepgram_track_immediate(events, aicm_api_key, aicm_api_base, tmp_path)
                 response_id=event["response_id"],
                 timestamp=event["timestamp"],
             )
-            assert result["result"]["cost_events"]
+            assert_track_result_payload(result.get("result", {}))
 
 
 @pytest.mark.parametrize(
@@ -340,7 +341,7 @@ def test_deepgram_track_immediate_with_meta(
                 context=event["context"],
                 timestamp=event["timestamp"],
             )
-            assert result["result"]["cost_events"]
+            assert_track_result_payload(result.get("result", {}))
 
 
 @pytest.mark.parametrize(

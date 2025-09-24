@@ -54,10 +54,20 @@ class PaginatedResponse(BaseModel, Generic[T]):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TrackStatus(str, Enum):
+    """Possible statuses returned for tracked events."""
+
+    QUEUED = "queued"
+    COMPLETED = "completed"
+    ERROR = "error"
+    SERVICE_KEY_UNKNOWN = "service_key_unknown"
+
+
 class TrackResult(BaseModel):
     """Per-record result for /track"""
 
     response_id: str
+    status: Optional[TrackStatus | str] = None
     cost_events: Optional[List[Dict[str, Any]]] = None
     errors: Optional[List[str]] = None
 
