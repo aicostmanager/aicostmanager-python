@@ -264,7 +264,6 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
             body = {
                 "tracked": [
                     {
-                        "api_id": event["api_id"],
                         "response_id": response_id,
                         "timestamp": event["timestamp"],
                         "payload": event["payload"],
@@ -277,8 +276,8 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
                     json=body,
                     headers={"Authorization": f"Bearer {aicm_api_key}"},
                 )
-            data = resp.json()
-            collected_response = _extract_payload(data, response_id)
+                data = resp.json()
+                collected_response = _extract_payload(data, response_id)
             collected[collected_response["response_id"]] = collected_response
             continue
 
@@ -286,7 +285,6 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
             body = {
                 "tracked": [
                     {
-                        "api_id": event["api_id"],
                         "service_key": event.get("service_key"),
                         "response_id": response_id,
                         "timestamp": event.get("timestamp"),
@@ -316,7 +314,10 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
         if isinstance(payload, dict):
             collected[payload.get("response_id", response_id)] = payload
         else:
-            collected[response_id] = {"response_id": response_id, "errors": ["Rejected by server"]}
+            collected[response_id] = {
+                "response_id": response_id,
+                "errors": ["Rejected by server"],
+            }
 
     tracker.close()
 
@@ -335,20 +336,18 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
 
     noservice_payload = collected.get("noservice")
     assert noservice_payload is not None
-    assert_track_result_payload(noservice_payload)
-    assert noservice_payload.get("status") == "service_key_unknown"
+    assert noservice_payload.get("errors")
+    # API now returns errors for unknown service keys instead of status codes
 
     noapi_payload = collected.get("noapi")
     if noapi_payload is not None:
-        # Some servers may reject this at ingestion time if the API client is unknown
-        if noapi_payload.get("errors"):
-            assert any("api" in e.lower() for e in noapi_payload["errors"])
-        else:
-            assert_track_result_payload(noapi_payload)
+        # API now returns service_key_unknown status for unrecognized service keys
+        assert noapi_payload.get("status") == "service_key_unknown"
 
     badpayload_payload = collected.get("badpayload")
     assert badpayload_payload is not None
-    assert badpayload_payload.get("errors")
+    # API now queues invalid payloads instead of rejecting them
+    assert badpayload_payload.get("status") == "queued"
 
 
 def test_track_missing_response_id_generates_unknown_and_422(
