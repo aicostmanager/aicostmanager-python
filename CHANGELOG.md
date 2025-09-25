@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.38] - 2025-09-25
+### Changed
+- **API Request Format Updates**: Updated test suite to align with server-side API changes:
+  - Removed `api_id` field from direct HTTP request bodies as the API no longer accepts this parameter
+  - Updated error handling expectations to match current API behavior where invalid service keys return `service_key_unknown` status instead of errors
+  - Modified payload validation expectations where invalid payloads are now queued (`status: 'queued'`) instead of rejected with errors
+  - Updated test assertions to properly validate the new response formats for various error conditions
+
+### Fixed
+- **Test Compatibility**: Fixed failing `test_deliver_now_multiple_events_with_errors` test to work with the updated server API response formats and validation rules
+
 ## [0.1.37] - 2025-09-19
 ### Removed
 - **User-Based Limit Logic**: Completely removed backward compatibility for user-specific limits. The following components no longer support user-based filtering:

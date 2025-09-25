@@ -316,7 +316,10 @@ def test_deliver_now_multiple_events_with_errors(aicm_api_key, aicm_api_base):
         if isinstance(payload, dict):
             collected[payload.get("response_id", response_id)] = payload
         else:
-            collected[response_id] = {"response_id": response_id, "errors": ["Rejected by server"]}
+            collected[response_id] = {
+                "response_id": response_id,
+                "errors": ["Rejected by server"],
+            }
 
     tracker.close()
 
