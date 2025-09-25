@@ -21,6 +21,7 @@ from .common import (
     TrackRequest,
     TrackResponse,
     TrackResult,
+    TrackStatus,
     TriggeredLimitPayload,
     ValidationError,
 )
@@ -102,6 +103,7 @@ __all__ = [
     "TrackRequest",
     "TrackResponse",
     "TrackResult",
+    "TrackStatus",
     "TrackedRecord",
     "TrendPointSchema",
     "TrendsFilterSchema",

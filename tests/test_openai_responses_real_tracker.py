@@ -8,6 +8,7 @@ from aicostmanager.delivery import DeliveryConfig, DeliveryType, create_delivery
 from aicostmanager.ini_manager import IniManager
 from aicostmanager.tracker import Tracker
 from aicostmanager.usage_utils import get_usage_from_response
+from tests.track_asserts import assert_track_result_payload
 
 BASE_URL = os.environ.get("AICM_API_BASE", "http://localhost:8001")
 
@@ -86,6 +87,6 @@ def test_openai_responses_tracker(
             pytest.fail(
                 "Server rejected tracking request - check server logs for validation errors"
             )
-        assert result2.get("result", {}).get("cost_events")
+        assert_track_result_payload(result2.get("result", {}))
 
     tracker.close()

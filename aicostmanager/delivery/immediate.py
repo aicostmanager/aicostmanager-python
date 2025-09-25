@@ -5,6 +5,7 @@ from typing import Any, Dict
 
 from ..client.exceptions import NoCostsTrackedException, UsageLimitExceeded
 from ..config_manager import ConfigManager
+from ..models import TrackStatus
 from .base import Delivery, DeliveryConfig, DeliveryType
 
 
@@ -114,8 +115,20 @@ class ImmediateDelivery(Delivery):
             cost_events = (
                 result.get("cost_events") if isinstance(result, dict) else None
             )
+            status = result.get("status") if isinstance(result, dict) else None
+            errors = result.get("errors") if isinstance(result, dict) else None
             if not cost_events:
-                raise NoCostsTrackedException()
+                allowed_statuses = {
+                    TrackStatus.QUEUED.value,
+                    TrackStatus.COMPLETED.value,
+                    TrackStatus.ERROR.value,
+                    TrackStatus.SERVICE_KEY_UNKNOWN.value,
+                }
+                if not (
+                    (isinstance(status, str) and status in allowed_statuses)
+                    or (errors and isinstance(errors, list))
+                ):
+                    raise NoCostsTrackedException()
 
             # Proactively raise on this call if the server indicates a limit was triggered
             # and limits are enabled
