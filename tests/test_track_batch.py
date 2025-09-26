@@ -402,7 +402,7 @@ class TestTrackBatch:
 class TestTrackBatchAsync:
     """Test the async version of track_batch."""
 
-    @pytest.mark.anyio
+    @pytest.mark.anyio(backends=["asyncio"])
     async def test_track_batch_async_basic(self):
         """Test basic functionality of track_batch_async."""
         received = []
