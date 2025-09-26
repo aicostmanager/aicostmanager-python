@@ -439,7 +439,7 @@ class TestTrackBatchAsync:
         assert "results" in result
         assert len(result["results"]) == 1
 
-    @pytest.mark.anyio
+    @pytest.mark.anyio(backends=["asyncio"])
     async def test_track_batch_async_persistent_delivery(self):
         """Test track_batch_async with persistent delivery."""
         with tempfile.TemporaryDirectory() as tmp_dir:
