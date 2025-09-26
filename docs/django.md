@@ -65,7 +65,7 @@ from django.apps import apps
 
 def my_view(request):
     tracker = apps.get_app_config("myapp").tracker
-    tracker.track("openai", "gpt-4o-mini", {"input_tokens": 10})
+    tracker.track("openai::gpt-4o-mini", {"input_tokens": 10})
     ...
 ```
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 from uuid import uuid4
 
+from .client.exceptions import BatchSizeLimitExceeded
 from .delivery import (
     Delivery,
     DeliveryConfig,
@@ -326,6 +327,10 @@ class Tracker:
         which is more efficient than individual track() calls and avoids
         issues with persistent queue API key mixing.
 
+        Note:
+            Maximum batch size is 1000 records. Batches exceeding this limit
+            will raise BatchSizeLimitExceeded.
+
         Args:
             records: List of dictionaries, each containing:
                 - service_key (str): The service key for tracking
@@ -358,6 +363,9 @@ class Tracker:
             ]
             result = tracker.track_batch(records)
         """
+        if len(records) > 1000:
+            raise BatchSizeLimitExceeded(len(records), 1000)
+
         if not records:
             return (
                 {"results": []} if hasattr(self.delivery, "_enqueue") else {"queued": 0}
@@ -476,7 +484,15 @@ class Tracker:
         anonymize_fields: Iterable[str] | None = None,
         anonymizer: Callable[[Any], Any] | None = None,
     ) -> Any:
-        """Async version of track_batch."""
+        """Async version of track_batch.
+
+        Note:
+            Maximum batch size is 1000 records. Batches exceeding this limit
+            will raise BatchSizeLimitExceeded.
+        """
+        if len(records) > 1000:
+            raise BatchSizeLimitExceeded(len(records), 1000)
+
         return await asyncio.to_thread(
             self.track_batch,
             records,

@@ -6,12 +6,14 @@ from .client import (
     AICMError,
     APIRequestError,
     AsyncCostManagerClient,
+    BatchSizeLimitExceeded,
     CostManagerClient,
     MissingConfiguration,
-    UsageLimitExceeded,
     NoCostsTrackedException,
+    UsageLimitExceeded,
 )
 from .config_manager import ConfigManager
+from .costs import CostQueryManager
 from .delivery import (
     Delivery,
     DeliveryConfig,
@@ -24,18 +26,18 @@ from .delivery import (
 from .limits import BaseLimitManager, TriggeredLimitManager, UsageLimitManager
 from .tracker import Tracker
 from .wrappers import (
+    AnthropicWrapper,
+    BedrockWrapper,
+    GeminiWrapper,
     OpenAIChatWrapper,
     OpenAIResponsesWrapper,
-    AnthropicWrapper,
-    GeminiWrapper,
-    BedrockWrapper,
 )
-from .costs import CostQueryManager
 
 __all__ = [
     "AICMError",
     "APIRequestError",
     "AsyncCostManagerClient",
+    "BatchSizeLimitExceeded",
     "CostManagerClient",
     "MissingConfiguration",
     "UsageLimitExceeded",

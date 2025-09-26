@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -35,13 +35,76 @@ class CustomCostUnitOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RoundingConfig(BaseModel):
+    """Schema for rounding configuration in mappings"""
+
+    mode: str = Field(description="Rounding mode: 'ceil', 'floor', 'round'")
+    increment: Optional[float] = Field(default=None, description="Increment to round to")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class Condition(BaseModel):
+    """Schema for conditional logic in mappings"""
+
+    equals: Optional[Dict[str, Any]] = Field(default=None, description="Equals condition")
+    regex: Optional[Dict[str, Any]] = Field(default=None, description="Regex condition")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CostUnitSwitch(BaseModel):
+    """Schema for cost unit switching based on field values"""
+
+    field: str = Field(description="Field to check for switching")
+    cases: Dict[str, str] = Field(description="Mapping of field values to cost unit names")
+    default: str = Field(description="Default cost unit name")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class Mapping(BaseModel):
+    """Schema for field-to-cost-unit mappings"""
+
+    cost_unit: Optional[str] = Field(default=None, description="Name of cost unit to assign to")
+    cost_unit_switch: Optional[CostUnitSwitch] = Field(default=None, description="Conditional cost unit switching")
+    field: str = Field(description="Path to quantity field in usage payload")
+    divide_by: Optional[float] = Field(default=None, description="Divide quantity by this value")
+    multiply_by: Optional[float] = Field(default=None, description="Multiply quantity by this value")
+    min_value: Optional[float] = Field(default=None, description="Minimum value to use")
+    max_value: Optional[float] = Field(default=None, description="Maximum value to use")
+    rounding: Optional[RoundingConfig] = Field(default=None, description="Rounding configuration")
+    only_if: Optional[Condition] = Field(default=None, description="Only apply if condition matches")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MappingGroup(BaseModel):
+    """Schema for conditional mapping groups"""
+
+    when: Condition = Field(description="Condition that must be met")
+    mappings: List[Mapping] = Field(description="Mappings to apply when condition is met")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CustomServiceConfiguration(BaseModel):
+    """Schema for custom service configuration"""
+
+    cost_units: List[CustomCostUnitIn] = Field(description="Cost units for this service")
+    mappings: Optional[List[Mapping]] = Field(default=None, description="Field-to-cost-unit mappings")
+    mapping_groups: Optional[List[MappingGroup]] = Field(default=None, description="Conditional mapping groups")
+    exclusions: Optional[List[Condition]] = Field(default=None, description="Conditions to exclude events")
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class CustomServiceIn(BaseModel):
     """Schema for creating/updating a custom service"""
 
     custom_service_key: str = Field(max_length=100, min_length=1)
-    configuration: Optional[Dict[str, Any]] = None
+    configuration: CustomServiceConfiguration
     is_active: bool = True
-    cost_units: Optional[List[CustomCostUnitIn]] = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -65,7 +128,7 @@ class CustomServiceOut(BaseModel):
 
     uuid: str
     custom_service_key: str
-    configuration: Optional[Dict[str, Any]] = None
+    configuration: CustomServiceConfiguration
     is_active: bool
     is_deleted: bool
     created_at: str  # datetime string

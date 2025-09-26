@@ -39,6 +39,7 @@ filterwarnings = [
 [dependency-groups]
 dev = [
     "bump-my-version>=1.2.1",
+    "pytest-asyncio>=1.2.0",
 ]
 test = [
     "openai",
@@ -59,7 +60,7 @@ dev = [
 ]
 
 [tool.bumpversion]
-current_version = "0.1.38"
+current_version = "0.1.39"
 commit = true
 tag = true
 allow_dirty = true

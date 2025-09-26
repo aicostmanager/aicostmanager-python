@@ -50,3 +50,14 @@ class NoCostsTrackedException(AICMError):
 
     def __init__(self) -> None:
         super().__init__("No cost events were recorded for the tracked payload")
+
+
+class BatchSizeLimitExceeded(AICMError):
+    """Raised when the batch size exceeds the maximum allowed limit."""
+
+    def __init__(self, batch_size: int, max_batch_size: int) -> None:
+        self.batch_size = batch_size
+        self.max_batch_size = max_batch_size
+        super().__init__(
+            f"Batch size of {batch_size} exceeds maximum allowed limit of {max_batch_size}"
+        )

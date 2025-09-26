@@ -398,11 +398,69 @@ class TestTrackBatch:
             with pytest.raises(KeyError):
                 tracker.track_batch([{"service_key": "openai::gpt-4"}])
 
+    def test_track_batch_exceeds_max_batch_size(self):
+        """Test track_batch raises BatchSizeLimitExceeded when batch size exceeds 1000."""
+        from aicostmanager.client.exceptions import BatchSizeLimitExceeded
+
+        ini = IniManager("ini")
+        dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test")
+        delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+
+        # Create 1001 records (exceeds limit)
+        records = [
+            {
+                "service_key": "openai::gpt-4",
+                "usage": {"tokens": 100},
+                "response_id": f"resp_{i}",
+            }
+            for i in range(1001)
+        ]
+
+        with Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery) as tracker:
+            with pytest.raises(BatchSizeLimitExceeded) as exc_info:
+                tracker.track_batch(records)
+
+        assert exc_info.value.batch_size == 1001
+        assert exc_info.value.max_batch_size == 1000
+        assert "1001 exceeds maximum allowed limit of 1000" in str(exc_info.value)
+
+    def test_track_batch_max_batch_size_allowed(self):
+        """Test track_batch allows exactly 1000 records."""
+        received = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            received.append(json.loads(request.read().decode()))
+            return httpx.Response(200, json={"results": [], "triggered_limits": {}})
+
+        transport = httpx.MockTransport(handler)
+        ini = IniManager("ini")
+        dconfig = DeliveryConfig(
+            ini_manager=ini, aicm_api_key="test", transport=transport
+        )
+        delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+
+        # Create exactly 1000 records (at limit)
+        records = [
+            {
+                "service_key": "openai::gpt-4",
+                "usage": {"tokens": 100},
+                "response_id": f"resp_{i}",
+            }
+            for i in range(1000)
+        ]
+
+        with Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery) as tracker:
+            result = tracker.track_batch(records)
+
+        # Should succeed and make a request
+        assert len(received) == 1
+        assert len(received[0]["tracked"]) == 1000
+
 
 class TestTrackBatchAsync:
     """Test the async version of track_batch."""
 
-    @pytest.mark.anyio(backends=["asyncio"])
+    @pytest.mark.asyncio
     async def test_track_batch_async_basic(self):
         """Test basic functionality of track_batch_async."""
         received = []
@@ -439,7 +497,7 @@ class TestTrackBatchAsync:
         assert "results" in result
         assert len(result["results"]) == 1
 
-    @pytest.mark.anyio(backends=["asyncio"])
+    @pytest.mark.asyncio
     async def test_track_batch_async_persistent_delivery(self):
         """Test track_batch_async with persistent delivery."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -466,6 +524,66 @@ class TestTrackBatchAsync:
             assert "queued" in result
             assert "response_ids" in result
             assert "async_resp_1" in result["response_ids"]
+
+    @pytest.mark.asyncio
+    async def test_track_batch_async_exceeds_max_batch_size(self):
+        """Test track_batch_async raises BatchSizeLimitExceeded when batch size exceeds 1000."""
+        from aicostmanager.client.exceptions import BatchSizeLimitExceeded
+
+        ini = IniManager("ini")
+        dconfig = DeliveryConfig(ini_manager=ini, aicm_api_key="test")
+        delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+
+        # Create 1001 records (exceeds limit)
+        records = [
+            {
+                "service_key": "openai::gpt-4",
+                "usage": {"tokens": 100},
+                "response_id": f"resp_{i}",
+            }
+            for i in range(1001)
+        ]
+
+        with Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery) as tracker:
+            with pytest.raises(BatchSizeLimitExceeded) as exc_info:
+                await tracker.track_batch_async(records)
+
+        assert exc_info.value.batch_size == 1001
+        assert exc_info.value.max_batch_size == 1000
+        assert "1001 exceeds maximum allowed limit of 1000" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_track_batch_async_max_batch_size_allowed(self):
+        """Test track_batch_async allows exactly 1000 records."""
+        received = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            received.append(json.loads(request.read().decode()))
+            return httpx.Response(200, json={"results": [], "triggered_limits": {}})
+
+        transport = httpx.MockTransport(handler)
+        ini = IniManager("ini")
+        dconfig = DeliveryConfig(
+            ini_manager=ini, aicm_api_key="test", transport=transport
+        )
+        delivery = create_delivery(DeliveryType.IMMEDIATE, dconfig)
+
+        # Create exactly 1000 records (at limit)
+        records = [
+            {
+                "service_key": "openai::gpt-4",
+                "usage": {"tokens": 100},
+                "response_id": f"resp_{i}",
+            }
+            for i in range(1000)
+        ]
+
+        with Tracker(aicm_api_key="test", ini_path="ini", delivery=delivery) as tracker:
+            result = await tracker.track_batch_async(records)
+
+        # Should succeed and make a request
+        assert len(received) == 1
+        assert len(received[0]["tracked"]) == 1000
 
 
 class TestTrackBatchIntegration:

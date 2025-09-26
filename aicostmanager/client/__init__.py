@@ -1,18 +1,20 @@
 """Client package exposing sync and async variants."""
 
+from .async_client import AsyncCostManagerClient
 from .exceptions import (
     AICMError,
     APIRequestError,
+    BatchSizeLimitExceeded,
     MissingConfiguration,
-    UsageLimitExceeded,
     NoCostsTrackedException,
+    UsageLimitExceeded,
 )
 from .sync_client import CostManagerClient
-from .async_client import AsyncCostManagerClient
 
 __all__ = [
     "AICMError",
     "APIRequestError",
+    "BatchSizeLimitExceeded",
     "MissingConfiguration",
     "UsageLimitExceeded",
     "NoCostsTrackedException",

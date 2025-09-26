@@ -46,11 +46,10 @@ Every usage event is tied to two identifiers:
 ```python
 from aicostmanager import Tracker
 
-api_id = "openai_chat"          # copied from the APIs tab
 service_key = "openai::gpt-5-mini"  # copied from the Services tab
 
 with Tracker() as tracker:
-    tracker.track(api_id, service_key, {
+    tracker.track(service_key, {
         "input_tokens": 10,
         "output_tokens": 20,
     })
@@ -168,7 +167,7 @@ class MyAppConfig(AppConfig):
 from .apps import tracker
 
 def my_view(request):
-    tracker.track("openai", "gpt-4o-mini", {"input_tokens": 10})
+    tracker.track("openai::gpt-4o-mini", {"input_tokens": 10})
     ...
 ```
 For a full setup guide, see [Django integration guide](docs/django.md).
@@ -207,7 +206,7 @@ def get_tracker():
 tracker = get_tracker()
 
 if st.button("Generate"):
-    tracker.track("openai", "gpt-4o-mini", {"input_tokens": 10})
+    tracker.track("openai::gpt-4o-mini", {"input_tokens": 10})
 ```
 For a full setup guide, see [Streamlit integration guide](docs/streamlit.md).
 
@@ -223,7 +222,7 @@ tracker = Tracker()
 
 @app.task
 def do_work():
-    tracker.track("openai", "gpt-4o-mini", {"input_tokens": 10})
+    tracker.track("openai::gpt-4o-mini", {"input_tokens": 10})
 
 @worker_shutdown.connect
 def close_tracker(**_):

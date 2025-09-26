@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.39] - 2025-09-26
+
+### Added
+- **Custom Services API Support**: Complete implementation of custom service configuration management:
+  - New `CustomServiceIn`, `CustomServiceOut`, `CustomServiceSummaryOut` models
+  - Advanced cost unit configuration with `CustomCostUnitIn`/`CustomCostUnitOut`
+  - Flexible mapping system supporting `Mapping`, `MappingGroup`, `Condition`, and `CostUnitSwitch`
+  - Exclusions support for filtering events
+  - Full CRUD operations: `list_custom_services()`, `create_custom_service()`, `get_custom_service()`, `update_custom_service()`, `delete_custom_service()`
+  - Comprehensive validation and type safety
+
+- **Batch Tracking Support**: Efficient bulk usage tracking with `track_batch()` and `track_batch_async()`:
+  - Send multiple tracking records in a single HTTP request
+  - Automatic batch size limits (1000 records max)
+  - Configurable anonymization and error handling
+  - Improved performance for high-volume tracking scenarios
+  - Full async support with `track_batch_async()`
+
+### Changed
+- **API Parameter Updates**: Removed `api_id` parameter from all track endpoint calls:
+  - Updated `track()` method calls throughout codebase to use `service_key` instead of `api_id`
+  - Fixed documentation examples in README.md, docs/fastapi.md, docs/streamlit.md, docs/django.md
+  - Ensured HTTP requests to `/track` endpoint no longer include `api_id` fields
+  - Updated all test cases to use correct parameter signatures
+
+### Fixed
+- **E2E Test Reliability**: Fixed failing end-to-end tests for usage limits:
+  - Corrected limit amounts to ensure triggering (extremely small values like 0.0000000001)
+  - Fixed persistent queue test expectations to account for asynchronous processing
+  - Improved test resilience for server-side timing variations
+  - Added proper validation of both exception handling and triggered limits state
+
+### Enhanced
+- **Model Type Safety**: Improved Pydantic models with comprehensive field descriptions and validation
+- **Error Handling**: Better handling of API responses and edge cases in custom services
+- **Documentation**: Updated examples to reflect current API usage patterns
+
 ## [0.1.38] - 2025-09-25
 ### Changed
 - **API Request Format Updates**: Updated test suite to align with server-side API changes:

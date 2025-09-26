@@ -54,7 +54,7 @@ Call the tracker when handling user actions:
 ```python
 def main():
     if st.button("Generate"):
-        tracker.track("openai", "gpt-4o-mini", {"input_tokens": 10})
+        tracker.track("openai::gpt-4o-mini", {"input_tokens": 10})
         st.write("queued")
 
 if __name__ == "__main__":

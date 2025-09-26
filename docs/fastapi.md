@@ -108,7 +108,7 @@ from fastapi import Request
 @app.post("/track")
 async def track(request: Request) -> dict:
     payload = await request.json()
-    app.state.tracker.track("openai", "gpt-4o-mini", payload)
+    app.state.tracker.track("openai::gpt-4o-mini", payload)
     return {"status": "queued"}
 ```
 
