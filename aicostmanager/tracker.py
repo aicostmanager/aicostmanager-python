@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
-from collections.abc import Iterable, Mapping
 from typing import Any, Callable, Dict, Optional, Tuple
 from uuid import uuid4
 
@@ -118,9 +118,7 @@ class Tracker:
         # Instance-level tracking metadata
         self.customer_key: Optional[str] = None
         self.context: Optional[Dict[str, Any]] = None
-        self._anonymize_fields = {
-            str(field) for field in anonymize_fields or []
-        }
+        self._anonymize_fields = {str(field) for field in anonymize_fields or []}
         self._anonymizer = anonymizer or self._default_anonymizer
 
     # ------------------------------------------------------------------
@@ -243,23 +241,16 @@ class Tracker:
         if isinstance(value, Mapping):
             return self._anonymize_mapping(value, fields, anonymizer)
         if isinstance(value, list):
-            return [
-                self._anonymize_value(item, fields, anonymizer) for item in value
-            ]
+            return [self._anonymize_value(item, fields, anonymizer) for item in value]
         if isinstance(value, tuple):
             return tuple(
                 self._anonymize_value(item, fields, anonymizer) for item in value
             )
         if isinstance(value, set):
-            return {
-                self._anonymize_value(item, fields, anonymizer)
-                for item in value
-            }
+            return {self._anonymize_value(item, fields, anonymizer) for item in value}
         return value
 
-    def _apply_anonymizer(
-        self, value: Any, anonymizer: Callable[[Any], Any]
-    ) -> Any:
+    def _apply_anonymizer(self, value: Any, anonymizer: Callable[[Any], Any]) -> Any:
         try:
             return anonymizer(value)
         except Exception as exc:  # pragma: no cover - defensive logging
@@ -276,8 +267,7 @@ class Tracker:
             return bytearray(b"[REDACTED]")
         if isinstance(value, Mapping):
             return {
-                key: Tracker._default_anonymizer(inner)
-                for key, inner in value.items()
+                key: Tracker._default_anonymizer(inner) for key, inner in value.items()
             }
         if isinstance(value, list):
             return [Tracker._default_anonymizer(inner) for inner in value]
@@ -285,7 +275,9 @@ class Tracker:
             return tuple(Tracker._default_anonymizer(inner) for inner in value)
         if isinstance(value, set):
             return {
-                f"[REDACTED_{idx}]" if isinstance(inner, str) else Tracker._default_anonymizer(inner)
+                f"[REDACTED_{idx}]"
+                if isinstance(inner, str)
+                else Tracker._default_anonymizer(inner)
                 for idx, inner in enumerate(value)
             }
         return value
@@ -321,6 +313,124 @@ class Tracker:
     # ------------------------------------------------------------------
     # Core Tracking Methods
     # ------------------------------------------------------------------
+    def track_batch(
+        self,
+        records: list[dict],
+        *,
+        anonymize_fields: Iterable[str] | None = None,
+        anonymizer: Callable[[Any], Any] | None = None,
+    ) -> Any:
+        """Track multiple usage records in a single batch request.
+
+        This method sends multiple tracking records in a single HTTP request,
+        which is more efficient than individual track() calls and avoids
+        issues with persistent queue API key mixing.
+
+        Args:
+            records: List of dictionaries, each containing:
+                - service_key (str): The service key for tracking
+                - usage (Dict[str, Any]): Usage data to track
+                - response_id (Optional[str]): Response ID (auto-generated if None)
+                - timestamp (Optional[str | datetime]): Timestamp (current time if None)
+                - customer_key (Optional[str]): Customer key (uses instance default if None)
+                - context (Optional[Dict[str, Any]]): Context data (uses instance default if None)
+            anonymize_fields: Fields to anonymize across all records
+            anonymizer: Anonymization function to apply to all records
+
+        Returns:
+            For immediate delivery: dict with "results" and "triggered_limits" keys
+            For queued delivery: dict with "queued" count
+
+        Example:
+            records = [
+                {
+                    "service_key": "openai::gpt-4",
+                    "usage": {"tokens": 100},
+                    "customer_key": "customer1",
+                    "response_id": "resp1"
+                },
+                {
+                    "service_key": "anthropic::claude-3",
+                    "usage": {"tokens": 200},
+                    "customer_key": "customer2",
+                    "context": {"session": "abc123"}
+                }
+            ]
+            result = tracker.track_batch(records)
+        """
+        if not records:
+            return (
+                {"results": []} if hasattr(self.delivery, "_enqueue") else {"queued": 0}
+            )
+
+        # Build all records first
+        built_records = []
+        for record_data in records:
+            # Extract required fields
+            service_key = record_data["service_key"]
+            usage = record_data["usage"]
+
+            # Extract optional fields with defaults
+            response_id = record_data.get("response_id")
+            timestamp = record_data.get("timestamp")
+            customer_key = record_data.get("customer_key")
+            context = record_data.get("context")
+
+            # Use instance-level values as fallbacks if parameters are None
+            resolved_customer_key, resolved_context = self._resolve_tracking_params(
+                customer_key, context
+            )
+
+            # Apply anonymization to this record's usage
+            anonymized_usage = self._apply_anonymization(
+                usage, anonymize_fields=anonymize_fields, anonymizer=anonymizer
+            )
+
+            # Build the record
+            record = self._build_record(
+                service_key,
+                anonymized_usage,
+                response_id=response_id,
+                timestamp=timestamp,
+                customer_key=resolved_customer_key,
+                context=resolved_context,
+            )
+            built_records.append(record)
+
+        # For immediate delivery, send all records in one batch
+        if hasattr(self.delivery, "type") and self.delivery.type.value == "immediate":
+            body = {self.delivery._body_key: built_records}
+            try:
+                data = self.delivery._post_with_retry(body, max_attempts=3)
+                if self.delivery._limits_enabled() and isinstance(data, dict):
+                    tl_data = data.get("triggered_limits")
+                    if tl_data:
+                        # Use a ConfigManager that preserves existing INI settings
+                        from .config_manager import ConfigManager
+
+                        cfg = ConfigManager(
+                            ini_path=self.ini_manager.ini_path, load=True
+                        )
+                        try:
+                            cfg.write_triggered_limits(tl_data)
+                        except Exception as exc:  # pragma: no cover
+                            self.logger.error("Triggered limits update failed: %s", exc)
+                return data
+            except Exception as exc:
+                self.logger.error("Batch delivery failed: %s", exc)
+                raise
+        else:
+            # For queued delivery, enqueue all records
+            total_queued = 0
+            response_ids = []
+            for record in built_records:
+                result = self.delivery.enqueue(record)
+                if isinstance(result, int):
+                    total_queued = result  # Last queue length
+                response_ids.append(record["response_id"])
+
+            return {"queued": total_queued, "response_ids": response_ids}
+
     def track(
         self,
         service_key: str,
@@ -358,6 +468,21 @@ class Tracker:
         if isinstance(result, int):
             return {"queued": result, "response_id": record["response_id"]}
         return result
+
+    async def track_batch_async(
+        self,
+        records: list[dict],
+        *,
+        anonymize_fields: Iterable[str] | None = None,
+        anonymizer: Callable[[Any], Any] | None = None,
+    ) -> Any:
+        """Async version of track_batch."""
+        return await asyncio.to_thread(
+            self.track_batch,
+            records,
+            anonymize_fields=anonymize_fields,
+            anonymizer=anonymizer,
+        )
 
     async def track_async(
         self,

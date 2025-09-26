@@ -8,6 +8,7 @@ pass it directly to the client or tracker.
 
 - [Usage](usage.md) - Basic SDK usage and API examples
 - [Tracker](tracker.md) - Record custom usage events
+- [Batch Tracking](batch_tracking.md) - Efficiently track multiple events at once
 - [LLM Wrappers](llm_wrappers.md) - Drop-in clients that track usage automatically
 - [Configuration](config.md) - Settings and defaults
 - [Limit Managers](limit_managers.md) - Manage usage limits and triggered limits

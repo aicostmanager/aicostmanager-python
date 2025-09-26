@@ -94,21 +94,88 @@ processing:
 
 ```python
 usage = {"input_tokens": 10, "output_tokens": 20}
-tracker.track("openai", "gpt-5-mini", usage)
+tracker.track("openai::gpt-4", usage)
 ```
 
 Optional fields let you attach metadata or override identifiers:
 
 ```python
 tracker.track(
-    "openai",
-    "gpt-5-mini",
+    "openai::gpt-4",
     usage,
     customer_key="acme_corp",
     context={"env": "prod"},
     response_id="external-session-id",
     timestamp="2024-01-01T00:00:00Z",
 )
+```
+
+## Batch tracking
+
+For improved efficiency when tracking multiple records, use `track_batch` to send multiple records in a single HTTP request:
+
+```python
+records = [
+    {
+        "service_key": "openai::gpt-4",
+        "usage": {"input_tokens": 100, "output_tokens": 50},
+        "customer_key": "customer_1",
+        "response_id": "req_1",
+    },
+    {
+        "service_key": "anthropic::claude-3",
+        "usage": {"input_tokens": 200, "output_tokens": 75},
+        "customer_key": "customer_2",
+        "context": {"session": "session_abc"},
+        "timestamp": "2024-01-15T10:30:00Z",
+    },
+]
+
+result = tracker.track_batch(records)
+```
+
+Each record in the batch can have individual parameters:
+- `service_key` (required): The service identifier
+- `usage` (required): Usage data dictionary
+- `response_id` (optional): Unique identifier (auto-generated if omitted)
+- `timestamp` (optional): Timestamp string or datetime object (current time if omitted)
+- `customer_key` (optional): Customer identifier (uses tracker default if omitted)
+- `context` (optional): Context metadata (uses tracker default if omitted)
+
+### Batch anonymization
+
+Apply anonymization across all records in a batch:
+
+```python
+def anonymizer(value):
+    return "REDACTED"
+
+records = [
+    {
+        "service_key": "openai::gpt-4",
+        "usage": {"input_tokens": 100, "user_id": "sensitive_user_123"},
+    },
+    # ... more records
+]
+
+tracker.track_batch(
+    records, 
+    anonymize_fields=["user_id"], 
+    anonymizer=anonymizer
+)
+```
+
+### Batch delivery behavior
+
+- **Immediate delivery**: All records are sent in a single HTTP request, providing atomic success/failure and optimal efficiency
+- **Persistent queue**: Each record is queued individually but processed together by the background worker in batches
+
+For applications that need guaranteed atomic delivery (all records succeed or fail together), use immediate delivery:
+
+```python
+with Tracker(delivery_type="immediate") as tracker:
+    result = tracker.track_batch(records)
+    # All records sent in single request
 ```
 
 ### Triggered limit enforcement
@@ -158,12 +225,17 @@ lets you build workflows to create the missing service or notify your team.
 
 ## Asynchronous usage
 
-All operations are safe to call from asynchronous applications.  The
-method `track_async` runs the corresponding synchronous logic in a worker
+All operations are safe to call from asynchronous applications. The
+async methods run the corresponding synchronous logic in a worker
 thread:
 
 ```python
-await tracker.track_async("openai", "gpt-5-mini", usage)
+# Single record
+await tracker.track_async("openai::gpt-4", usage)
+
+# Batch records
+records = [{"service_key": "openai::gpt-4", "usage": {"tokens": 100}}]
+await tracker.track_batch_async(records)
 ```
 
 Example FastAPI integration:
