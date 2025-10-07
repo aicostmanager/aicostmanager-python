@@ -159,7 +159,7 @@ class Tracker:
                 "openai": "openai_chat",
                 "anthropic": "anthropic",
                 "amazon-bedrock": "amazon-bedrock",
-                "fireworks-ai": "openai_chat",  # Fireworks uses OpenAI-compatible API
+                "fireworks-ai": "fireworks-ai",
                 "xai": "openai_chat",  # X.AI uses OpenAI-compatible API
                 "google": "gemini",
             }
@@ -181,6 +181,7 @@ class Tracker:
                 api_to_vendor = {
                     "openai_chat": "openai",
                     "openai_responses": "openai",
+                    "fireworks-ai": "fireworks-ai",
                     "anthropic": "anthropic",
                     "amazon-bedrock": "amazon-bedrock",
                     "gemini": "google",

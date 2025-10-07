@@ -13,7 +13,7 @@ provider is built in.
 The service key format is ``[vendor]::[model]``. For the OpenAI Chat wrapper the
 vendor is inferred from the client's ``base_url`` so compatible providers like
 Fireworks or xAI are attributed correctly. The other wrappers use fixed vendors:
-``openai``, ``anthropic``, ``google`` and ``amazon-bedrock``.
+``openai``, ``anthropic``, ``google``, ``fireworks-ai`` and ``amazon-bedrock``.
 
 ## Supported providers
 
@@ -23,6 +23,7 @@ Fireworks or xAI are attributed correctly. The other wrappers use fixed vendors:
 | ``OpenAIResponsesWrapper`` | ``openai.OpenAI`` | ``openai_responses`` |
 | ``AnthropicWrapper`` | ``anthropic.Anthropic`` | ``anthropic`` |
 | ``GeminiWrapper`` | ``google.generativeai.GenerativeModel`` | ``gemini`` |
+| ``FireworksWrapper`` | ``fireworks.client.Fireworks`` | ``fireworks-ai`` |
 | ``BedrockWrapper`` | ``boto3.client('bedrock-runtime')`` | ``bedrock`` |
 
 ## Basic usage
@@ -113,6 +114,7 @@ from aicostmanager import (
     OpenAIResponsesWrapper,
     AnthropicWrapper,
     GeminiWrapper,
+    FireworksWrapper,
     BedrockWrapper,
 )
 
@@ -130,6 +132,15 @@ import google.generativeai as genai
 genai.configure()
 gem_wrapper = GeminiWrapper(genai.GenerativeModel("gemini-1.5-flash"))
 result = gem_wrapper.generate_content("hello")
+
+# Fireworks
+from fireworks.client import Fireworks
+fw_client = Fireworks()
+fw_wrapper = FireworksWrapper(fw_client)
+fw_wrapper.completions.create(
+    model="accounts/fireworks/models/deepseek-r1",
+    prompt="hi",
+)
 
 # Bedrock
 import boto3

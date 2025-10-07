@@ -28,6 +28,7 @@ from .tracker import Tracker
 from .wrappers import (
     AnthropicWrapper,
     BedrockWrapper,
+    FireworksWrapper,
     GeminiWrapper,
     OpenAIChatWrapper,
     OpenAIResponsesWrapper,
@@ -59,6 +60,7 @@ __all__ = [
     "AnthropicWrapper",
     "GeminiWrapper",
     "BedrockWrapper",
+    "FireworksWrapper",
     "CostQueryManager",
     "__version__",
 ]

@@ -5,6 +5,7 @@ import pytest
 from aicostmanager.wrappers import (
     AnthropicWrapper,
     BedrockWrapper,
+    FireworksWrapper,
     GeminiWrapper,
     OpenAIChatWrapper,
     OpenAIResponsesWrapper,
@@ -381,14 +382,11 @@ def test_xai_real():
 
 @pytest.mark.skipif("CI" in os.environ, reason="avoid real API calls in CI")
 def test_fireworks_real():
-    openai = pytest.importorskip("openai")
+    fireworks_client = pytest.importorskip("fireworks.client")
     _require_env("FIREWORKS_API_KEY")
     model = os.getenv("FIREWORKS_MODEL", "accounts/fireworks/models/deepseek-r1")
-    client = openai.OpenAI(
-        api_key=os.environ["FIREWORKS_API_KEY"],
-        base_url="https://api.fireworks.ai/inference/v1",
-    )
-    wrapper = OpenAIChatWrapper(
+    client = fireworks_client.Fireworks(api_key=os.environ["FIREWORKS_API_KEY"])
+    wrapper = FireworksWrapper(
         client,
         customer_key="cck1",
         context={"ctx": "v1"},
@@ -396,9 +394,9 @@ def test_fireworks_real():
     calls = _setup_capture(wrapper)
 
     def non_stream():
-        wrapper.chat.completions.create(
+        wrapper.completions.create(
             model=model,
-            messages=[{"role": "user", "content": "hi"}],
+            prompt="hi",
         )
 
     _call_or_skip(non_stream, "fireworks non-stream")
@@ -416,11 +414,10 @@ def test_fireworks_real():
     calls.clear()
 
     def stream():
-        stream = wrapper.chat.completions.create(
+        stream = wrapper.completions.create(
             model=model,
-            messages=[{"role": "user", "content": "hi"}],
+            prompt="hi",
             stream=True,
-            stream_options={"include_usage": True},
         )
         for _ in stream:
             pass

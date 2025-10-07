@@ -252,7 +252,7 @@ def _coerce_mapping(obj: Any) -> dict:
 def get_usage_from_response(response: Any, api_id: str) -> dict[str, Any]:
     """Return JSON-serializable usage info from an API response."""
     usage: Any = None
-    if api_id in {"openai_chat", "openai_responses"}:
+    if api_id in {"openai_chat", "openai_responses", "fireworks-ai"}:
         usage = getattr(response, "usage", None)
     elif api_id == "anthropic":
         usage = (
@@ -284,7 +284,7 @@ def get_usage_from_response(response: Any, api_id: str) -> dict[str, Any]:
 def get_streaming_usage_from_response(chunk: Any, api_id: str) -> dict[str, Any]:
     """Extract usage information from streaming response chunks."""
     usage: Any = None
-    if api_id in {"openai_chat", "openai_responses"}:
+    if api_id in {"openai_chat", "openai_responses", "fireworks-ai"}:
         # Some SDKs put usage directly on the event
         usage = getattr(chunk, "usage", None)
         # Responses API events often nest usage on the inner .response
