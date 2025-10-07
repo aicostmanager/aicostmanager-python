@@ -140,7 +140,9 @@ class BaseLLMWrapper:
         self._proxy = _Proxy(client, self)
         self.customer_key = customer_key
         self.context = context
-        self._anonymize_fields = tuple(anonymize_fields) if anonymize_fields is not None else None
+        self._anonymize_fields = (
+            tuple(anonymize_fields) if anonymize_fields is not None else None
+        )
         self._anonymizer = anonymizer
 
     # ------------------------------------------------------------------
@@ -155,9 +157,7 @@ class BaseLLMWrapper:
     def set_anonymize_fields(self, fields: Iterable[str] | None) -> None:
         """Update the usage fields that should be anonymized before tracking."""
 
-        self._anonymize_fields = (
-            tuple(fields) if fields is not None else None
-        )
+        self._anonymize_fields = tuple(fields) if fields is not None else None
         self._tracker.set_anonymize_fields(fields)
 
     def set_anonymizer(self, anonymizer: Callable[[Any], Any] | None) -> None:
@@ -387,6 +387,19 @@ class BedrockWrapper(BaseLLMWrapper):
 class FireworksWrapper(BaseLLMWrapper):
     api_id = "fireworks-ai"
     vendor_name = "fireworks-ai"
+
+    def _extract_model(self, method: Any, args: tuple, kwargs: dict) -> str | None:
+        # First try the standard extraction from call parameters
+        model = super()._extract_model(method, args, kwargs)
+        if model is not None:
+            return model
+
+        # For fireworks.LLM clients, model is set at initialization
+        # Try to extract from the client instance
+        if hasattr(self._client, "model"):
+            return self._client.model
+
+        return None
 
 
 __all__ = [

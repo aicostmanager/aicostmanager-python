@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.41] - 2025-10-07
+
+### Fixed
+- **FireworksWrapper Model Extraction**: Fixed `FireworksWrapper` to correctly extract model names from `fireworks.LLM` clients:
+  - Added support for clients that store the model as an instance attribute (e.g., `fireworks.LLM`)
+  - Maintains backward compatibility with legacy `fireworks.client.Fireworks` clients
+  - Prevents "unknown-model" service keys when model is not passed in API call parameters
+  - Service keys now correctly show `fireworks-ai::{model_name}` instead of `fireworks-ai::unknown-model`
+
 ## [0.1.40] - 2025-10-07
 
 ### Added
