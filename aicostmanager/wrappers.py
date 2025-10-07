@@ -384,10 +384,16 @@ class BedrockWrapper(BaseLLMWrapper):
     vendor_name = "amazon-bedrock"
 
 
+class FireworksWrapper(BaseLLMWrapper):
+    api_id = "fireworks-ai"
+    vendor_name = "fireworks-ai"
+
+
 __all__ = [
     "OpenAIChatWrapper",
     "OpenAIResponsesWrapper",
     "AnthropicWrapper",
     "GeminiWrapper",
     "BedrockWrapper",
+    "FireworksWrapper",
 ]

@@ -68,6 +68,7 @@ OpenAIResponsesWrapper = wrappers.OpenAIResponsesWrapper
 AnthropicWrapper = wrappers.AnthropicWrapper
 GeminiWrapper = wrappers.GeminiWrapper
 BedrockWrapper = wrappers.BedrockWrapper
+FireworksWrapper = wrappers.FireworksWrapper
 
 # Restore any modules that were present before importing the stubs so that
 # other tests importing :mod:`aicostmanager` are not affected by the temporary
@@ -190,6 +191,21 @@ def make_bedrock_client():
     return Client()
 
 
+def make_fireworks_client():
+    class Completions:
+        def create(self, *args, **kwargs):
+            return types.SimpleNamespace(
+                id="resp-6",
+                model=kwargs.get("model"),
+                usage={"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+            )
+
+    class Client:
+        completions = Completions()
+
+    return Client()
+
+
 def test_wrappers_track_non_streaming():
     tracker = DummyTracker()
     cases = [
@@ -227,6 +243,13 @@ def test_wrappers_track_non_streaming():
             "invoke_model",
             {"modelId": "anthropic.claude-v2"},
             "amazon-bedrock::anthropic.claude-v2",
+        ),
+        (
+            FireworksWrapper,
+            make_fireworks_client(),
+            "completions.create",
+            {"model": "accounts/fireworks/models/deepseek-r1"},
+            "fireworks-ai::accounts/fireworks/models/deepseek-r1",
         ),
     ]
     for wrapper_cls, client, call_path, kwargs, expected in cases:

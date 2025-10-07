@@ -50,6 +50,7 @@ test = [
     "anthropic",
     "boto3",
     "google-genai",
+    "fireworks-ai",
 ]
 
 [project.optional-dependencies]
