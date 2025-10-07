@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.40] - 2025-10-07
+
+### Added
+- **Fireworks AI LLM Wrapper**: New `FireworksWrapper` class for tracking Fireworks AI API usage:
+  - Full support for Fireworks client completions API with `completions.create()` method
+  - Automatic vendor attribution as `fireworks-ai` in service keys (format: `fireworks-ai::[model]`)
+  - Support for both streaming and non-streaming completions
+  - Comprehensive test coverage including mock tests and real API integration tests
+  - Added `fireworks-ai` package to test dependencies
+  - Updated documentation with Fireworks usage examples
+
 ## [0.1.39] - 2025-09-26
 
 ### Added
