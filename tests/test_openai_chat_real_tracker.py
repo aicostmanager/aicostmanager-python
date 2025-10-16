@@ -31,8 +31,8 @@ def _make_xai_client(api_key: str):
     [
         ("openai::gpt-5-mini", "gpt-5-mini", "OPENAI_API_KEY", _make_openai_client),
         (
-            "fireworks-ai::accounts/fireworks/models/deepseek-r1",
-            "accounts/fireworks/models/deepseek-r1",
+            "fireworks-ai::accounts/fireworks/models/deepseek-r1-0528",
+            "accounts/fireworks/models/deepseek-r1-0528",
             "FIREWORKS_API_KEY",
             _make_fireworks_client,
         ),
